@@ -83,15 +83,25 @@ async function ocrSingleDocument(
 ): Promise<Record<string, any>> {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-  // Fetch file from Vercel Blob URL (or any HTTP URL)
-  const res = await fetch(fileUrl);
-  if (!res.ok) throw new Error(`ファイルの取得に失敗しました: ${fileUrl}`);
-  const arrayBuffer = await res.arrayBuffer();
-  const base64 = Buffer.from(arrayBuffer).toString("base64");
+  let base64: string;
+  let imageMimeType: string;
 
-  // Gemini supports JPEG, PNG, WebP, HEIC, HEIF for images
   const supportedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
-  const imageMimeType = supportedTypes.includes(mimeType) ? mimeType : "image/jpeg";
+
+  if (fileUrl.startsWith("data:")) {
+    // データURL: base64部分を直接使用
+    const commaIdx = fileUrl.indexOf(",");
+    base64 = fileUrl.slice(commaIdx + 1);
+    const headerMime = fileUrl.slice(5, commaIdx).split(";")[0];
+    imageMimeType = supportedTypes.includes(headerMime) ? headerMime : "image/jpeg";
+  } else {
+    // HTTP URL: ファイルを取得してBase64に変換
+    const res = await fetch(fileUrl);
+    if (!res.ok) throw new Error(`ファイルの取得に失敗しました: ${fileUrl}`);
+    const arrayBuffer = await res.arrayBuffer();
+    base64 = Buffer.from(arrayBuffer).toString("base64");
+    imageMimeType = supportedTypes.includes(mimeType) ? mimeType : "image/jpeg";
+  }
 
   const prompt = `あなたは身分証明書のOCR専門家です。
 この画像は「${documentTypeLabel}」です。

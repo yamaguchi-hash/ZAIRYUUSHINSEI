@@ -145,7 +145,7 @@ JSONのみを返し、説明文は不要です。`;
   let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
   try {
     response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       contents: [
         {
           parts: [

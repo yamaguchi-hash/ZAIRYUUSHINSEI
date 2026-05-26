@@ -30,6 +30,7 @@ import { DocumentSelector } from "@/components/applications/document-selector";
 import { ConsistencyCheckPanel } from "@/components/applications/consistency-check-panel";
 import { ApproveButton } from "@/components/applications/approve-button";
 import { getDocumentRequirements } from "@/actions/applications";
+import { DeleteApplicationButton } from "./delete-application-button";
 
 const WORKFLOW_STEPS = [
   { key: "draft", label: "基本情報セットアップ" },
@@ -72,17 +73,24 @@ export default async function ApplicationDetailPage({
 
   return (
     <div className="p-8 max-w-5xl">
-      {/* Back */}
-      <div className="flex items-center gap-3 mb-6">
-        <Link
-          href="/applications"
-          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          申請一覧
-        </Link>
-        <span className="text-gray-300">/</span>
-        <span className="text-sm text-gray-700 font-medium">{application.caseNumber}</span>
+      {/* Back + 削除ボタン */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/applications"
+            className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            申請一覧
+          </Link>
+          <span className="text-gray-300">/</span>
+          <span className="text-sm text-gray-700 font-medium">{application.caseNumber}</span>
+        </div>
+        <DeleteApplicationButton
+          applicationId={application.id}
+          caseNumber={application.caseNumber ?? ""}
+          applicantName={`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim()}
+        />
       </div>
 
       {/* Header */}

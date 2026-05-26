@@ -409,7 +409,7 @@ export async function addDocumentsToChecklist(
     const existingIds = new Set(existing.map((e) => e.documentRequirementId).filter(Boolean));
 
     // まだ追加されていない書類だけを対象に
-    const newIds = documentRequirementIds.filter((id) => !existingIds.has(id));
+    let newIds = documentRequirementIds.filter((id) => !existingIds.has(id));
     if (newIds.length === 0) {
       revalidatePath(`/applications/${applicationId}`);
       return { success: true };
@@ -421,6 +421,40 @@ export async function addDocumentsToChecklist(
       .select()
       .from(documentRequirementMaster)
       .where(inArray(documentRequirementMaster.id, newIds));
+
+    // 在留カード表面が含まれる場合、同カテゴリーの裏面も自動追加（逆も同様）
+    const cardNames = masters.map((m) => m.documentName);
+    const hasFront = cardNames.some((n) => /在留カード（表面）/.test(n));
+    const hasBack  = cardNames.some((n) => /在留カード（裏面）/.test(n));
+    if (hasFront && !hasBack) {
+      // 表面と同じ visa_type・application_type の裏面を探す
+      const frontMaster = masters.find((m) => /在留カード（表面）/.test(m.documentName))!;
+      const [backMaster] = await db.select().from(documentRequirementMaster)
+        .where(and(
+          eq(documentRequirementMaster.visaType, frontMaster.visaType),
+          eq(documentRequirementMaster.applicationType, frontMaster.applicationType),
+          eq(documentRequirementMaster.isActive, true)
+        ))
+        .then(rows => rows.filter(r => /在留カード（裏面）/.test(r.documentName)));
+      if (backMaster && !existingIds.has(backMaster.id) && !newIds.includes(backMaster.id)) {
+        masters.push(backMaster);
+        newIds.push(backMaster.id);
+      }
+    }
+    if (hasBack && !hasFront) {
+      const backMaster = masters.find((m) => /在留カード（裏面）/.test(m.documentName))!;
+      const [frontMasterAuto] = await db.select().from(documentRequirementMaster)
+        .where(and(
+          eq(documentRequirementMaster.visaType, backMaster.visaType),
+          eq(documentRequirementMaster.applicationType, backMaster.applicationType),
+          eq(documentRequirementMaster.isActive, true)
+        ))
+        .then(rows => rows.filter(r => /在留カード（表面）/.test(r.documentName)));
+      if (frontMasterAuto && !existingIds.has(frontMasterAuto.id) && !newIds.includes(frontMasterAuto.id)) {
+        masters.push(frontMasterAuto);
+        newIds.push(frontMasterAuto.id);
+      }
+    }
 
     await db.insert(applicationDocumentChecklist).values(
       masters.map((m) => ({

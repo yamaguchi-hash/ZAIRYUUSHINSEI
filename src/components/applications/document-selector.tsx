@@ -237,9 +237,13 @@ function CategoryGroup({
 
       {open && (
         <div>
-          {docs.map((doc) => {
+          {docs.map((doc, idx) => {
             const isAdded = addedIds.has(doc.id);
             const isSelected = selected.has(doc.id);
+            // 在留カード両面セットの判定（表面の直後に裏面が来る場合）
+            const isCardFront = /在留カード（表面）/.test(doc.documentName) || /在留カード（表面）/.test(doc.documentName);
+            const nextDoc = docs[idx + 1];
+            const hasBackSide = isCardFront && nextDoc && /裏面/.test(nextDoc.documentName);
             return (
               <button
                 key={doc.id}
@@ -261,7 +265,19 @@ function CategoryGroup({
                   )}
                 </span>
                 <span className="flex-1 min-w-0">
-                  <span className="text-sm text-gray-800 block">{doc.documentName}</span>
+                  <span className="text-sm text-gray-800 block">
+                    {doc.documentName}
+                    {hasBackSide && (
+                      <span className="ml-2 text-xs text-orange-600 font-medium bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5">
+                        裏面と両方必要
+                      </span>
+                    )}
+                    {/裏面/.test(doc.documentName) && isCardFront === false && (
+                      <span className="ml-2 text-xs text-orange-600 font-medium bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5">
+                        表面とセット
+                      </span>
+                    )}
+                  </span>
                   {doc.isAlwaysRequired && (
                     <span className="text-xs text-red-500 font-medium">必須</span>
                   )}

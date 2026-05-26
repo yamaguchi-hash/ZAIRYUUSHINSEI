@@ -126,8 +126,9 @@ const DOCUMENTS: DocDef[] = [
   // 【家族滞在】
   // ══════════════════════════════════════════════════════════════
   { visaType: "dependent", applicationType: "all", category: "身分関係証明", documentName: "申請人と扶養者との身分関係を証する文書", description: "戸籍謄本・婚姻届受理証明書・結婚証明書・出生証明書等", isAlwaysRequired: true, sortOrder: 100 },
-  { visaType: "dependent", applicationType: "all", category: "扶養者関係", documentName: "扶養者の在留カード（表面）又は旅券の写し", description: "扶養者が外国人の場合：在留カード表面。日本人・永住者の場合：旅券の写し", isAlwaysRequired: true, sortOrder: 110 },
-  { visaType: "dependent", applicationType: "all", category: "扶養者関係", documentName: "扶養者の在留カード（裏面）の写し", description: "扶養者が在留カードを持つ外国人の場合のみ提出。住所・裏面情報が確認できるもの", isAlwaysRequired: false, sortOrder: 111 },
+  { visaType: "dependent", applicationType: "all", category: "扶養者関係", documentName: "扶養者のパスポートの写し", description: "扶養者が日本人・永住者の場合：旅券（パスポート）の写し", isAlwaysRequired: false, sortOrder: 110 },
+  { visaType: "dependent", applicationType: "all", category: "扶養者関係", documentName: "扶養者の在留カード（表面）の写し", description: "扶養者が外国人（在留カード保有者）の場合：在留カード表面の写し", isAlwaysRequired: false, sortOrder: 111 },
+  { visaType: "dependent", applicationType: "all", category: "扶養者関係", documentName: "扶養者の在留カード（裏面）の写し", description: "扶養者が外国人（在留カード保有者）の場合：在留カード裏面の写し", isAlwaysRequired: false, sortOrder: 112 },
   { visaType: "dependent", applicationType: "all", category: "扶養者関係", documentName: "扶養者の在職証明書又は営業許可書の写し等", description: "扶養者の職業がわかる証明書", isAlwaysRequired: true, sortOrder: 120 },
   { visaType: "dependent", applicationType: "all", category: "扶養者関係", documentName: "住民税の課税（又は非課税）証明書（扶養者）", isAlwaysRequired: true, sortOrder: 130 },
   { visaType: "dependent", applicationType: "all", category: "扶養者関係", documentName: "住民税の納税証明書（扶養者）", isAlwaysRequired: true, sortOrder: 135 },

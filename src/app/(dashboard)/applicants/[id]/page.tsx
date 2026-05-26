@@ -8,6 +8,7 @@ import Link from "next/link";
 import { formatDate, VISA_TYPE_LABELS } from "@/lib/utils";
 import { OcrPanel } from "@/components/applicants/ocr-panel";
 import { EditApplicantForm } from "./edit-applicant-form";
+import { DeleteApplicantButton } from "./delete-applicant-button";
 
 function getDaysUntil(dateStr: string | null | undefined): number | null {
   if (!dateStr) return null;
@@ -44,16 +45,22 @@ export default async function ApplicantDetailPage({
 
   return (
     <div className="p-8 max-w-6xl">
-      {/* ── Breadcrumb ── */}
-      <div className="flex items-center gap-2 mb-6">
-        <Link href="/applicants" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-          <ArrowLeft className="w-4 h-4" />
-          申請人一覧
-        </Link>
-        <span className="text-gray-300">/</span>
-        <span className="text-sm text-gray-700 font-medium">
-          {applicant.familyNameEn} {applicant.givenNameEn}
-        </span>
+      {/* ── Breadcrumb + 削除ボタン ── */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Link href="/applicants" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+            <ArrowLeft className="w-4 h-4" />
+            申請人一覧
+          </Link>
+          <span className="text-gray-300">/</span>
+          <span className="text-sm text-gray-700 font-medium">
+            {applicant.familyNameEn} {applicant.givenNameEn}
+          </span>
+        </div>
+        <DeleteApplicantButton
+          applicantId={applicant.id}
+          applicantName={`${applicant.familyNameEn} ${applicant.givenNameEn}${applicant.familyNameJa ? `（${applicant.familyNameJa} ${applicant.givenNameJa}）` : ""}`}
+        />
       </div>
 
       {/* ── Header ── */}

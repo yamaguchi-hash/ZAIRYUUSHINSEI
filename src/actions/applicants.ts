@@ -135,3 +135,29 @@ export async function updateApplicant(
   revalidatePath("/applicants");
   revalidatePath(`/applicants/${id}`);
 }
+
+export async function deleteApplicant(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    await db
+      .update(applicantMaster)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(eq(applicantMaster.id, id), eq(applicantMaster.tenantId, tenantId)));
+
+    await db.insert(auditLog).values({
+      tenantId,
+      userId: session.user.id,
+      action: "delete",
+      entityType: "applicant",
+      entityId: id,
+    });
+
+    revalidatePath("/applicants");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "削除に失敗しました" };
+  }
+}

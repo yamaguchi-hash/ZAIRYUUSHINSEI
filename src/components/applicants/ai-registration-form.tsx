@@ -90,31 +90,28 @@ export function AiRegistrationForm() {
   function handleRunOcr() {
     setOcrError("");
     startOcr(async () => {
-      try {
-        const docIds = docs.map((d) => d.docId).filter(Boolean) as string[];
-        if (docIds.length === 0) throw new Error("書類がアップロードされていません");
-        const result = await ocrFilesForRegistration(docIds);
-        setForm({
-          familyNameEn: result.familyNameEn,
-          givenNameEn: result.givenNameEn,
-          familyNameJa: result.familyNameJa,
-          givenNameJa: result.givenNameJa,
-          nationality: result.nationality,
-          dateOfBirth: result.dateOfBirth,
-          gender: result.gender,
-          passportNumber: result.passportNumber,
-          passportExpiry: result.passportExpiry,
-          residenceCardNumber: result.residenceCardNumber,
-          currentVisaType: result.currentVisaType,
-          currentVisaExpiry: result.currentVisaExpiry,
-          phone: "",
-          emailAddress: "",
-          japanAddress: result.japanAddress,
-        });
-        setPhase("review");
-      } catch (err: any) {
-        setOcrError(err.message ?? "OCR処理に失敗しました");
-      }
+      const docIds = docs.map((d) => d.docId).filter(Boolean) as string[];
+      if (docIds.length === 0) { setOcrError("書類がアップロードされていません"); return; }
+      const result = await ocrFilesForRegistration(docIds);
+      if (!result.success) { setOcrError(result.error); return; }
+      setForm({
+        familyNameEn: result.familyNameEn,
+        givenNameEn: result.givenNameEn,
+        familyNameJa: result.familyNameJa,
+        givenNameJa: result.givenNameJa,
+        nationality: result.nationality,
+        dateOfBirth: result.dateOfBirth,
+        gender: result.gender,
+        passportNumber: result.passportNumber,
+        passportExpiry: result.passportExpiry,
+        residenceCardNumber: result.residenceCardNumber,
+        currentVisaType: result.currentVisaType,
+        currentVisaExpiry: result.currentVisaExpiry,
+        phone: "",
+        emailAddress: "",
+        japanAddress: result.japanAddress,
+      });
+      setPhase("review");
     });
   }
 
@@ -127,14 +124,11 @@ export function AiRegistrationForm() {
   function handleSave() {
     setSaveError("");
     startSave(async () => {
-      try {
-        const docIds = docs.map((d) => d.docId).filter(Boolean) as string[];
-        const applicant = await createApplicantWithDocuments(form, docIds);
-        router.push(`/applicants/${applicant.id}`);
-        router.refresh();
-      } catch (err: any) {
-        setSaveError(err.message ?? "登録に失敗しました");
-      }
+      const docIds = docs.map((d) => d.docId).filter(Boolean) as string[];
+      const result = await createApplicantWithDocuments(form, docIds);
+      if (!result.success) { setSaveError(result.error); return; }
+      router.push(`/applicants/${result.applicantId}`);
+      router.refresh();
     });
   }
 

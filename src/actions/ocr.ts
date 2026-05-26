@@ -145,7 +145,7 @@ JSONのみを返し、説明文は不要です。`;
   let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
   try {
     response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [
         {
           parts: [
@@ -260,138 +260,119 @@ export async function ocrAndFillApplicant(applicantId: string) {
 }
 
 // ─── 新規登録用: DBに保存済みのdocIdを使ってOCR実行 ──────────────────────────
-export async function ocrFilesForRegistration(
-  docIds: string[]
-): Promise<{
-  familyNameEn: string;
-  givenNameEn: string;
-  familyNameJa: string;
-  givenNameJa: string;
-  nationality: string;
-  dateOfBirth: string;
-  gender: string;
-  passportNumber: string;
-  passportExpiry: string;
-  residenceCardNumber: string;
-  currentVisaType: string;
-  currentVisaExpiry: string;
-  japanAddress: string;
-  raw: Record<string, any>;
-}> {
-  const session = await auth();
-  if (!session?.user) throw new Error("認証が必要です");
+export async function ocrFilesForRegistration(docIds: string[]): Promise<
+  | { success: true; familyNameEn: string; givenNameEn: string; familyNameJa: string; givenNameJa: string; nationality: string; dateOfBirth: string; gender: string; passportNumber: string; passportExpiry: string; residenceCardNumber: string; currentVisaType: string; currentVisaExpiry: string; japanAddress: string; raw: Record<string, any> }
+  | { success: false; error: string }
+> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
 
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY が設定されていません");
+    if (!process.env.GEMINI_API_KEY) {
+      return { success: false, error: "GEMINI_API_KEY が設定されていません" };
+    }
+
+    if (docIds.length === 0) return { success: false, error: "書類がアップロードされていません" };
+
+    const docs = await db
+      .select()
+      .from(applicantDocuments)
+      .where(inArray(applicantDocuments.id, docIds));
+
+    if (docs.length === 0) return { success: false, error: "書類が見つかりません" };
+
+    const allExtracted: Record<string, any> = {};
+
+    for (const doc of docs) {
+      const label = DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
+      const extracted = await ocrSingleDocument(doc.fileUrl, doc.mimeType ?? "image/jpeg", label);
+      Object.assign(allExtracted, extracted);
+
+      await db
+        .update(applicantDocuments)
+        .set({ ocrExtractedData: extracted, ocrProcessedAt: new Date() })
+        .where(eq(applicantDocuments.id, doc.id));
+    }
+
+    const result = {
+      success: true as const,
+      familyNameEn: "",
+      givenNameEn: "",
+      familyNameJa: "",
+      givenNameJa: "",
+      nationality: "",
+      dateOfBirth: "",
+      gender: "",
+      passportNumber: "",
+      passportExpiry: "",
+      residenceCardNumber: "",
+      currentVisaType: "",
+      currentVisaExpiry: "",
+      japanAddress: "",
+      raw: allExtracted,
+    };
+
+    if (allExtracted.surname)          result.familyNameEn = String(allExtracted.surname).toUpperCase();
+    if (allExtracted.given_name)       result.givenNameEn  = String(allExtracted.given_name).toUpperCase();
+    if (allExtracted.surname_ja)       result.familyNameJa = String(allExtracted.surname_ja);
+    if (allExtracted.given_name_ja)    result.givenNameJa  = String(allExtracted.given_name_ja);
+    if (allExtracted.surname_en)       result.familyNameEn = String(allExtracted.surname_en).toUpperCase();
+    if (allExtracted.given_name_en)    result.givenNameEn  = String(allExtracted.given_name_en).toUpperCase();
+    if (allExtracted.nationality)      result.nationality  = String(allExtracted.nationality);
+    if (allExtracted.date_of_birth)    result.dateOfBirth  = String(allExtracted.date_of_birth);
+    if (allExtracted.gender)           result.gender       = allExtracted.gender === "F" ? "F" : allExtracted.gender === "M" ? "M" : "";
+    if (allExtracted.passport_number)  result.passportNumber = String(allExtracted.passport_number);
+    if (allExtracted.expiry_date)      result.passportExpiry = String(allExtracted.expiry_date);
+    if (allExtracted.residence_card_number) result.residenceCardNumber = String(allExtracted.residence_card_number);
+    if (allExtracted.date_of_expiry)   result.currentVisaExpiry = String(allExtracted.date_of_expiry);
+    if (allExtracted.address)          result.japanAddress = String(allExtracted.address);
+
+    return result;
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "OCR処理に失敗しました" };
   }
-
-  if (docIds.length === 0) throw new Error("書類がアップロードされていません");
-
-  // DBからドキュメントを取得
-  const docs = await db
-    .select()
-    .from(applicantDocuments)
-    .where(inArray(applicantDocuments.id, docIds));
-
-  if (docs.length === 0) throw new Error("書類が見つかりません");
-
-  const allExtracted: Record<string, any> = {};
-
-  for (const doc of docs) {
-    const label = DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
-    const extracted = await ocrSingleDocument(doc.fileUrl, doc.mimeType ?? "image/jpeg", label);
-    Object.assign(allExtracted, extracted);
-
-    // OCR結果をDBに保存
-    await db
-      .update(applicantDocuments)
-      .set({ ocrExtractedData: extracted, ocrProcessedAt: new Date() })
-      .where(eq(applicantDocuments.id, doc.id));
-  }
-
-  const result = {
-    familyNameEn: "",
-    givenNameEn: "",
-    familyNameJa: "",
-    givenNameJa: "",
-    nationality: "",
-    dateOfBirth: "",
-    gender: "",
-    passportNumber: "",
-    passportExpiry: "",
-    residenceCardNumber: "",
-    currentVisaType: "",
-    currentVisaExpiry: "",
-    japanAddress: "",
-    raw: allExtracted,
-  };
-
-  if (allExtracted.surname)          result.familyNameEn = String(allExtracted.surname).toUpperCase();
-  if (allExtracted.given_name)       result.givenNameEn  = String(allExtracted.given_name).toUpperCase();
-  if (allExtracted.surname_ja)       result.familyNameJa = String(allExtracted.surname_ja);
-  if (allExtracted.given_name_ja)    result.givenNameJa  = String(allExtracted.given_name_ja);
-  if (allExtracted.surname_en)       result.familyNameEn = String(allExtracted.surname_en).toUpperCase();
-  if (allExtracted.given_name_en)    result.givenNameEn  = String(allExtracted.given_name_en).toUpperCase();
-  if (allExtracted.nationality)      result.nationality  = String(allExtracted.nationality);
-  if (allExtracted.date_of_birth)    result.dateOfBirth  = String(allExtracted.date_of_birth);
-  if (allExtracted.gender)           result.gender       = allExtracted.gender === "F" ? "F" : allExtracted.gender === "M" ? "M" : "";
-  if (allExtracted.passport_number)  result.passportNumber = String(allExtracted.passport_number);
-  if (allExtracted.expiry_date)      result.passportExpiry = String(allExtracted.expiry_date);
-  if (allExtracted.residence_card_number) result.residenceCardNumber = String(allExtracted.residence_card_number);
-  if (allExtracted.date_of_expiry)   result.currentVisaExpiry = String(allExtracted.date_of_expiry);
-  if (allExtracted.address)          result.japanAddress = String(allExtracted.address);
-
-  return result;
 }
 
 // ─── 新規登録用: 申請人作成 + 既存の一時書類レコードを紐付け ──────────────────
 export async function createApplicantWithDocuments(
   applicantData: {
-    familyNameEn: string;
-    givenNameEn: string;
-    familyNameJa?: string;
-    givenNameJa?: string;
-    nationality: string;
-    dateOfBirth?: string;
-    gender?: string;
-    passportNumber?: string;
-    passportExpiry?: string;
-    residenceCardNumber?: string;
-    currentVisaType?: string;
-    currentVisaExpiry?: string;
-    phone?: string;
-    emailAddress?: string;
-    japanAddress?: string;
+    familyNameEn: string; givenNameEn: string; familyNameJa?: string; givenNameJa?: string;
+    nationality: string; dateOfBirth?: string; gender?: string;
+    passportNumber?: string; passportExpiry?: string;
+    residenceCardNumber?: string; currentVisaType?: string; currentVisaExpiry?: string;
+    phone?: string; emailAddress?: string; japanAddress?: string;
   },
   docIds: string[]
-) {
-  const session = await auth();
-  if (!session?.user) throw new Error("認証が必要です");
-  const tenantId = (session.user as any).tenantId;
-  if (!tenantId) throw new Error("テナントIDが不正です");
+): Promise<{ success: true; applicantId: string } | { success: false; error: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = (session.user as any).tenantId;
+    if (!tenantId) return { success: false, error: "テナントIDが不正です" };
 
-  // 申請人マスター作成
-  const [newApplicant] = await db
-    .insert(applicantMaster)
-    .values({
-      tenantId,
-      ...applicantData,
-      dateOfBirth: applicantData.dateOfBirth || null,
-      passportExpiry: applicantData.passportExpiry || null,
-      currentVisaExpiry: applicantData.currentVisaExpiry || null,
-    })
-    .returning();
+    const [newApplicant] = await db
+      .insert(applicantMaster)
+      .values({
+        tenantId,
+        ...applicantData,
+        dateOfBirth: applicantData.dateOfBirth || null,
+        passportExpiry: applicantData.passportExpiry || null,
+        currentVisaExpiry: applicantData.currentVisaExpiry || null,
+      })
+      .returning();
 
-  // 一時書類レコードに申請人IDを紐付け
-  if (docIds.length > 0) {
-    for (const docId of docIds) {
-      await db
-        .update(applicantDocuments)
-        .set({ applicantId: newApplicant.id })
-        .where(eq(applicantDocuments.id, docId));
+    if (docIds.length > 0) {
+      for (const docId of docIds) {
+        await db
+          .update(applicantDocuments)
+          .set({ applicantId: newApplicant.id })
+          .where(eq(applicantDocuments.id, docId));
+      }
     }
-  }
 
-  revalidatePath("/applicants");
-  return newApplicant;
+    revalidatePath("/applicants");
+    return { success: true, applicantId: newApplicant.id };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "登録に失敗しました" };
+  }
 }

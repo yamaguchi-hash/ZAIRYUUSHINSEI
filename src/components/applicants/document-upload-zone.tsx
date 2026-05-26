@@ -2,9 +2,9 @@
 
 import { useRef, useState } from "react";
 import { saveApplicantDocument, deleteApplicantDocument } from "@/actions/ocr";
-import { Upload, X, CheckCircle, Loader2, ImageIcon, FileText } from "lucide-react";
+import { Upload, X, CheckCircle, Loader2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
+import { DocumentViewTrigger } from "./document-viewer";
 
 type DocType = "passport_front" | "passport_data_page" | "residence_card_front" | "residence_card_back";
 
@@ -35,7 +35,6 @@ export function DocumentUploadZone({
     setError("");
     setIsUploading(true);
     try {
-      // 1. Upload file
       const form = new FormData();
       form.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: form });
@@ -45,7 +44,6 @@ export function DocumentUploadZone({
       }
       const { url, fileName, fileSize, mimeType } = await res.json();
 
-      // 2. Save to DB
       await saveApplicantDocument({
         applicantId,
         documentType,
@@ -92,34 +90,40 @@ export function DocumentUploadZone({
       </div>
 
       {existingDoc ? (
-        /* Preview */
+        /* Preview with viewer */
         <div className="relative border border-gray-200 rounded-xl overflow-hidden bg-gray-50 group">
-          <div className="aspect-[3/2] flex items-center justify-center">
-            {isPdf ? (
-              <div className="flex flex-col items-center gap-2 text-gray-400">
-                <FileText className="w-10 h-10" />
-                <p className="text-xs">{existingDoc.fileName}</p>
-              </div>
-            ) : (
-              <Image
-                src={existingDoc.fileUrl}
-                alt={label}
-                fill
-                className="object-contain p-2"
-                unoptimized
-              />
-            )}
-          </div>
-          {/* Overlay buttons */}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+          <DocumentViewTrigger
+            url={existingDoc.fileUrl}
+            fileName={existingDoc.fileName}
+            documentType={documentType}
+          >
+            <div className="aspect-[3/2] flex items-center justify-center">
+              {isPdf ? (
+                <div className="flex flex-col items-center gap-2 text-gray-400">
+                  <FileText className="w-10 h-10" />
+                  <p className="text-xs">{existingDoc.fileName}</p>
+                </div>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={existingDoc.fileUrl}
+                  alt={label}
+                  className="object-contain w-full h-full p-2"
+                />
+              )}
+            </div>
+          </DocumentViewTrigger>
+
+          {/* Hover overlay */}
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
             <button
-              onClick={() => inputRef.current?.click()}
+              onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
               className="bg-white text-gray-800 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-gray-100"
             >
               差し替え
             </button>
             <button
-              onClick={handleDelete}
+              onClick={(e) => { e.stopPropagation(); handleDelete(); }}
               disabled={isDeleting}
               className="bg-red-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-red-600 flex items-center gap-1"
             >
@@ -154,7 +158,7 @@ export function DocumentUploadZone({
           ) : (
             <>
               <Upload className="w-8 h-8 text-gray-300" />
-              <div className="text-center">
+              <div className="text-center px-2">
                 <p className="text-xs text-gray-500">クリックまたはドラッグ＆ドロップ</p>
                 <p className="text-xs text-gray-400">JPEG / PNG / WebP / PDF（10MB以下）</p>
               </div>

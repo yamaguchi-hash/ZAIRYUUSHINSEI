@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { put } from "@vercel/blob";
+import { writeFile, mkdir } from "fs/promises";
+import path from "path";
+import { randomUUID } from "crypto";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"];
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -15,36 +18,36 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
-    if (!file) {
-      return NextResponse.json({ error: "ファイルが選択されていません" }, { status: 400 });
-    }
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        { error: "対応していないファイル形式です（JPEG/PNG/WebP/HEIC/PDF）" },
-        { status: 400 }
-      );
-    }
-    if (file.size > MAX_SIZE) {
+    if (!file) return NextResponse.json({ error: "ファイルが選択されていません" }, { status: 400 });
+    if (!ALLOWED_TYPES.includes(file.type))
+      return NextResponse.json({ error: "対応していないファイル形式です（JPEG/PNG/WebP/HEIC/PDF）" }, { status: 400 });
+    if (file.size > MAX_SIZE)
       return NextResponse.json({ error: "ファイルサイズは10MB以下にしてください" }, { status: 400 });
-    }
 
     const tenantId = (session.user as any).tenantId ?? "unknown";
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-    const blobPath = `uploads/${tenantId}/${Date.now()}.${ext}`;
+    const uniqueName = `${randomUUID()}.${ext}`;
 
-    const blob = await put(blobPath, file, {
-      access: "public",
-      contentType: file.type,
-    });
+    // Vercel Blob が設定されている場合はクラウド保存
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      const blobPath = `uploads/${tenantId}/${uniqueName}`;
+      const blob = await put(blobPath, file, { access: "public", contentType: file.type });
+      return NextResponse.json({ url: blob.url, fileName: file.name, fileSize: file.size, mimeType: file.type });
+    }
 
-    return NextResponse.json({
-      url: blob.url,
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
-    });
+    // ローカル開発フォールバック: public/uploads に保存
+    const uploadDir = path.join(process.cwd(), "public", "uploads", tenantId);
+    await mkdir(uploadDir, { recursive: true });
+    const bytes = await file.arrayBuffer();
+    await writeFile(path.join(uploadDir, uniqueName), Buffer.from(bytes));
+    const fileUrl = `/uploads/${tenantId}/${uniqueName}`;
+    return NextResponse.json({ url: fileUrl, fileName: file.name, fileSize: file.size, mimeType: file.type });
+
   } catch (err: any) {
     console.error("Upload error:", err);
-    return NextResponse.json({ error: "アップロードに失敗しました" }, { status: 500 });
+    const msg = err?.message?.includes("BLOB")
+      ? "Vercel Blobが設定されていません。Vercelダッシュボードから Storage > Blob を接続してください。"
+      : "アップロードに失敗しました";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -142,22 +142,30 @@ async function ocrSingleDocument(
 読み取れなかった項目はnullにしてください。
 JSONのみを返し、説明文は不要です。`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
-    contents: [
-      {
-        parts: [
-          {
-            inlineData: {
-              mimeType: imageMimeType,
-              data: base64,
-            },
-          },
-          { text: prompt },
-        ],
-      },
-    ],
-  });
+  let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
+  try {
+    response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [
+        {
+          parts: [
+            { inlineData: { mimeType: imageMimeType, data: base64 } },
+            { text: prompt },
+          ],
+        },
+      ],
+    });
+  } catch (err: any) {
+    const body = err?.errorDetails ?? err?.message ?? "";
+    const bodyStr = typeof body === "string" ? body : JSON.stringify(body);
+    if (err?.status === 429 || bodyStr.includes("429") || bodyStr.includes("RESOURCE_EXHAUSTED") || bodyStr.includes("credits are depleted")) {
+      throw new Error("Gemini APIのクレジットが不足しています。Google AI Studio（https://aistudio.google.com）でお支払い方法を確認してください。");
+    }
+    if (err?.status === 400 || bodyStr.includes("400")) {
+      throw new Error("画像の読み取りに失敗しました。別の形式（JPEGなど）でお試しください。");
+    }
+    throw new Error(`AI読み込みエラー: ${err?.message ?? "不明なエラー"}`);
+  }
 
   const text = response.text ?? "{}";
 
@@ -199,7 +207,6 @@ export async function ocrAndFillApplicant(applicantId: string) {
   const allExtracted: Record<string, any> = {};
   const docResults: Array<{ id: string; data: Record<string, any> }> = [];
 
-  // OCR each document
   for (const doc of docs) {
     const label = DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
     const extracted = await ocrSingleDocument(

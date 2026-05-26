@@ -6,12 +6,13 @@ import {
   updateDocumentStatus,
   runConsistencyCheck,
   saveChecklistDocumentAndOcr,
+  shareApplicantDocumentsToChecklist,
 } from "@/actions/applications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   CheckSquare, Square, CheckCircle, XCircle, AlertCircle,
   Clock, RefreshCw, Loader2, FileText, Upload, Sparkles,
-  ChevronDown, ChevronRight, X, Eye,
+  ChevronDown, ChevronRight, Share2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -232,6 +233,8 @@ export function DocumentChecklist({
   const [isPending, startTransition] = useTransition();
   const [localChecklist, setLocalChecklist] = useState(checklist);
   const [isCheckRunning, setIsCheckRunning] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
 
   const isExpert = userRole === "expert" || userRole === "admin";
   const requiredItems = localChecklist.filter((i) => i.isRequiredByExpert);
@@ -263,29 +266,77 @@ export function DocumentChecklist({
     try { await runConsistencyCheck(applicationId); } finally { setIsCheckRunning(false); }
   }
 
+  async function handleShare() {
+    setIsSharing(true);
+    setShareMessage("");
+    try {
+      const result = await shareApplicantDocumentsToChecklist(applicationId);
+      if (result.success) {
+        setShareMessage(
+          result.count && result.count > 0
+            ? `✓ ${result.count}件のパスポート・在留カード情報を反映しました`
+            : "対象書類が見つかりませんでした（チェックリストにパスポート・在留カード項目を追加してください）"
+        );
+        // ページをリロードして最新データを表示
+        window.location.reload();
+      } else {
+        setShareMessage(`エラー: ${result.error}`);
+      }
+    } finally {
+      setIsSharing(false);
+    }
+  }
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            必要書類チェックリスト
-          </CardTitle>
-          {requiredItems.length > 0 && (
-            <p className="text-xs text-gray-500 mt-1">
-              必要書類: {submittedRequired.length} / {requiredItems.length} 件提出済
-            </p>
-          )}
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              必要書類チェックリスト
+            </CardTitle>
+            {requiredItems.length > 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                必要書類: {submittedRequired.length} / {requiredItems.length} 件提出済
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* 申請人マスターから共有ボタン */}
+            <button
+              onClick={handleShare}
+              disabled={isSharing}
+              className="inline-flex items-center gap-1.5 border border-blue-200 bg-blue-50 text-blue-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-blue-100 transition-colors disabled:opacity-50"
+              title="申請人マスターのパスポート・在留カード情報をチェックリストに反映"
+            >
+              {isSharing
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <Share2 className="w-3 h-3" />}
+              申請人マスターから共有
+            </button>
+            {isExpert && (
+              <button
+                onClick={handleConsistencyCheck}
+                disabled={isCheckRunning}
+                className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                {isCheckRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                整合性チェック
+              </button>
+            )}
+          </div>
         </div>
-        {isExpert && (
-          <button
-            onClick={handleConsistencyCheck}
-            disabled={isCheckRunning}
-            className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            {isCheckRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-            整合性チェック
-          </button>
+        {/* 共有結果メッセージ */}
+        {shareMessage && (
+          <p className={cn(
+            "text-xs mt-2 px-3 py-2 rounded-lg",
+            shareMessage.startsWith("エラー") || shareMessage.startsWith("対象")
+              ? "bg-yellow-50 text-yellow-700 border border-yellow-200"
+              : "bg-blue-50 text-blue-700 border border-blue-200"
+          )}>
+            {shareMessage}
+          </p>
         )}
       </CardHeader>
       <CardContent className="p-0">

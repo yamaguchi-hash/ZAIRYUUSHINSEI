@@ -11,6 +11,7 @@ import {
   applicationSnapshots,
   questionnaireQuestions,
   auditLog,
+  applicantDocuments,
 } from "@/lib/db/schema";
 import { eq, and, desc, ilike, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -596,5 +597,137 @@ JSONのみを返し、説明文は不要です。`;
     return { success: true, extracted, summary };
   } catch (err: any) {
     return { success: false, error: err.message ?? "アップロードに失敗しました" };
+  }
+}
+
+// ── 申請人マスターの書類・情報をチェックリストへ共有 ─────────────────────────
+export async function shareApplicantDocumentsToChecklist(
+  applicationId: string
+): Promise<{ success: boolean; error?: string; count?: number }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    // 申請案件を取得
+    const [app] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    // 申請人マスター情報を取得
+    const [applicant] = await db
+      .select()
+      .from(applicantMaster)
+      .where(eq(applicantMaster.id, app.applicantId))
+      .limit(1);
+    if (!applicant) return { success: false, error: "申請人が見つかりません" };
+
+    // 申請人マスターのアップロード書類を取得
+    const uploadedDocs = await db
+      .select()
+      .from(applicantDocuments)
+      .where(eq(applicantDocuments.applicantId, app.applicantId));
+
+    // タイプ別マップ
+    const docByType: Record<string, typeof uploadedDocs[0]> = {};
+    for (const d of uploadedDocs) docByType[d.documentType] = d;
+
+    // チェックリスト取得
+    const checklist = await db
+      .select()
+      .from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.applicationId, applicationId));
+
+    let updatedCount = 0;
+
+    for (const item of checklist) {
+      const name = item.documentName;
+      let uploadedDoc: typeof uploadedDocs[0] | null = null;
+      let ocrData: Record<string, any> = {};
+
+      // ─── パスポート ───────────────────────────────────────────
+      if (/パスポート/.test(name)) {
+        uploadedDoc =
+          docByType["passport_data_page"] ?? docByType["passport_front"] ?? null;
+
+        // 申請人マスターの情報をベースにOCRデータを組み立て
+        ocrData = {
+          full_name_en: `${applicant.familyNameEn} ${applicant.givenNameEn}`.trim(),
+          nationality: applicant.nationality ?? null,
+          date_of_birth: applicant.dateOfBirth ?? null,
+          gender: applicant.gender ?? null,
+          passport_number: applicant.passportNumber ?? null,
+          expiry_date: applicant.passportExpiry ?? null,
+        };
+        // アップロード書類のOCRデータがあればマージ（マスター値優先）
+        if (uploadedDoc?.ocrExtractedData) {
+          ocrData = {
+            ...(uploadedDoc.ocrExtractedData as Record<string, any>),
+            ...ocrData,
+          };
+        }
+      }
+
+      // ─── 在留カード（裏面） ───────────────────────────────────
+      else if (/在留カード/.test(name) && /裏面|裏/.test(name)) {
+        uploadedDoc = docByType["residence_card_back"] ?? null;
+        if (uploadedDoc?.ocrExtractedData) {
+          ocrData = uploadedDoc.ocrExtractedData as Record<string, any>;
+        }
+      }
+
+      // ─── 在留カード（表面・一般） ─────────────────────────────
+      else if (/在留カード/.test(name)) {
+        uploadedDoc = docByType["residence_card_front"] ?? null;
+
+        ocrData = {
+          full_name_ja: [applicant.familyNameJa, applicant.givenNameJa].filter(Boolean).join(" ") || null,
+          full_name_en: `${applicant.familyNameEn} ${applicant.givenNameEn}`.trim(),
+          nationality: applicant.nationality ?? null,
+          date_of_birth: applicant.dateOfBirth ?? null,
+          gender: applicant.gender ?? null,
+          residence_card_number: applicant.residenceCardNumber ?? null,
+          date_of_expiry: applicant.currentVisaExpiry ?? null,
+          address: applicant.japanAddress ?? null,
+        };
+        if (uploadedDoc?.ocrExtractedData) {
+          ocrData = {
+            ...(uploadedDoc.ocrExtractedData as Record<string, any>),
+            ...ocrData,
+          };
+        }
+      }
+
+      // 一致なしはスキップ
+      if (!uploadedDoc && Object.keys(ocrData).every((k) => !ocrData[k])) continue;
+
+      await db
+        .update(applicationDocumentChecklist)
+        .set({
+          ...(uploadedDoc
+            ? {
+                fileUrl: uploadedDoc.fileUrl,
+                fileName: uploadedDoc.fileName,
+                fileSize: uploadedDoc.fileSize ?? null,
+                mimeType: uploadedDoc.mimeType ?? null,
+                status: "submitted",
+                submittedAt: item.submittedAt ?? new Date(),
+              }
+            : {}),
+          ocrExtractedData: Object.keys(ocrData).length > 0 ? ocrData : item.ocrExtractedData,
+          updatedAt: new Date(),
+        })
+        .where(eq(applicationDocumentChecklist.id, item.id));
+
+      updatedCount++;
+    }
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true, count: updatedCount };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "エラーが発生しました" };
   }
 }

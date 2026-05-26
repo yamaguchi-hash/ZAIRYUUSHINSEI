@@ -7,7 +7,8 @@ import bcrypt from "bcryptjs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET,
-  session: { strategy: "jwt", maxAge: 8 * 60 * 60 }, // 8 hours auto logout
+  trustHost: true,
+  session: { strategy: "jwt", maxAge: 8 * 60 * 60 },
   providers: [
     Credentials({
       name: "credentials",
@@ -16,48 +17,54 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        try {
+          const email = credentials?.email as string | undefined;
+          const password = credentials?.password as string | undefined;
 
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, credentials.email as string))
-          .limit(1);
+          if (!email || !password) return null;
 
-        if (!user || !user.passwordHash || !user.isActive) return null;
+          const [user] = await db
+            .select()
+            .from(users)
+            .where(eq(users.email, email.toLowerCase().trim()))
+            .limit(1);
 
-        const isValid = await bcrypt.compare(
-          credentials.password as string,
-          user.passwordHash
-        );
+          if (!user || !user.passwordHash || !user.isActive) return null;
 
-        if (!isValid) return null;
+          const isValid = await bcrypt.compare(password, user.passwordHash);
+          if (!isValid) return null;
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          tenantId: user.tenantId,
-        };
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name ?? email,
+            role: user.role,
+            tenantId: user.tenantId,
+          };
+        } catch (err) {
+          console.error("[auth] authorize error:", err);
+          return null;
+        }
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
+        token.sub = user.id;
         token.role = (user as any).role;
         token.tenantId = (user as any).tenantId;
+        token.name = user.name;
+        token.email = user.email;
       }
       return token;
     },
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string;
-        (session.user as any).role = token.role;
-        (session.user as any).tenantId = token.tenantId;
-      }
+      session.user.id = (token.sub ?? token.id) as string;
+      (session.user as any).role = token.role;
+      (session.user as any).tenantId = token.tenantId;
+      session.user.name = token.name as string;
+      session.user.email = token.email as string;
       return session;
     },
   },

@@ -295,7 +295,16 @@ export default async function ApplicationDetailPage({
       {/* Document checklist + selector */}
       <div>
         <DocumentChecklist
-          checklist={checklist}
+          checklist={checklist.map((c) => ({
+            id: c.id,
+            documentName: c.documentName,
+            isRequiredByExpert: c.isRequiredByExpert,
+            status: c.status,
+            fileUrl: c.fileUrl,
+            fileName: c.fileName,
+            expertNotes: c.expertNotes,
+            ocrExtractedData: (c.ocrExtractedData ?? null) as Record<string, any> | null,
+          }))}
           applicationId={application.id}
           userRole={userRole}
           applicationStatus={application.status}

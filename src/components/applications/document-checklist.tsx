@@ -1,19 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { toggleExpertCheckmark, updateDocumentStatus, runConsistencyCheck } from "@/actions/applications";
+import { useState, useTransition, useRef } from "react";
+import {
+  toggleExpertCheckmark,
+  updateDocumentStatus,
+  runConsistencyCheck,
+  saveChecklistDocumentAndOcr,
+} from "@/actions/applications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  CheckSquare,
-  Square,
-  Upload,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Clock,
-  RefreshCw,
-  Loader2,
-  FileText,
+  CheckSquare, Square, CheckCircle, XCircle, AlertCircle,
+  Clock, RefreshCw, Loader2, FileText, Upload, Sparkles,
+  ChevronDown, ChevronRight, X, Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +23,7 @@ interface ChecklistItem {
   fileUrl: string | null;
   fileName: string | null;
   expertNotes: string | null;
+  ocrExtractedData?: Record<string, any> | null;
 }
 
 interface DocumentChecklistProps {
@@ -36,18 +35,194 @@ interface DocumentChecklistProps {
 
 const STATUS_ICONS: Record<string, React.ReactNode> = {
   not_submitted: <Clock className="w-4 h-4 text-gray-400" />,
-  submitted: <Upload className="w-4 h-4 text-blue-500" />,
-  approved: <CheckCircle className="w-4 h-4 text-green-500" />,
+  submitted:     <CheckCircle className="w-4 h-4 text-blue-500" />,
+  approved:      <CheckCircle className="w-4 h-4 text-green-500" />,
   resubmit_required: <AlertCircle className="w-4 h-4 text-red-500" />,
 };
-
 const STATUS_LABELS: Record<string, string> = {
   not_submitted: "未提出",
-  submitted: "提出済",
-  approved: "承認",
+  submitted:     "提出済",
+  approved:      "承認",
   resubmit_required: "再提出要求",
 };
 
+// 申請書類（アップロード不要）の判定
+function isApplicationForm(name: string) {
+  return /申請書/.test(name);
+}
+
+// OCR抽出データのサマリー表示用フィールド
+const OCR_DISPLAY_FIELDS: { key: string; label: string }[] = [
+  { key: "company_name",    label: "会社名" },
+  { key: "position",        label: "役職" },
+  { key: "annual_salary",   label: "年収" },
+  { key: "monthly_salary",  label: "月収" },
+  { key: "school_name",     label: "学校名" },
+  { key: "degree",          label: "学位" },
+  { key: "graduation_date", label: "卒業日" },
+  { key: "qualification",   label: "資格" },
+  { key: "full_name_ja",    label: "氏名" },
+  { key: "issue_date",      label: "発行日" },
+  { key: "notes",           label: "備考" },
+];
+
+// ── 書類アップロード（per item）──────────────────────────────────────────────
+function ChecklistItemUpload({
+  item,
+  onUploaded,
+}: {
+  item: ChecklistItem;
+  onUploaded: (id: string, updates: Partial<ChecklistItem>) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [ocrStatus, setOcrStatus] = useState<"idle" | "processing" | "done">("idle");
+  const [showOcr, setShowOcr] = useState(false);
+
+  const ocr = item.ocrExtractedData as Record<string, any> | null;
+  const ocrFields = ocr
+    ? OCR_DISPLAY_FIELDS.filter((f) => ocr[f.key] && ocr[f.key] !== "null")
+    : [];
+
+  async function handleFile(file: File) {
+    setError("");
+    setIsUploading(true);
+    setOcrStatus("idle");
+    try {
+      // Step1: /api/upload でファイルをアップロード（docTypeなし = DB保存なし）
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "アップロード失敗");
+
+      setOcrStatus("processing");
+
+      // Step2: Server Action でDB保存 + Gemini OCR
+      const result = await saveChecklistDocumentAndOcr(
+        item.id,
+        data.url,
+        file.name,
+        file.size,
+        data.mimeType,
+        item.documentName
+      );
+
+      if (!result.success) throw new Error(result.error ?? "保存失敗");
+
+      onUploaded(item.id, {
+        fileUrl: data.url,
+        fileName: file.name,
+        status: "submitted",
+        ocrExtractedData: result.extracted ?? null,
+      });
+      setOcrStatus("done");
+    } catch (err: any) {
+      setError(err.message ?? "アップロードに失敗しました");
+      setOcrStatus("idle");
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  // ファイルあり → ファイル名＋OCR結果表示
+  if (item.fileUrl && item.fileName) {
+    return (
+      <div className="mt-2 ml-8">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5 text-xs text-blue-800 max-w-xs">
+            <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">{item.fileName}</span>
+          </div>
+          {/* AI読込結果バッジ */}
+          {ocr && ocrFields.length > 0 && (
+            <button
+              onClick={() => setShowOcr((v) => !v)}
+              className="flex items-center gap-1 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-2 py-1 hover:bg-purple-100"
+            >
+              <Sparkles className="w-3 h-3" />
+              AI読込済み
+              {showOcr ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            </button>
+          )}
+          {/* 差し替えボタン */}
+          <button
+            onClick={() => inputRef.current?.click()}
+            className="text-xs text-gray-400 hover:text-gray-600 underline"
+          >
+            差し替え
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,image/jpeg,image/png,application/pdf"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) { handleFile(f); e.target.value = ""; } }}
+          />
+        </div>
+
+        {/* OCR抽出データ詳細 */}
+        {showOcr && ocr && ocrFields.length > 0 && (
+          <div className="mt-2 bg-purple-50 border border-purple-100 rounded-lg p-3 text-xs space-y-1">
+            <p className="font-semibold text-purple-800 flex items-center gap-1 mb-2">
+              <Sparkles className="w-3 h-3" /> AI自動読込データ
+            </p>
+            {ocrFields.map((f) => (
+              <div key={f.key} className="flex gap-2">
+                <span className="text-purple-500 w-16 flex-shrink-0">{f.label}:</span>
+                <span className="text-gray-800 break-all">
+                  {f.key === "annual_salary" || f.key === "monthly_salary"
+                    ? `${Number(ocr[f.key]).toLocaleString()}円`
+                    : String(ocr[f.key])}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      </div>
+    );
+  }
+
+  // ファイルなし → ドロップゾーン
+  return (
+    <div className="mt-2 ml-8">
+      <div
+        className={cn(
+          "border border-dashed rounded-lg px-3 py-2 flex items-center gap-2 cursor-pointer transition-colors text-xs",
+          isDragging ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50/40",
+          (isUploading || ocrStatus === "processing") && "pointer-events-none opacity-60"
+        )}
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+      >
+        {isUploading ? (
+          <><Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" /><span className="text-blue-600">アップロード中...</span></>
+        ) : ocrStatus === "processing" ? (
+          <><Sparkles className="w-3.5 h-3.5 text-purple-500 animate-pulse" /><span className="text-purple-600">AIが読み込み中...</span></>
+        ) : isDragging ? (
+          <><Upload className="w-3.5 h-3.5 text-blue-500" /><span className="text-blue-600">ここにドロップ</span></>
+        ) : (
+          <><Upload className="w-3.5 h-3.5 text-gray-400" /><span className="text-gray-400">クリックまたはドロップで添付・AI自動読込</span></>
+        )}
+      </div>
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,image/jpeg,image/png,application/pdf"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) { handleFile(f); e.target.value = ""; } }}
+      />
+    </div>
+  );
+}
+
+// ── メインチェックリスト ──────────────────────────────────────────────────────
 export function DocumentChecklist({
   checklist,
   applicationId,
@@ -67,27 +242,25 @@ export function DocumentChecklist({
     setLocalChecklist((prev) =>
       prev.map((i) => (i.id === item.id ? { ...i, isRequiredByExpert: newValue } : i))
     );
-    startTransition(async () => {
-      await toggleExpertCheckmark(item.id, newValue);
-    });
+    startTransition(async () => { await toggleExpertCheckmark(item.id, newValue); });
   }
 
   function handleStatusChange(itemId: string, status: string) {
     setLocalChecklist((prev) =>
       prev.map((i) => (i.id === itemId ? { ...i, status } : i))
     );
-    startTransition(async () => {
-      await updateDocumentStatus(itemId, status);
-    });
+    startTransition(async () => { await updateDocumentStatus(itemId, status); });
+  }
+
+  function handleUploaded(id: string, updates: Partial<ChecklistItem>) {
+    setLocalChecklist((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, ...updates } : i))
+    );
   }
 
   async function handleConsistencyCheck() {
     setIsCheckRunning(true);
-    try {
-      await runConsistencyCheck(applicationId);
-    } finally {
-      setIsCheckRunning(false);
-    }
+    try { await runConsistencyCheck(applicationId); } finally { setIsCheckRunning(false); }
   }
 
   return (
@@ -104,28 +277,23 @@ export function DocumentChecklist({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {isExpert && (
-            <button
-              onClick={handleConsistencyCheck}
-              disabled={isCheckRunning}
-              className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              {isCheckRunning ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <RefreshCw className="w-3 h-3" />
-              )}
-              整合性チェック
-            </button>
-          )}
-        </div>
+        {isExpert && (
+          <button
+            onClick={handleConsistencyCheck}
+            disabled={isCheckRunning}
+            className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            {isCheckRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            整合性チェック
+          </button>
+        )}
       </CardHeader>
       <CardContent className="p-0">
         {localChecklist.length === 0 ? (
           <div className="text-center py-10 text-gray-400">
             <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">書類リストがありません</p>
+            <p className="text-xs mt-1">下の「入管必要書類から選択」から追加してください</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
@@ -133,79 +301,76 @@ export function DocumentChecklist({
               <div
                 key={item.id}
                 className={cn(
-                  "flex items-center gap-4 px-6 py-3 hover:bg-gray-50 transition-colors",
-                  item.isRequiredByExpert ? "" : "opacity-60"
+                  "px-6 py-4 hover:bg-gray-50/50 transition-colors",
+                  !item.isRequiredByExpert && "opacity-60"
                 )}
               >
-                {/* Expert checkbox (Step 3) */}
-                {isExpert ? (
-                  <button
-                    onClick={() => handleToggleExpert(item)}
-                    disabled={isPending}
-                    className="flex-shrink-0 text-blue-600 hover:text-blue-700 disabled:opacity-50"
-                    title="専門家チェック（必要書類として確定）"
-                  >
-                    {item.isRequiredByExpert ? (
-                      <CheckSquare className="w-5 h-5" />
-                    ) : (
-                      <Square className="w-5 h-5 text-gray-300" />
-                    )}
-                  </button>
-                ) : (
-                  <div className="flex-shrink-0 w-5">
-                    {item.isRequiredByExpert && (
-                      <CheckSquare className="w-5 h-5 text-blue-600" />
-                    )}
-                  </div>
-                )}
+                {/* 上段: チェックボックス + 書類名 + ステータス */}
+                <div className="flex items-center gap-3">
+                  {isExpert ? (
+                    <button
+                      onClick={() => handleToggleExpert(item)}
+                      disabled={isPending}
+                      className="flex-shrink-0 text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                      title="必要書類として確定"
+                    >
+                      {item.isRequiredByExpert
+                        ? <CheckSquare className="w-5 h-5" />
+                        : <Square className="w-5 h-5 text-gray-300" />}
+                    </button>
+                  ) : (
+                    <div className="flex-shrink-0 w-5">
+                      {item.isRequiredByExpert && <CheckSquare className="w-5 h-5 text-blue-600" />}
+                    </div>
+                  )}
 
-                {/* Document name */}
-                <div className="flex-1 min-w-0">
-                  <p className={cn(
-                    "text-sm font-medium",
-                    item.isRequiredByExpert ? "text-gray-900" : "text-gray-400"
-                  )}>
-                    {item.documentName}
-                    {item.isRequiredByExpert && (
-                      <span className="ml-2 text-xs text-red-500">必須</span>
-                    )}
-                  </p>
-                  {item.fileName && (
-                    <p className="text-xs text-gray-400 truncate mt-0.5">
-                      {item.fileName}
+                  <div className="flex-1 min-w-0">
+                    <p className={cn(
+                      "text-sm font-medium leading-tight",
+                      item.isRequiredByExpert ? "text-gray-900" : "text-gray-400"
+                    )}>
+                      {item.documentName}
+                      {item.isRequiredByExpert && (
+                        <span className="ml-2 text-xs text-red-500 font-normal">必須</span>
+                      )}
                     </p>
-                  )}
-                  {item.expertNotes && (
-                    <p className="text-xs text-orange-600 mt-0.5">{item.expertNotes}</p>
-                  )}
-                </div>
-
-                {/* Status icon */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {STATUS_ICONS[item.status]}
-                  <span className="text-xs text-gray-500">{STATUS_LABELS[item.status]}</span>
-                </div>
-
-                {/* Expert status control */}
-                {isExpert && item.status === "submitted" && (
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => handleStatusChange(item.id, "approved")}
-                      disabled={isPending}
-                      className="p-1 rounded text-green-600 hover:bg-green-50 disabled:opacity-50"
-                      title="承認"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleStatusChange(item.id, "resubmit_required")}
-                      disabled={isPending}
-                      className="p-1 rounded text-red-600 hover:bg-red-50 disabled:opacity-50"
-                      title="再提出要求"
-                    >
-                      <XCircle className="w-4 h-4" />
-                    </button>
+                    {item.expertNotes && (
+                      <p className="text-xs text-orange-600 mt-0.5">{item.expertNotes}</p>
+                    )}
                   </div>
+
+                  {/* ステータス */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {STATUS_ICONS[item.status]}
+                    <span className="text-xs text-gray-500 hidden sm:block">{STATUS_LABELS[item.status]}</span>
+                  </div>
+
+                  {/* 承認・却下ボタン */}
+                  {isExpert && item.status === "submitted" && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => handleStatusChange(item.id, "approved")}
+                        disabled={isPending}
+                        className="p-1 rounded text-green-600 hover:bg-green-50 disabled:opacity-50"
+                        title="承認"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange(item.id, "resubmit_required")}
+                        disabled={isPending}
+                        className="p-1 rounded text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        title="再提出要求"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* 下段: アップロードゾーン（申請書以外） */}
+                {item.isRequiredByExpert && !isApplicationForm(item.documentName) && (
+                  <ChecklistItemUpload item={item} onUploaded={handleUploaded} />
                 )}
               </div>
             ))}

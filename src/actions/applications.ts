@@ -460,3 +460,141 @@ export async function removeDocumentFromChecklist(
     return { success: false, error: err.message ?? "削除に失敗しました" };
   }
 }
+
+// ── チェックリスト書類のアップロード＋Gemini自動解析 ────────────────────────
+export async function saveChecklistDocumentAndOcr(
+  checklistItemId: string,
+  fileUrl: string,
+  fileName: string,
+  fileSize: number | undefined,
+  mimeType: string,
+  documentName: string
+): Promise<{ success: boolean; error?: string; extracted?: Record<string, any>; summary?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+
+    // ファイル情報を保存・ステータスを「提出済」に更新
+    await db
+      .update(applicationDocumentChecklist)
+      .set({
+        fileUrl,
+        fileName,
+        fileSize: fileSize ?? null,
+        mimeType,
+        status: "submitted",
+        submittedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(applicationDocumentChecklist.id, checklistItemId));
+
+    // Gemini APIキーがなければここで返す
+    if (!process.env.GEMINI_API_KEY) {
+      const [item] = await db.select({ applicationId: applicationDocumentChecklist.applicationId })
+        .from(applicationDocumentChecklist).where(eq(applicationDocumentChecklist.id, checklistItemId)).limit(1);
+      if (item) revalidatePath(`/applications/${item.applicationId}`);
+      return { success: true };
+    }
+
+    // Gemini で書類内容を解析
+    const { GoogleGenAI } = await import("@google/genai");
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+    let base64: string;
+    let imageMimeType: string;
+
+    if (fileUrl.startsWith("data:")) {
+      const commaIdx = fileUrl.indexOf(",");
+      base64 = fileUrl.slice(commaIdx + 1);
+      imageMimeType = fileUrl.slice(5, commaIdx).split(";")[0];
+    } else {
+      const res = await fetch(fileUrl);
+      if (!res.ok) throw new Error("ファイルの取得に失敗しました");
+      const buf = await res.arrayBuffer();
+      base64 = Buffer.from(buf).toString("base64");
+      imageMimeType = mimeType;
+    }
+
+    const supportedImageTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+    const isPdf = imageMimeType === "application/pdf";
+    const isImage = supportedImageTypes.includes(imageMimeType);
+    if (!isImage && !isPdf) {
+      return { success: true }; // 非対応形式はスキップ
+    }
+
+    const prompt = `あなたは在留資格申請書類の読み取り専門家です。
+この書類は「${documentName}」です。
+
+書類から読み取れる全ての重要な情報をJSON形式で抽出してください。
+以下の項目が含まれる場合は必ず抽出してください：
+- full_name_ja: 氏名（日本語）
+- full_name_en: 氏名（英語・ローマ字）
+- company_name: 会社名・機関名・組織名
+- company_name_en: 会社名（英語）
+- position: 役職・職種・業務内容
+- employment_start: 雇用開始日・在籍開始日（YYYY-MM-DD形式）
+- employment_end: 雇用終了日（YYYY-MM-DD形式、現職はnull）
+- annual_salary: 年収・報酬（数値のみ、単位：円）
+- monthly_salary: 月収（数値のみ、単位：円）
+- school_name: 学校名・大学名
+- major: 学部・学科・専攻
+- degree: 学位（学士・修士・博士等）
+- graduation_date: 卒業日（YYYY-MM-DD形式）
+- qualification: 資格・免許・称号
+- address: 住所
+- issue_date: 発行日（YYYY-MM-DD形式）
+- expiry_date: 有効期限（YYYY-MM-DD形式）
+- notes: その他の重要事項
+
+読み取れない項目はnullにしてください（省略不要）。
+JSONのみを返し、説明文は不要です。`;
+
+    let extracted: Record<string, any> = {};
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{
+          parts: [
+            { inlineData: { mimeType: isImage ? imageMimeType : "image/jpeg", data: base64 } },
+            { text: prompt },
+          ],
+        }],
+      });
+
+      const text = response.text ?? "{}";
+      const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+      if (jsonMatch) {
+        try { extracted = JSON.parse(jsonMatch[1] ?? jsonMatch[0]); } catch { extracted = {}; }
+      }
+    } catch (ocrErr: any) {
+      console.error("[OCR] checklist doc error:", ocrErr?.message);
+      // OCRエラーでもファイル保存は成功扱い
+    }
+
+    // 非nullフィールドのサマリー生成
+    const summaryParts: string[] = [];
+    if (extracted.company_name) summaryParts.push(`会社: ${extracted.company_name}`);
+    if (extracted.position) summaryParts.push(`役職: ${extracted.position}`);
+    if (extracted.annual_salary) summaryParts.push(`年収: ${Number(extracted.annual_salary).toLocaleString()}円`);
+    if (extracted.monthly_salary && !extracted.annual_salary) summaryParts.push(`月収: ${Number(extracted.monthly_salary).toLocaleString()}円`);
+    if (extracted.school_name) summaryParts.push(`学校: ${extracted.school_name}`);
+    if (extracted.degree) summaryParts.push(`学位: ${extracted.degree}`);
+    if (extracted.graduation_date) summaryParts.push(`卒業: ${extracted.graduation_date}`);
+    if (extracted.qualification) summaryParts.push(`資格: ${extracted.qualification}`);
+    const summary = summaryParts.join(" / ");
+
+    // 解析結果をDBに保存
+    await db
+      .update(applicationDocumentChecklist)
+      .set({ ocrExtractedData: extracted, updatedAt: new Date() })
+      .where(eq(applicationDocumentChecklist.id, checklistItemId));
+
+    const [item] = await db.select({ applicationId: applicationDocumentChecklist.applicationId })
+      .from(applicationDocumentChecklist).where(eq(applicationDocumentChecklist.id, checklistItemId)).limit(1);
+    if (item) revalidatePath(`/applications/${item.applicationId}`);
+
+    return { success: true, extracted, summary };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "アップロードに失敗しました" };
+  }
+}

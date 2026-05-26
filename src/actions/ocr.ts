@@ -132,12 +132,16 @@ async function ocrSingleDocument(
 - status_of_residence (在留資格)
 - period_of_stay (在留期間)
 - date_of_expiry (在留期限、YYYY-MM-DD形式)
-- address (住居地)
+- postal_code (郵便番号、数字7桁のみ例:1234567。〒マーク不要。記載があれば抽出)
+- address (住居地。郵便番号を除いた住所のみ)
 
 在留カード（裏面）の場合:
-- workplace (勤務先)
+重要: 在留カード裏面には住所変更の記録が記載されている場合があります。
+- address (変更後の新しい住所。「住居地」「新住所」「変更後」などの欄に記載された最新の住所。記載がない場合はnull)
+- postal_code (変更後住所の郵便番号、数字7桁のみ。記載がない場合はnull)
+- workplace (勤務先・所属機関)
 - qualification (資格外活動許可等)
-- notes (備考欄の内容)
+- notes (その他備考欄の内容)
 
 読み取れなかった項目はnullにしてください。
 JSONのみを返し、説明文は不要です。`;
@@ -237,6 +241,13 @@ export async function ocrAndFillApplicant(applicantId: string) {
 
   console.log("[OCR/fill] allExtracted:", JSON.stringify(allExtracted).slice(0, 800));
 
+  // 書類タイプ別に整理
+  const byType2: Record<string, Record<string, any>> = {};
+  for (const dr of docResults) {
+    const doc = docs.find(d => d.id === dr.id);
+    if (doc) byType2[doc.documentType] = dr.data;
+  }
+
   // Build applicant master update from extracted data
   const update: Record<string, any> = { updatedAt: new Date() };
 
@@ -281,11 +292,30 @@ export async function ocrAndFillApplicant(applicantId: string) {
   const rcNum = getVal("residence_card_number", "residenceCardNumber");
   if (rcNum) update.residenceCardNumber = rcNum;
 
-  const rcExp = getVal("date_of_expiry", "residence_expiry");
-  if (rcExp) update.currentVisaExpiry = rcExp;
+  const rcExp2 = byType2["residence_card_front"]?.date_of_expiry;
+  if (rcExp2 && rcExp2 !== "null") update.currentVisaExpiry = String(rcExp2);
 
-  const addr = getVal("address", "japan_address");
-  if (addr) update.japanAddress = addr;
+  // 住所優先: 裏面 > 表面
+  const backAddr2 = byType2["residence_card_back"]?.address;
+  const frontAddr2 = byType2["residence_card_front"]?.address;
+  let chosenAddr2 = "";
+  let chosenPostal2 = "";
+  if (backAddr2 && backAddr2 !== "null") {
+    chosenAddr2 = String(backAddr2);
+    const bp = byType2["residence_card_back"]?.postal_code;
+    if (bp && bp !== "null") chosenPostal2 = String(bp);
+  } else if (frontAddr2 && frontAddr2 !== "null") {
+    chosenAddr2 = String(frontAddr2);
+    const fp = byType2["residence_card_front"]?.postal_code;
+    if (fp && fp !== "null") chosenPostal2 = String(fp);
+  }
+  if (chosenAddr2) update.japanAddress = chosenAddr2;
+  if (chosenPostal2) {
+    update.postalCode = formatPostalCode(chosenPostal2);
+  } else if (chosenAddr2) {
+    const lookedUp = await lookupPostalCode(chosenAddr2);
+    if (lookedUp) update.postalCode = lookedUp;
+  }
 
   if (Object.keys(update).length > 1) {
     await db
@@ -300,9 +330,33 @@ export async function ocrAndFillApplicant(applicantId: string) {
   return { extracted: allExtracted, updatedFields: Object.keys(update).filter((k) => k !== "updatedAt") };
 }
 
+// ─── 郵便番号フォーマット ─────────────────────────────────────────────────────
+function formatPostalCode(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return raw;
+}
+
+// ─── 住所から郵便番号をAPIで検索 ────────────────────────────────────────────
+async function lookupPostalCode(address: string): Promise<string> {
+  try {
+    // 都道府県＋市区町村レベルで検索（先頭50文字）
+    const query = address.replace(/[0-9０-９\-－]/g, "").slice(0, 50);
+    const url = `https://geoapi.heartrails.com/api/json?method=suggest&address=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return "";
+    const data: any = await res.json();
+    const postal = data?.response?.location?.[0]?.postal as string | undefined;
+    if (postal && /^\d{7}$/.test(postal)) return `${postal.slice(0, 3)}-${postal.slice(3)}`;
+  } catch {
+    // タイムアウト・ネットワークエラーは無視
+  }
+  return "";
+}
+
 // ─── 新規登録用: DBに保存済みのdocIdを使ってOCR実行 ──────────────────────────
 export async function ocrFilesForRegistration(docIds: string[]): Promise<
-  | { success: true; familyNameEn: string; givenNameEn: string; familyNameJa: string; givenNameJa: string; nationality: string; dateOfBirth: string; gender: string; passportNumber: string; passportExpiry: string; residenceCardNumber: string; currentVisaType: string; currentVisaExpiry: string; japanAddress: string; raw: Record<string, any> }
+  | { success: true; familyNameEn: string; givenNameEn: string; familyNameJa: string; givenNameJa: string; nationality: string; dateOfBirth: string; gender: string; passportNumber: string; passportExpiry: string; residenceCardNumber: string; currentVisaType: string; currentVisaExpiry: string; japanPostalCode: string; japanAddress: string; raw: Record<string, any> }
   | { success: false; error: string }
 > {
   try {
@@ -323,10 +377,13 @@ export async function ocrFilesForRegistration(docIds: string[]): Promise<
     if (docs.length === 0) return { success: false, error: "書類が見つかりません" };
 
     const allExtracted: Record<string, any> = {};
+    // 書類タイプ別に結果を保持（住所優先判定に使用）
+    const byType: Record<string, Record<string, any>> = {};
 
     for (const doc of docs) {
       const label = DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
       const extracted = await ocrSingleDocument(doc.fileUrl, doc.mimeType ?? "image/jpeg", label);
+      byType[doc.documentType] = extracted;
       Object.assign(allExtracted, extracted);
 
       await db
@@ -336,23 +393,15 @@ export async function ocrFilesForRegistration(docIds: string[]): Promise<
     }
 
     console.log("[OCR] allExtracted keys:", Object.keys(allExtracted));
-    console.log("[OCR] allExtracted values:", JSON.stringify(allExtracted).slice(0, 500));
+    console.log("[OCR] byType keys:", Object.keys(byType));
 
     const result = {
       success: true as const,
-      familyNameEn: "",
-      givenNameEn: "",
-      familyNameJa: "",
-      givenNameJa: "",
-      nationality: "",
-      dateOfBirth: "",
-      gender: "",
-      passportNumber: "",
-      passportExpiry: "",
-      residenceCardNumber: "",
-      currentVisaType: "",
-      currentVisaExpiry: "",
-      japanAddress: "",
+      familyNameEn: "", givenNameEn: "", familyNameJa: "", givenNameJa: "",
+      nationality: "", dateOfBirth: "", gender: "",
+      passportNumber: "", passportExpiry: "",
+      residenceCardNumber: "", currentVisaType: "", currentVisaExpiry: "",
+      japanPostalCode: "", japanAddress: "",
       raw: allExtracted,
     };
 
@@ -365,31 +414,24 @@ export async function ocrFilesForRegistration(docIds: string[]): Promise<
       return "";
     };
 
-    // 姓（英）: パスポートの surname / 在留カードの surname_en
     const fnEn = get("surname_en", "surname", "family_name", "familyName", "last_name", "lastName");
     if (fnEn) result.familyNameEn = fnEn.toUpperCase();
 
-    // 名（英）: パスポートの given_name / 在留カードの given_name_en
     const gnEn = get("given_name_en", "given_name", "givenName", "first_name", "firstName");
     if (gnEn) result.givenNameEn = gnEn.toUpperCase();
 
-    // 姓（日）
     const fnJa = get("surname_ja", "family_name_ja", "familyNameJa", "last_name_ja");
     if (fnJa) result.familyNameJa = fnJa;
 
-    // 名（日）
     const gnJa = get("given_name_ja", "first_name_ja", "givenNameJa", "firstName_ja");
     if (gnJa) result.givenNameJa = gnJa;
 
-    // 国籍
     const nat = get("nationality", "country", "citizenship");
     if (nat) result.nationality = nat;
 
-    // 生年月日
     const dob = get("date_of_birth", "birth_date", "birthDate", "dateOfBirth", "dob");
     if (dob) result.dateOfBirth = dob;
 
-    // 性別
     const genderRaw = get("gender", "sex");
     if (genderRaw) {
       const g = genderRaw.toUpperCase();
@@ -397,32 +439,62 @@ export async function ocrFilesForRegistration(docIds: string[]): Promise<
         : g === "M" || g.includes("男") || g === "MALE" ? "M" : "";
     }
 
-    // パスポート番号
     const ppNum = get("passport_number", "passportNumber", "document_number");
     if (ppNum) result.passportNumber = ppNum;
 
-    // パスポート有効期限
-    const ppExp = get("expiry_date", "expiration_date", "date_of_expiry", "expiryDate", "passportExpiry");
-    if (ppExp) result.passportExpiry = ppExp;
+    // パスポート有効期限（passport の expiry_date のみ）
+    const ppExpRaw = byType["passport_data_page"]?.expiry_date ?? byType["passport_front"]?.expiry_date;
+    if (ppExpRaw && ppExpRaw !== "null") result.passportExpiry = String(ppExpRaw);
 
-    // 在留カード番号
     const rcNum = get("residence_card_number", "residenceCardNumber", "card_number");
     if (rcNum) result.residenceCardNumber = rcNum;
 
-    // 在留期限（在留カードの date_of_expiry はパスポートと重複する可能性があるため別途処理）
-    const rcExp = get("date_of_expiry", "residence_expiry", "status_expiry");
-    if (rcExp && !result.passportExpiry) result.currentVisaExpiry = rcExp;
-    else if (allExtracted.date_of_expiry && result.passportExpiry) result.currentVisaExpiry = String(allExtracted.date_of_expiry);
+    // 在留期限（在留カード表面の date_of_expiry）
+    const rcExpRaw = byType["residence_card_front"]?.date_of_expiry;
+    if (rcExpRaw && rcExpRaw !== "null") result.currentVisaExpiry = String(rcExpRaw);
 
-    // 住所
-    const addr = get("address", "japanAddress", "japan_address", "residence_address");
-    if (addr) result.japanAddress = addr;
+    // ─── 住所・郵便番号の優先処理 ────────────────────────────────────────────
+    // 在留カード裏面に住所変更記録がある場合はそちらが最新
+    const backAddr = byType["residence_card_back"]?.address;
+    const frontAddr = byType["residence_card_front"]?.address;
+
+    let chosenAddr = "";
+    let chosenPostal = "";
+
+    if (backAddr && backAddr !== "null") {
+      // 裏面の住所が最新
+      chosenAddr = String(backAddr);
+      const backPostal = byType["residence_card_back"]?.postal_code;
+      if (backPostal && backPostal !== "null") chosenPostal = String(backPostal);
+      else {
+        const frontPostal = byType["residence_card_front"]?.postal_code;
+        if (frontPostal && frontPostal !== "null") chosenPostal = String(frontPostal);
+      }
+      console.log("[OCR] 裏面住所を使用:", chosenAddr);
+    } else if (frontAddr && frontAddr !== "null") {
+      // 表面の住所
+      chosenAddr = String(frontAddr);
+      const frontPostal = byType["residence_card_front"]?.postal_code;
+      if (frontPostal && frontPostal !== "null") chosenPostal = String(frontPostal);
+      console.log("[OCR] 表面住所を使用:", chosenAddr);
+    }
+
+    result.japanAddress = chosenAddr;
+
+    // 郵便番号: OCRで取得できなければAPIで検索
+    if (chosenPostal) {
+      result.japanPostalCode = formatPostalCode(chosenPostal);
+    } else if (chosenAddr) {
+      console.log("[OCR] 郵便番号をAPIで検索:", chosenAddr);
+      result.japanPostalCode = await lookupPostalCode(chosenAddr);
+    }
 
     console.log("[OCR] mapped result:", JSON.stringify({
       familyNameEn: result.familyNameEn,
       givenNameEn: result.givenNameEn,
       nationality: result.nationality,
-      dateOfBirth: result.dateOfBirth,
+      japanAddress: result.japanAddress,
+      japanPostalCode: result.japanPostalCode,
     }));
 
     return result;
@@ -438,7 +510,7 @@ export async function createApplicantWithDocuments(
     nationality: string; dateOfBirth?: string; gender?: string;
     passportNumber?: string; passportExpiry?: string;
     residenceCardNumber?: string; currentVisaType?: string; currentVisaExpiry?: string;
-    phone?: string; emailAddress?: string; japanAddress?: string;
+    phone?: string; emailAddress?: string; postalCode?: string; japanAddress?: string;
   },
   docIds: string[]
 ): Promise<{ success: true; applicantId: string } | { success: false; error: string }> {

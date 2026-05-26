@@ -64,6 +64,7 @@ export async function createApplicant(data: {
   residenceCardNumber?: string;
   phone?: string;
   emailAddress?: string;
+  postalCode?: string;
   japanAddress?: string;
 }) {
   const session = await auth();
@@ -107,6 +108,7 @@ export async function updateApplicant(
     residenceCardNumber: string;
     phone: string;
     emailAddress: string;
+    postalCode: string;
     japanAddress: string;
     educationHistory: any;
     workHistory: any;

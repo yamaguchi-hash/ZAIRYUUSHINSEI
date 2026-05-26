@@ -36,7 +36,7 @@ const emptyForm = {
   nationality: "", dateOfBirth: "", gender: "",
   passportNumber: "", passportExpiry: "",
   residenceCardNumber: "", currentVisaType: "", currentVisaExpiry: "",
-  phone: "", emailAddress: "", japanAddress: "",
+  phone: "", emailAddress: "", postalCode: "", japanAddress: "",
 };
 
 export function AiRegistrationForm() {
@@ -109,6 +109,7 @@ export function AiRegistrationForm() {
         currentVisaExpiry: result.currentVisaExpiry,
         phone: "",
         emailAddress: "",
+        postalCode: result.japanPostalCode,
         japanAddress: result.japanAddress,
       });
       setPhase("review");
@@ -365,7 +366,10 @@ export function AiRegistrationForm() {
         </div>
         <div><label className="label-xs">電話番号</label><input name="phone" value={form.phone} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
         <div><label className="label-xs">メールアドレス</label><input name="emailAddress" type="email" value={form.emailAddress} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
-        <div><label className="label-xs">日本の住所</label><input name="japanAddress" value={form.japanAddress} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
+        <div className="grid grid-cols-[130px_1fr] gap-2">
+          <div><label className="label-xs">郵便番号</label><input name="postalCode" value={form.postalCode} onChange={handleChange} placeholder="123-4567" className="input-field text-sm py-1.5 font-mono" /></div>
+          <div><label className="label-xs">日本の住所</label><input name="japanAddress" value={form.japanAddress} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
+        </div>
 
         <button
           onClick={handleSave}

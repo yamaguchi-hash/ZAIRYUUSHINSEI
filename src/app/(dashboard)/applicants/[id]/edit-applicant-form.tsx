@@ -22,6 +22,7 @@ interface EditApplicantFormProps {
     currentVisaExpiry: string | null;
     phone: string | null;
     emailAddress: string | null;
+    postalCode?: string | null;
     japanAddress: string | null;
   };
 }
@@ -46,6 +47,7 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
     currentVisaExpiry: applicant.currentVisaExpiry ?? "",
     phone: applicant.phone ?? "",
     emailAddress: applicant.emailAddress ?? "",
+    postalCode: applicant.postalCode ?? "",
     japanAddress: applicant.japanAddress ?? "",
   });
 
@@ -156,9 +158,15 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
         <label className="block text-xs font-medium text-gray-600 mb-1">メールアドレス</label>
         <input name="emailAddress" type="email" value={form.emailAddress} onChange={handleChange} className="input-field text-sm py-1.5" />
       </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">日本の住所</label>
-        <input name="japanAddress" value={form.japanAddress} onChange={handleChange} className="input-field text-sm py-1.5" />
+      <div className="grid grid-cols-[140px_1fr] gap-2">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">郵便番号</label>
+          <input name="postalCode" value={form.postalCode} onChange={handleChange} placeholder="123-4567" className="input-field text-sm py-1.5 font-mono" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">日本の住所</label>
+          <input name="japanAddress" value={form.japanAddress} onChange={handleChange} className="input-field text-sm py-1.5" />
+        </div>
       </div>
 
       <button

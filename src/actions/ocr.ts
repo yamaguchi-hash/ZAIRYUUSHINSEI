@@ -241,3 +241,141 @@ export async function ocrAndFillApplicant(applicantId: string) {
 
   return { extracted: allExtracted, updatedFields: Object.keys(update).filter((k) => k !== "updatedAt") };
 }
+
+// ─── 新規登録用: DB保存なしでOCR実行してフォームデータを返す ─────────────────
+export async function ocrFilesForRegistration(
+  files: Array<{ url: string; mimeType: string; documentType: string }>
+): Promise<{
+  familyNameEn: string;
+  givenNameEn: string;
+  familyNameJa: string;
+  givenNameJa: string;
+  nationality: string;
+  dateOfBirth: string;
+  gender: string;
+  passportNumber: string;
+  passportExpiry: string;
+  residenceCardNumber: string;
+  currentVisaType: string;
+  currentVisaExpiry: string;
+  japanAddress: string;
+  raw: Record<string, any>;
+}> {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY が設定されていません");
+  }
+
+  if (files.length === 0) throw new Error("書類がアップロードされていません");
+
+  const allExtracted: Record<string, any> = {};
+
+  for (const file of files) {
+    const label = DOCUMENT_TYPE_LABELS[file.documentType] ?? file.documentType;
+    const extracted = await ocrSingleDocument(file.url, file.mimeType, label);
+    Object.assign(allExtracted, extracted);
+  }
+
+  // OCR結果をフォームフィールドにマッピング
+  const result = {
+    familyNameEn: "",
+    givenNameEn: "",
+    familyNameJa: "",
+    givenNameJa: "",
+    nationality: "",
+    dateOfBirth: "",
+    gender: "",
+    passportNumber: "",
+    passportExpiry: "",
+    residenceCardNumber: "",
+    currentVisaType: "",
+    currentVisaExpiry: "",
+    japanAddress: "",
+    raw: allExtracted,
+  };
+
+  if (allExtracted.surname)          result.familyNameEn = String(allExtracted.surname).toUpperCase();
+  if (allExtracted.given_name)       result.givenNameEn  = String(allExtracted.given_name).toUpperCase();
+  if (allExtracted.surname_ja)       result.familyNameJa = String(allExtracted.surname_ja);
+  if (allExtracted.given_name_ja)    result.givenNameJa  = String(allExtracted.given_name_ja);
+  if (allExtracted.surname_en)       result.familyNameEn = String(allExtracted.surname_en).toUpperCase();
+  if (allExtracted.given_name_en)    result.givenNameEn  = String(allExtracted.given_name_en).toUpperCase();
+  if (allExtracted.nationality)      result.nationality  = String(allExtracted.nationality);
+  if (allExtracted.date_of_birth)    result.dateOfBirth  = String(allExtracted.date_of_birth);
+  if (allExtracted.gender)           result.gender       = allExtracted.gender === "F" ? "F" : allExtracted.gender === "M" ? "M" : "";
+  if (allExtracted.passport_number)  result.passportNumber = String(allExtracted.passport_number);
+  if (allExtracted.expiry_date)      result.passportExpiry = String(allExtracted.expiry_date);
+  if (allExtracted.residence_card_number) result.residenceCardNumber = String(allExtracted.residence_card_number);
+  if (allExtracted.date_of_expiry)   result.currentVisaExpiry = String(allExtracted.date_of_expiry);
+  if (allExtracted.address)          result.japanAddress = String(allExtracted.address);
+
+  return result;
+}
+
+// ─── 新規登録用: 申請人作成 + 書類保存を1トランザクションで行う ───────────────
+export async function createApplicantWithDocuments(
+  applicantData: {
+    familyNameEn: string;
+    givenNameEn: string;
+    familyNameJa?: string;
+    givenNameJa?: string;
+    nationality: string;
+    dateOfBirth?: string;
+    gender?: string;
+    passportNumber?: string;
+    passportExpiry?: string;
+    residenceCardNumber?: string;
+    currentVisaType?: string;
+    currentVisaExpiry?: string;
+    phone?: string;
+    emailAddress?: string;
+    japanAddress?: string;
+  },
+  documents: Array<{
+    documentType: "passport_front" | "passport_data_page" | "residence_card_front" | "residence_card_back";
+    fileUrl: string;
+    fileName: string;
+    fileSize?: number;
+    mimeType?: string;
+    ocrExtractedData?: Record<string, any>;
+  }>
+) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+  const tenantId = (session.user as any).tenantId;
+  if (!tenantId) throw new Error("テナントIDが不正です");
+
+  // 申請人マスター作成
+  const [newApplicant] = await db
+    .insert(applicantMaster)
+    .values({
+      tenantId,
+      ...applicantData,
+      dateOfBirth: applicantData.dateOfBirth || null,
+      passportExpiry: applicantData.passportExpiry || null,
+      currentVisaExpiry: applicantData.currentVisaExpiry || null,
+    })
+    .returning();
+
+  // 書類レコードを保存
+  if (documents.length > 0) {
+    await db.insert(applicantDocuments).values(
+      documents.map((doc) => ({
+        applicantId: newApplicant.id,
+        tenantId,
+        documentType: doc.documentType,
+        fileUrl: doc.fileUrl,
+        fileName: doc.fileName,
+        fileSize: doc.fileSize,
+        mimeType: doc.mimeType,
+        ocrExtractedData: doc.ocrExtractedData,
+        ocrProcessedAt: doc.ocrExtractedData ? new Date() : null,
+      }))
+    );
+  }
+
+  revalidatePath("/applicants");
+  return newApplicant;
+}

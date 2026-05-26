@@ -1,0 +1,243 @@
+"use server";
+
+import { auth } from "@/lib/auth";
+import { db, applicantDocuments, applicantMaster } from "@/lib/db";
+import { eq, and } from "drizzle-orm";
+import { GoogleGenAI } from "@google/genai";
+import { revalidatePath } from "next/cache";
+
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  passport_front: "パスポート（表紙）",
+  passport_data_page: "パスポート（顔写真・情報ページ）",
+  residence_card_front: "在留カード（表面）",
+  residence_card_back: "在留カード（裏面）",
+};
+
+// Save uploaded document metadata to DB
+export async function saveApplicantDocument(data: {
+  applicantId: string;
+  documentType: "passport_front" | "passport_data_page" | "residence_card_front" | "residence_card_back";
+  fileUrl: string;
+  fileName: string;
+  fileSize?: number;
+  mimeType?: string;
+}) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+  const tenantId = (session.user as any).tenantId;
+  if (!tenantId) throw new Error("テナントIDが不正です");
+
+  // Upsert: delete existing same type and insert new
+  await db
+    .delete(applicantDocuments)
+    .where(
+      and(
+        eq(applicantDocuments.applicantId, data.applicantId),
+        eq(applicantDocuments.documentType, data.documentType)
+      )
+    );
+
+  const [doc] = await db
+    .insert(applicantDocuments)
+    .values({ tenantId, ...data })
+    .returning();
+
+  revalidatePath(`/applicants/${data.applicantId}`);
+  return doc;
+}
+
+// Get all documents for an applicant
+export async function getApplicantDocuments(applicantId: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+  const tenantId = (session.user as any).tenantId;
+
+  return db
+    .select()
+    .from(applicantDocuments)
+    .where(
+      and(
+        eq(applicantDocuments.applicantId, applicantId),
+        eq(applicantDocuments.tenantId, tenantId)
+      )
+    );
+}
+
+// Delete a document
+export async function deleteApplicantDocument(documentId: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+
+  await db
+    .delete(applicantDocuments)
+    .where(eq(applicantDocuments.id, documentId));
+
+  revalidatePath("/applicants");
+}
+
+// OCR a single document with Gemini
+async function ocrSingleDocument(
+  fileUrl: string,
+  mimeType: string,
+  documentTypeLabel: string
+): Promise<Record<string, any>> {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+  // Fetch file from Vercel Blob URL (or any HTTP URL)
+  const res = await fetch(fileUrl);
+  if (!res.ok) throw new Error(`ファイルの取得に失敗しました: ${fileUrl}`);
+  const arrayBuffer = await res.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString("base64");
+
+  // Gemini supports JPEG, PNG, WebP, HEIC, HEIF for images
+  const supportedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+  const imageMimeType = supportedTypes.includes(mimeType) ? mimeType : "image/jpeg";
+
+  const prompt = `あなたは身分証明書のOCR専門家です。
+この画像は「${documentTypeLabel}」です。
+
+画像から読み取れる全ての情報をJSON形式で抽出してください。
+パスポートの場合は以下の項目を抽出:
+- surname (姓・ファミリーネーム、ローマ字)
+- given_name (名・ファーストネーム、ローマ字)
+- nationality (国籍)
+- date_of_birth (生年月日、YYYY-MM-DD形式)
+- gender (性別: M or F)
+- passport_number (パスポート番号)
+- expiry_date (有効期限、YYYY-MM-DD形式)
+- issuing_country (発行国)
+- place_of_birth (出生地、読み取れる場合)
+- mrz_line1 (MRZ第1行、読み取れる場合)
+- mrz_line2 (MRZ第2行、読み取れる場合)
+
+在留カード（表面）の場合:
+- surname_ja (姓・漢字)
+- given_name_ja (名・漢字)
+- surname_en (姓・ローマ字)
+- given_name_en (名・ローマ字)
+- nationality (国籍・地域)
+- date_of_birth (生年月日、YYYY-MM-DD形式)
+- gender (性別)
+- residence_card_number (在留カード番号)
+- status_of_residence (在留資格)
+- period_of_stay (在留期間)
+- date_of_expiry (在留期限、YYYY-MM-DD形式)
+- address (住居地)
+
+在留カード（裏面）の場合:
+- workplace (勤務先)
+- qualification (資格外活動許可等)
+- notes (備考欄の内容)
+
+読み取れなかった項目はnullにしてください。
+JSONのみを返し、説明文は不要です。`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: [
+      {
+        parts: [
+          {
+            inlineData: {
+              mimeType: imageMimeType,
+              data: base64,
+            },
+          },
+          { text: prompt },
+        ],
+      },
+    ],
+  });
+
+  const text = response.text ?? "{}";
+
+  // Extract JSON from response (strip markdown code fences if present)
+  const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+  if (!jsonMatch) return {};
+  try {
+    return JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+  } catch {
+    return {};
+  }
+}
+
+// OCR all documents for an applicant and auto-fill master data
+export async function ocrAndFillApplicant(applicantId: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY が設定されていません。.env.local に追加してください。");
+  }
+
+  const tenantId = (session.user as any).tenantId;
+
+  const docs = await db
+    .select()
+    .from(applicantDocuments)
+    .where(
+      and(
+        eq(applicantDocuments.applicantId, applicantId),
+        eq(applicantDocuments.tenantId, tenantId)
+      )
+    );
+
+  if (docs.length === 0) {
+    throw new Error("アップロードされた書類がありません");
+  }
+
+  const allExtracted: Record<string, any> = {};
+  const docResults: Array<{ id: string; data: Record<string, any> }> = [];
+
+  // OCR each document
+  for (const doc of docs) {
+    const label = DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
+    const extracted = await ocrSingleDocument(
+      doc.fileUrl,
+      doc.mimeType ?? "image/jpeg",
+      label
+    );
+
+    Object.assign(allExtracted, extracted);
+    docResults.push({ id: doc.id, data: extracted });
+
+    // Save OCR result to document record
+    await db
+      .update(applicantDocuments)
+      .set({ ocrExtractedData: extracted, ocrProcessedAt: new Date() })
+      .where(eq(applicantDocuments.id, doc.id));
+  }
+
+  // Build applicant master update from extracted data
+  const update: Record<string, any> = { updatedAt: new Date() };
+
+  // From passport data page
+  if (allExtracted.surname) update.familyNameEn = allExtracted.surname.toUpperCase();
+  if (allExtracted.given_name) update.givenNameEn = allExtracted.given_name.toUpperCase();
+  if (allExtracted.nationality) update.nationality = allExtracted.nationality;
+  if (allExtracted.date_of_birth) update.dateOfBirth = allExtracted.date_of_birth;
+  if (allExtracted.gender) update.gender = allExtracted.gender === "F" ? "F" : "M";
+  if (allExtracted.passport_number) update.passportNumber = allExtracted.passport_number;
+  if (allExtracted.expiry_date) update.passportExpiry = allExtracted.expiry_date;
+
+  // From residence card
+  if (allExtracted.surname_ja) update.familyNameJa = allExtracted.surname_ja;
+  if (allExtracted.given_name_ja) update.givenNameJa = allExtracted.given_name_ja;
+  if (allExtracted.surname_en) update.familyNameEn = allExtracted.surname_en.toUpperCase();
+  if (allExtracted.given_name_en) update.givenNameEn = allExtracted.given_name_en.toUpperCase();
+  if (allExtracted.residence_card_number) update.residenceCardNumber = allExtracted.residence_card_number;
+  if (allExtracted.date_of_expiry) update.currentVisaExpiry = allExtracted.date_of_expiry;
+  if (allExtracted.address) update.japanAddress = allExtracted.address;
+
+  if (Object.keys(update).length > 1) {
+    await db
+      .update(applicantMaster)
+      .set(update)
+      .where(eq(applicantMaster.id, applicantId));
+  }
+
+  revalidatePath(`/applicants/${applicantId}`);
+  revalidatePath("/applicants");
+
+  return { extracted: allExtracted, updatedFields: Object.keys(update).filter((k) => k !== "updatedAt") };
+}

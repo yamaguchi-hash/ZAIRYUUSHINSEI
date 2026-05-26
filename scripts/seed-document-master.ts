@@ -32,8 +32,10 @@ const DOCUMENTS: DocDef[] = [
   { visaType: "common", applicationType: "renewal",       category: "共通書類（更新）", documentName: "在留期間更新許可申請書", description: "入管指定書式", isAlwaysRequired: true, sortOrder: 10 },
   { visaType: "common", applicationType: "all",           category: "共通書類",         documentName: "写真（縦4cm×横3cm）", description: "3か月以内撮影・背景白・正面・無帽", isAlwaysRequired: true, sortOrder: 20 },
   { visaType: "common", applicationType: "all",           category: "共通書類",         documentName: "パスポート（提示）", description: "有効期限内のもの", isAlwaysRequired: true, sortOrder: 30 },
-  { visaType: "common", applicationType: "change",        category: "共通書類（変更）", documentName: "在留カード（提示）", description: "現在の在留カード", isAlwaysRequired: true, sortOrder: 35 },
-  { visaType: "common", applicationType: "renewal",       category: "共通書類（更新）", documentName: "在留カード（提示）", description: "現在の在留カード", isAlwaysRequired: true, sortOrder: 35 },
+  { visaType: "common", applicationType: "change",        category: "共通書類（変更）", documentName: "在留カード（表面）", description: "氏名・在留資格・在留期限等が記載された表面", isAlwaysRequired: true, sortOrder: 35 },
+  { visaType: "common", applicationType: "change",        category: "共通書類（変更）", documentName: "在留カード（裏面）", description: "住所変更記録・資格外活動許可等が記載された裏面", isAlwaysRequired: true, sortOrder: 36 },
+  { visaType: "common", applicationType: "renewal",       category: "共通書類（更新）", documentName: "在留カード（表面）", description: "氏名・在留資格・在留期限等が記載された表面", isAlwaysRequired: true, sortOrder: 35 },
+  { visaType: "common", applicationType: "renewal",       category: "共通書類（更新）", documentName: "在留カード（裏面）", description: "住所変更記録・資格外活動許可等が記載された裏面", isAlwaysRequired: true, sortOrder: 36 },
   { visaType: "common", applicationType: "certification", category: "共通書類（認定）", documentName: "返信用封筒（簡易書留・切手貼付）", description: "定形封筒に宛先明記・404円切手貼付", isAlwaysRequired: true, sortOrder: 40 },
 
   // ══════════════════════════════════════════════════════════════

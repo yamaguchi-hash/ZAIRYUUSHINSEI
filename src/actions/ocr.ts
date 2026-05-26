@@ -168,15 +168,25 @@ JSONのみを返し、説明文は不要です。`;
   }
 
   const text = response.text ?? "{}";
+  console.log("[OCR] raw response text:", text.slice(0, 1000));
 
   // Extract JSON from response (strip markdown code fences if present)
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
-  if (!jsonMatch) return {};
-  try {
-    return JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
-  } catch {
-    return {};
+  let parsed: Record<string, any> = {};
+  const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/```\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+  if (jsonMatch) {
+    try {
+      parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+    } catch {
+      // フォールバック: テキスト全体をパース
+      try { parsed = JSON.parse(text.trim()); } catch { parsed = {}; }
+    }
+  } else {
+    // コードブロックなしで直接JSONが返された場合
+    try { parsed = JSON.parse(text.trim()); } catch { parsed = {}; }
   }
+
+  console.log("[OCR] parsed fields:", JSON.stringify(parsed));
+  return parsed;
 }
 
 // OCR all documents for an applicant and auto-fill master data
@@ -225,26 +235,57 @@ export async function ocrAndFillApplicant(applicantId: string) {
       .where(eq(applicantDocuments.id, doc.id));
   }
 
+  console.log("[OCR/fill] allExtracted:", JSON.stringify(allExtracted).slice(0, 800));
+
   // Build applicant master update from extracted data
   const update: Record<string, any> = { updatedAt: new Date() };
 
-  // From passport data page
-  if (allExtracted.surname) update.familyNameEn = allExtracted.surname.toUpperCase();
-  if (allExtracted.given_name) update.givenNameEn = allExtracted.given_name.toUpperCase();
-  if (allExtracted.nationality) update.nationality = allExtracted.nationality;
-  if (allExtracted.date_of_birth) update.dateOfBirth = allExtracted.date_of_birth;
-  if (allExtracted.gender) update.gender = allExtracted.gender === "F" ? "F" : "M";
-  if (allExtracted.passport_number) update.passportNumber = allExtracted.passport_number;
-  if (allExtracted.expiry_date) update.passportExpiry = allExtracted.expiry_date;
+  const getVal = (...keys: string[]): string => {
+    for (const k of keys) {
+      const v = allExtracted[k];
+      if (v && v !== "null" && v !== "undefined") return String(v);
+    }
+    return "";
+  };
 
-  // From residence card
-  if (allExtracted.surname_ja) update.familyNameJa = allExtracted.surname_ja;
-  if (allExtracted.given_name_ja) update.givenNameJa = allExtracted.given_name_ja;
-  if (allExtracted.surname_en) update.familyNameEn = allExtracted.surname_en.toUpperCase();
-  if (allExtracted.given_name_en) update.givenNameEn = allExtracted.given_name_en.toUpperCase();
-  if (allExtracted.residence_card_number) update.residenceCardNumber = allExtracted.residence_card_number;
-  if (allExtracted.date_of_expiry) update.currentVisaExpiry = allExtracted.date_of_expiry;
-  if (allExtracted.address) update.japanAddress = allExtracted.address;
+  const fnEn = getVal("surname_en", "surname", "family_name", "last_name");
+  if (fnEn) update.familyNameEn = fnEn.toUpperCase();
+
+  const gnEn = getVal("given_name_en", "given_name", "first_name");
+  if (gnEn) update.givenNameEn = gnEn.toUpperCase();
+
+  const nat = getVal("nationality", "country", "citizenship");
+  if (nat) update.nationality = nat;
+
+  const dob = getVal("date_of_birth", "birth_date", "dateOfBirth");
+  if (dob) update.dateOfBirth = dob;
+
+  const gRaw = getVal("gender", "sex");
+  if (gRaw) {
+    const g = gRaw.toUpperCase();
+    update.gender = g === "F" || g.includes("女") || g === "FEMALE" ? "F" : "M";
+  }
+
+  const ppNum = getVal("passport_number", "passportNumber");
+  if (ppNum) update.passportNumber = ppNum;
+
+  const ppExp = getVal("expiry_date", "expiration_date");
+  if (ppExp) update.passportExpiry = ppExp;
+
+  const fnJa = getVal("surname_ja", "family_name_ja");
+  if (fnJa) update.familyNameJa = fnJa;
+
+  const gnJa = getVal("given_name_ja", "first_name_ja");
+  if (gnJa) update.givenNameJa = gnJa;
+
+  const rcNum = getVal("residence_card_number", "residenceCardNumber");
+  if (rcNum) update.residenceCardNumber = rcNum;
+
+  const rcExp = getVal("date_of_expiry", "residence_expiry");
+  if (rcExp) update.currentVisaExpiry = rcExp;
+
+  const addr = getVal("address", "japan_address");
+  if (addr) update.japanAddress = addr;
 
   if (Object.keys(update).length > 1) {
     await db
@@ -294,6 +335,9 @@ export async function ocrFilesForRegistration(docIds: string[]): Promise<
         .where(eq(applicantDocuments.id, doc.id));
     }
 
+    console.log("[OCR] allExtracted keys:", Object.keys(allExtracted));
+    console.log("[OCR] allExtracted values:", JSON.stringify(allExtracted).slice(0, 500));
+
     const result = {
       success: true as const,
       familyNameEn: "",
@@ -312,20 +356,74 @@ export async function ocrFilesForRegistration(docIds: string[]): Promise<
       raw: allExtracted,
     };
 
-    if (allExtracted.surname)          result.familyNameEn = String(allExtracted.surname).toUpperCase();
-    if (allExtracted.given_name)       result.givenNameEn  = String(allExtracted.given_name).toUpperCase();
-    if (allExtracted.surname_ja)       result.familyNameJa = String(allExtracted.surname_ja);
-    if (allExtracted.given_name_ja)    result.givenNameJa  = String(allExtracted.given_name_ja);
-    if (allExtracted.surname_en)       result.familyNameEn = String(allExtracted.surname_en).toUpperCase();
-    if (allExtracted.given_name_en)    result.givenNameEn  = String(allExtracted.given_name_en).toUpperCase();
-    if (allExtracted.nationality)      result.nationality  = String(allExtracted.nationality);
-    if (allExtracted.date_of_birth)    result.dateOfBirth  = String(allExtracted.date_of_birth);
-    if (allExtracted.gender)           result.gender       = allExtracted.gender === "F" ? "F" : allExtracted.gender === "M" ? "M" : "";
-    if (allExtracted.passport_number)  result.passportNumber = String(allExtracted.passport_number);
-    if (allExtracted.expiry_date)      result.passportExpiry = String(allExtracted.expiry_date);
-    if (allExtracted.residence_card_number) result.residenceCardNumber = String(allExtracted.residence_card_number);
-    if (allExtracted.date_of_expiry)   result.currentVisaExpiry = String(allExtracted.date_of_expiry);
-    if (allExtracted.address)          result.japanAddress = String(allExtracted.address);
+    // キー名の正規化（Geminiが返すバリエーションに対応）
+    const get = (...keys: string[]): string => {
+      for (const k of keys) {
+        const v = allExtracted[k];
+        if (v && v !== "null" && v !== "undefined") return String(v);
+      }
+      return "";
+    };
+
+    // 姓（英）: パスポートの surname / 在留カードの surname_en
+    const fnEn = get("surname_en", "surname", "family_name", "familyName", "last_name", "lastName");
+    if (fnEn) result.familyNameEn = fnEn.toUpperCase();
+
+    // 名（英）: パスポートの given_name / 在留カードの given_name_en
+    const gnEn = get("given_name_en", "given_name", "givenName", "first_name", "firstName");
+    if (gnEn) result.givenNameEn = gnEn.toUpperCase();
+
+    // 姓（日）
+    const fnJa = get("surname_ja", "family_name_ja", "familyNameJa", "last_name_ja");
+    if (fnJa) result.familyNameJa = fnJa;
+
+    // 名（日）
+    const gnJa = get("given_name_ja", "first_name_ja", "givenNameJa", "firstName_ja");
+    if (gnJa) result.givenNameJa = gnJa;
+
+    // 国籍
+    const nat = get("nationality", "country", "citizenship");
+    if (nat) result.nationality = nat;
+
+    // 生年月日
+    const dob = get("date_of_birth", "birth_date", "birthDate", "dateOfBirth", "dob");
+    if (dob) result.dateOfBirth = dob;
+
+    // 性別
+    const genderRaw = get("gender", "sex");
+    if (genderRaw) {
+      const g = genderRaw.toUpperCase();
+      result.gender = g === "F" || g.includes("女") || g === "FEMALE" ? "F"
+        : g === "M" || g.includes("男") || g === "MALE" ? "M" : "";
+    }
+
+    // パスポート番号
+    const ppNum = get("passport_number", "passportNumber", "document_number");
+    if (ppNum) result.passportNumber = ppNum;
+
+    // パスポート有効期限
+    const ppExp = get("expiry_date", "expiration_date", "date_of_expiry", "expiryDate", "passportExpiry");
+    if (ppExp) result.passportExpiry = ppExp;
+
+    // 在留カード番号
+    const rcNum = get("residence_card_number", "residenceCardNumber", "card_number");
+    if (rcNum) result.residenceCardNumber = rcNum;
+
+    // 在留期限（在留カードの date_of_expiry はパスポートと重複する可能性があるため別途処理）
+    const rcExp = get("date_of_expiry", "residence_expiry", "status_expiry");
+    if (rcExp && !result.passportExpiry) result.currentVisaExpiry = rcExp;
+    else if (allExtracted.date_of_expiry && result.passportExpiry) result.currentVisaExpiry = String(allExtracted.date_of_expiry);
+
+    // 住所
+    const addr = get("address", "japanAddress", "japan_address", "residence_address");
+    if (addr) result.japanAddress = addr;
+
+    console.log("[OCR] mapped result:", JSON.stringify({
+      familyNameEn: result.familyNameEn,
+      givenNameEn: result.givenNameEn,
+      nationality: result.nationality,
+      dateOfBirth: result.dateOfBirth,
+    }));
 
     return result;
   } catch (err: any) {

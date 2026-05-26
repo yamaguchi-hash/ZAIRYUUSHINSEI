@@ -238,7 +238,7 @@ export function AiRegistrationForm() {
               key={cfg.type}
               ref={(el) => { if (el) inputRefs.current[cfg.type] = el; }}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
+              accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf,image/jpeg,image/png,image/webp,image/heic,application/pdf"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];

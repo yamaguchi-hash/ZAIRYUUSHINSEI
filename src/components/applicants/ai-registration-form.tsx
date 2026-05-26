@@ -51,8 +51,8 @@ export function AiRegistrationForm() {
   const [saveError, setSaveError] = useState("");
   const [rawOcr, setRawOcr] = useState<Record<string, any> | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [pendingDocType, setPendingDocType] = useState<DocType | null>(null);
+  const inputRefs = useRef<Partial<Record<DocType, HTMLInputElement>>>({});
+  const [draggingType, setDraggingType] = useState<DocType | null>(null);
 
   // ── ファイルアップロード ──────────────────────────────────────────────────
   async function handleFileSelect(file: File, docType: DocType) {
@@ -180,12 +180,20 @@ export function AiRegistrationForm() {
                         </div>
                       </DocumentViewTrigger>
                       {/* delete overlay */}
-                      <button
-                        onClick={() => removeDoc(cfg.type)}
-                        className="absolute top-1.5 right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); inputRefs.current[cfg.type]?.click(); }}
+                          className="bg-white text-gray-800 rounded-lg px-2 py-1 text-xs font-medium hover:bg-gray-100"
+                        >
+                          差し替え
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeDoc(cfg.type); }}
+                          className="bg-red-500 text-white rounded-lg px-2 py-1 text-xs font-medium hover:bg-red-600 flex items-center gap-1"
+                        >
+                          <X className="w-3 h-3" />削除
+                        </button>
+                      </div>
                       <div className="absolute bottom-1 left-1 bg-green-500 text-white rounded px-1 py-0.5 text-xs flex items-center gap-0.5">
                         <CheckCircle className="w-2.5 h-2.5" /> 完了
                       </div>
@@ -196,14 +204,26 @@ export function AiRegistrationForm() {
                         "border-2 border-dashed rounded-xl aspect-[3/2] flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors",
                         isLoading
                           ? "border-blue-300 bg-blue-50 pointer-events-none"
+                          : draggingType === cfg.type
+                          ? "border-purple-500 bg-purple-50 scale-[1.02]"
                           : "border-gray-200 hover:border-purple-400 hover:bg-purple-50/40"
                       )}
-                      onClick={() => { setPendingDocType(cfg.type); inputRef.current?.click(); }}
+                      onClick={() => { inputRefs.current[cfg.type]?.click(); }}
+                      onDragOver={(e) => { e.preventDefault(); setDraggingType(cfg.type); }}
+                      onDragLeave={() => setDraggingType(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDraggingType(null);
+                        const file = e.dataTransfer.files[0];
+                        if (file) handleFileSelect(file, cfg.type);
+                      }}
                     >
                       {isLoading ? (
                         <><Loader2 className="w-6 h-6 text-blue-500 animate-spin" /><p className="text-xs text-blue-600">アップロード中...</p></>
+                      ) : draggingType === cfg.type ? (
+                        <><Upload className="w-6 h-6 text-purple-500" /><p className="text-xs text-purple-600 font-medium text-center px-2">ここにドロップ</p></>
                       ) : (
-                        <><Upload className="w-6 h-6 text-gray-300" /><p className="text-xs text-gray-400 text-center px-2">クリックして選択<br/>JPEG/PNG/PDF</p></>
+                        <><Upload className="w-6 h-6 text-gray-300" /><p className="text-xs text-gray-400 text-center px-2">クリックまたはドロップ<br/>JPEG/PNG/PDF</p></>
                       )}
                     </div>
                   )}
@@ -212,17 +232,20 @@ export function AiRegistrationForm() {
             })}
           </div>
 
-          {/* Hidden file input */}
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file && pendingDocType) { handleFileSelect(file, pendingDocType); e.target.value = ""; }
-            }}
-          />
+          {/* Hidden file inputs — one per zone */}
+          {DOC_CONFIGS.map((cfg) => (
+            <input
+              key={cfg.type}
+              ref={(el) => { if (el) inputRefs.current[cfg.type] = el; }}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) { handleFileSelect(file, cfg.type); e.target.value = ""; }
+              }}
+            />
+          ))}
 
           {uploadError && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">

@@ -354,3 +354,109 @@ export async function runConsistencyCheck(applicationId: string) {
   revalidatePath(`/applications/${applicationId}`);
   return { issues };
 }
+
+// ── 書類マスター取得（visaType + applicationType でフィルタ）────────────────
+export async function getDocumentRequirements(visaType: string, applicationType: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+
+  const { inArray } = await import("drizzle-orm");
+
+  // "common"（全ビザ共通）と指定ビザ種別の書類を返す
+  const searchVisaTypes = ["common", visaType];
+  // applicationType: "all"（全申請種別共通）と指定申請種別の書類を返す
+  const searchAppTypes = ["all", applicationType];
+
+  const rows = await db
+    .select()
+    .from(documentRequirementMaster)
+    .where(
+      and(
+        eq(documentRequirementMaster.isActive, true),
+        inArray(documentRequirementMaster.visaType, searchVisaTypes),
+        inArray(documentRequirementMaster.applicationType, searchAppTypes)
+      )
+    )
+    .orderBy(documentRequirementMaster.sortOrder);
+
+  return rows;
+}
+
+// ── チェックリストに書類を追加（選択した書類IDから一括登録）────────────────
+export async function addDocumentsToChecklist(
+  applicationId: string,
+  documentRequirementIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    // 申請案件の確認
+    const [app] = await db
+      .select({ id: applications.id })
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    // 既存チェックリストのdocumentRequirementIdを取得
+    const existing = await db
+      .select({ documentRequirementId: applicationDocumentChecklist.documentRequirementId })
+      .from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.applicationId, applicationId));
+    const existingIds = new Set(existing.map((e) => e.documentRequirementId).filter(Boolean));
+
+    // まだ追加されていない書類だけを対象に
+    const newIds = documentRequirementIds.filter((id) => !existingIds.has(id));
+    if (newIds.length === 0) {
+      revalidatePath(`/applications/${applicationId}`);
+      return { success: true };
+    }
+
+    // マスターから書類名を取得
+    const { inArray } = await import("drizzle-orm");
+    const masters = await db
+      .select()
+      .from(documentRequirementMaster)
+      .where(inArray(documentRequirementMaster.id, newIds));
+
+    await db.insert(applicationDocumentChecklist).values(
+      masters.map((m) => ({
+        applicationId,
+        documentRequirementId: m.id,
+        documentName: m.documentName,
+        isRequiredByExpert: true,
+        status: "not_submitted" as const,
+      }))
+    );
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "追加に失敗しました" };
+  }
+}
+
+// ── チェックリストから書類を削除 ─────────────────────────────────────────────
+export async function removeDocumentFromChecklist(
+  checklistItemId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+
+    const [item] = await db
+      .select({ applicationId: applicationDocumentChecklist.applicationId })
+      .from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.id, checklistItemId))
+      .limit(1);
+
+    await db.delete(applicationDocumentChecklist).where(eq(applicationDocumentChecklist.id, checklistItemId));
+
+    if (item?.applicationId) revalidatePath(`/applications/${item.applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "削除に失敗しました" };
+  }
+}

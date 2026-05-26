@@ -26,8 +26,10 @@ import {
 import Link from "next/link";
 import { WorkflowStepper } from "@/components/applications/workflow-stepper";
 import { DocumentChecklist } from "@/components/applications/document-checklist";
+import { DocumentSelector } from "@/components/applications/document-selector";
 import { ConsistencyCheckPanel } from "@/components/applications/consistency-check-panel";
 import { ApproveButton } from "@/components/applications/approve-button";
+import { getDocumentRequirements } from "@/actions/applications";
 
 const WORKFLOW_STEPS = [
   { key: "draft", label: "基本情報セットアップ" },
@@ -58,6 +60,12 @@ export default async function ApplicationDetailPage({
 
   const { application, applicant, organization, checklist, questionnaire } = data;
   const checkResult = application.consistencyCheckResult as any;
+
+  // 書類マスター取得（ビザ種別・申請種別でフィルタ）
+  const masterDocuments = await getDocumentRequirements(
+    application.visaType,
+    application.applicationType
+  );
   const issues = checkResult?.issues ?? [];
 
   const currentStepIndex = WORKFLOW_STEPS.findIndex((s) => s.key === application.status);
@@ -284,13 +292,26 @@ export default async function ApplicationDetailPage({
         </div>
       )}
 
-      {/* Document checklist */}
-      <DocumentChecklist
-        checklist={checklist}
-        applicationId={application.id}
-        userRole={userRole}
-        applicationStatus={application.status}
-      />
+      {/* Document checklist + selector */}
+      <div>
+        <DocumentChecklist
+          checklist={checklist}
+          applicationId={application.id}
+          userRole={userRole}
+          applicationStatus={application.status}
+        />
+        <DocumentSelector
+          applicationId={application.id}
+          masterDocuments={masterDocuments}
+          checklist={checklist.map((c) => ({
+            id: c.id,
+            documentName: c.documentName,
+            documentRequirementId: (c as any).documentRequirementId ?? null,
+            isRequiredByExpert: c.isRequiredByExpert,
+            status: c.status,
+          }))}
+        />
+      </div>
     </div>
   );
 }

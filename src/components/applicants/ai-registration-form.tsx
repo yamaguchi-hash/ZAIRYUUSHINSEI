@@ -23,9 +23,9 @@ const DOC_CONFIGS: { type: DocType; label: string; hint: string }[] = [
 
 interface UploadedDoc {
   type: DocType;
-  url: string;
+  docId: string;   // DB上の一時レコードID
+  url: string;     // 表示用URL（data URL またはBlob URL）
   fileName: string;
-  fileSize?: number;
   mimeType: string;
 }
 
@@ -49,7 +49,6 @@ export function AiRegistrationForm() {
   const [isSaving, startSave] = useTransition();
   const [ocrError, setOcrError] = useState("");
   const [saveError, setSaveError] = useState("");
-  const [rawOcr, setRawOcr] = useState<Record<string, any> | null>(null);
   const [form, setForm] = useState(emptyForm);
   const inputRefs = useRef<Partial<Record<DocType, HTMLInputElement>>>({});
   const [draggingType, setDraggingType] = useState<DocType | null>(null);
@@ -61,13 +60,20 @@ export function AiRegistrationForm() {
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("documentType", docType);
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "アップロード失敗");
 
       setDocs((prev) => {
         const filtered = prev.filter((d) => d.type !== docType);
-        return [...filtered, { type: docType, url: data.url, fileName: data.fileName, fileSize: data.fileSize, mimeType: data.mimeType }];
+        return [...filtered, {
+          type: docType,
+          docId: data.docId,
+          url: data.url,
+          fileName: data.fileName,
+          mimeType: data.mimeType,
+        }];
       });
     } catch (err: any) {
       setUploadError(err.message ?? "アップロードに失敗しました");
@@ -85,9 +91,9 @@ export function AiRegistrationForm() {
     setOcrError("");
     startOcr(async () => {
       try {
-        const files = docs.map((d) => ({ url: d.url, mimeType: d.mimeType, documentType: d.type }));
-        const result = await ocrFilesForRegistration(files);
-        setRawOcr(result.raw);
+        const docIds = docs.map((d) => d.docId).filter(Boolean) as string[];
+        if (docIds.length === 0) throw new Error("書類がアップロードされていません");
+        const result = await ocrFilesForRegistration(docIds);
         setForm({
           familyNameEn: result.familyNameEn,
           givenNameEn: result.givenNameEn,
@@ -122,14 +128,8 @@ export function AiRegistrationForm() {
     setSaveError("");
     startSave(async () => {
       try {
-        const applicant = await createApplicantWithDocuments(form, docs.map((d) => ({
-          documentType: d.type,
-          fileUrl: d.url,
-          fileName: d.fileName,
-          fileSize: d.fileSize,
-          mimeType: d.mimeType,
-          ocrExtractedData: rawOcr ?? undefined,
-        })));
+        const docIds = docs.map((d) => d.docId).filter(Boolean) as string[];
+        const applicant = await createApplicantWithDocuments(form, docIds);
         router.push(`/applicants/${applicant.id}`);
         router.refresh();
       } catch (err: any) {
@@ -179,7 +179,6 @@ export function AiRegistrationForm() {
                           )}
                         </div>
                       </DocumentViewTrigger>
-                      {/* delete overlay */}
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
                         <button
                           onClick={(e) => { e.stopPropagation(); inputRefs.current[cfg.type]?.click(); }}
@@ -308,7 +307,7 @@ export function AiRegistrationForm() {
             内容確認・修正して登録
           </CardTitle>
         </div>
-        {rawOcr && (
+        {docs.length > 0 && (
           <div className="flex items-center gap-1.5 mt-1">
             <CheckCircle className="w-3.5 h-3.5 text-green-600" />
             <p className="text-xs text-green-600 font-medium">AIが自動入力しました。内容を確認・修正してください。</p>

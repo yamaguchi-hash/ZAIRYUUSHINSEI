@@ -233,7 +233,7 @@ export const pdfFieldMapping = pgTable("pdf_field_mapping", {
 // ─── Applicant documents ──────────────────────────────────────────────────────
 export const applicantDocuments = pgTable("applicant_documents", {
   id: uuid("id").defaultRandom().primaryKey(),
-  applicantId: uuid("applicant_id").notNull().references(() => applicantMaster.id, { onDelete: "cascade" }),
+  applicantId: uuid("applicant_id").references(() => applicantMaster.id, { onDelete: "cascade" }),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   documentType: applicantDocumentTypeEnum("document_type").notNull(),
   fileUrl: text("file_url").notNull(),

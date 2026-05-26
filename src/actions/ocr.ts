@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { db, applicantDocuments, applicantMaster } from "@/lib/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
 import { revalidatePath } from "next/cache";
 
@@ -252,9 +252,9 @@ export async function ocrAndFillApplicant(applicantId: string) {
   return { extracted: allExtracted, updatedFields: Object.keys(update).filter((k) => k !== "updatedAt") };
 }
 
-// ─── 新規登録用: DB保存なしでOCR実行してフォームデータを返す ─────────────────
+// ─── 新規登録用: DBに保存済みのdocIdを使ってOCR実行 ──────────────────────────
 export async function ocrFilesForRegistration(
-  files: Array<{ url: string; mimeType: string; documentType: string }>
+  docIds: string[]
 ): Promise<{
   familyNameEn: string;
   givenNameEn: string;
@@ -278,17 +278,30 @@ export async function ocrFilesForRegistration(
     throw new Error("GEMINI_API_KEY が設定されていません");
   }
 
-  if (files.length === 0) throw new Error("書類がアップロードされていません");
+  if (docIds.length === 0) throw new Error("書類がアップロードされていません");
+
+  // DBからドキュメントを取得
+  const docs = await db
+    .select()
+    .from(applicantDocuments)
+    .where(inArray(applicantDocuments.id, docIds));
+
+  if (docs.length === 0) throw new Error("書類が見つかりません");
 
   const allExtracted: Record<string, any> = {};
 
-  for (const file of files) {
-    const label = DOCUMENT_TYPE_LABELS[file.documentType] ?? file.documentType;
-    const extracted = await ocrSingleDocument(file.url, file.mimeType, label);
+  for (const doc of docs) {
+    const label = DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
+    const extracted = await ocrSingleDocument(doc.fileUrl, doc.mimeType ?? "image/jpeg", label);
     Object.assign(allExtracted, extracted);
+
+    // OCR結果をDBに保存
+    await db
+      .update(applicantDocuments)
+      .set({ ocrExtractedData: extracted, ocrProcessedAt: new Date() })
+      .where(eq(applicantDocuments.id, doc.id));
   }
 
-  // OCR結果をフォームフィールドにマッピング
   const result = {
     familyNameEn: "",
     givenNameEn: "",
@@ -324,7 +337,7 @@ export async function ocrFilesForRegistration(
   return result;
 }
 
-// ─── 新規登録用: 申請人作成 + 書類保存を1トランザクションで行う ───────────────
+// ─── 新規登録用: 申請人作成 + 既存の一時書類レコードを紐付け ──────────────────
 export async function createApplicantWithDocuments(
   applicantData: {
     familyNameEn: string;
@@ -343,14 +356,7 @@ export async function createApplicantWithDocuments(
     emailAddress?: string;
     japanAddress?: string;
   },
-  documents: Array<{
-    documentType: "passport_front" | "passport_data_page" | "residence_card_front" | "residence_card_back";
-    fileUrl: string;
-    fileName: string;
-    fileSize?: number;
-    mimeType?: string;
-    ocrExtractedData?: Record<string, any>;
-  }>
+  docIds: string[]
 ) {
   const session = await auth();
   if (!session?.user) throw new Error("認証が必要です");
@@ -369,21 +375,14 @@ export async function createApplicantWithDocuments(
     })
     .returning();
 
-  // 書類レコードを保存
-  if (documents.length > 0) {
-    await db.insert(applicantDocuments).values(
-      documents.map((doc) => ({
-        applicantId: newApplicant.id,
-        tenantId,
-        documentType: doc.documentType,
-        fileUrl: doc.fileUrl,
-        fileName: doc.fileName,
-        fileSize: doc.fileSize,
-        mimeType: doc.mimeType,
-        ocrExtractedData: doc.ocrExtractedData,
-        ocrProcessedAt: doc.ocrExtractedData ? new Date() : null,
-      }))
-    );
+  // 一時書類レコードに申請人IDを紐付け
+  if (docIds.length > 0) {
+    for (const docId of docIds) {
+      await db
+        .update(applicantDocuments)
+        .set({ applicantId: newApplicant.id })
+        .where(eq(applicantDocuments.id, docId));
+    }
   }
 
   revalidatePath("/applicants");

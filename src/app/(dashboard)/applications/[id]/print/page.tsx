@@ -46,6 +46,13 @@ export default async function ChecklistPrintPage({
   // 必須書類のみ表示（isRequiredByExpert=true）
   const requiredItems = checklist.filter(c => c.isRequiredByExpert);
 
+  // 写真を含む書類は番号なし
+  let docNum2 = 0;
+  const docNumbers2: Record<string, number | null> = {};
+  for (const item of requiredItems) {
+    docNumbers2[item.id] = item.documentName.includes("写真") ? null : ++docNum2;
+  }
+
   const today = formatDateJa(new Date());
   const applicantName = [applicant?.familyNameEn, applicant?.givenNameEn].filter(Boolean).join(" ");
   const applicantNameJa = [applicant?.familyNameJa, applicant?.givenNameJa].filter(Boolean).join(" ");
@@ -127,11 +134,10 @@ export default async function ChecklistPrintPage({
                   必要書類が登録されていません
                 </td>
               </tr>
-            ) : (
-              requiredItems.map((item, idx) => (
+            ) : requiredItems.map((item, idx) => (
                 <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                   <td className="border border-gray-200 px-2 py-2.5 text-center text-gray-500">
-                    {idx + 1}
+                    {docNumbers2[item.id] ?? "—"}
                   </td>
                   <td className="border border-gray-200 px-2 py-2.5 text-center text-lg">
                     {item.status === "approved" ? "✓" :
@@ -155,8 +161,8 @@ export default async function ChecklistPrintPage({
                     )}
                   </td>
                 </tr>
-              ))
-            )}
+            ))
+            }
           </tbody>
         </table>
 

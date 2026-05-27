@@ -47,6 +47,13 @@ export default async function ChecklistPrintPage({
 
   const requiredItems = checklist.filter(c => c.isRequiredByExpert);
 
+  // 写真を含む書類は番号なし
+  let docNum = 0;
+  const docNumbers: Record<string, number | null> = {};
+  for (const item of requiredItems) {
+    docNumbers[item.id] = item.documentName.includes("写真") ? null : ++docNum;
+  }
+
   const today = formatDateJa(new Date());
   const applicantName = [applicant?.familyNameEn, applicant?.givenNameEn].filter(Boolean).join(" ");
   const applicantNameJa = [applicant?.familyNameJa, applicant?.givenNameJa].filter(Boolean).join(" ");
@@ -188,10 +195,9 @@ export default async function ChecklistPrintPage({
                     必要書類が登録されていません
                   </td>
                 </tr>
-              ) : (
-                requiredItems.map((item, idx) => (
+              ) : requiredItems.map((item) => (
                   <tr key={item.id}>
-                    <td className="col-no">{idx + 1}</td>
+                    <td className="col-no">{docNumbers[item.id] ?? "—"}</td>
                     <td className="col-check">
                       {item.status === "approved" ? "✓" :
                        item.status === "submitted" ? "◎" : "□"}
@@ -209,8 +215,8 @@ export default async function ChecklistPrintPage({
                       <div className="notes-cell">{item.expertNotes ?? ""}</div>
                     </td>
                   </tr>
-                ))
-              )}
+              ))
+              }
             </tbody>
           </table>
 

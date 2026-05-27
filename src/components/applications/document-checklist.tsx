@@ -400,7 +400,16 @@ export function DocumentChecklist({
             <p className="text-sm">書類リストがありません</p>
             <p className="text-xs mt-1">下の「入管必要書類から選択」から追加してください</p>
           </div>
-        ) : (
+        ) : (() => {
+            // 必須書類の連番（「写真」を含む書類は番号なし）
+            let docNum = 0;
+            const numMap: Record<string, number | null> = {};
+            for (const it of localChecklist) {
+              if (it.isRequiredByExpert) {
+                numMap[it.id] = it.documentName.includes("写真") ? null : ++docNum;
+              }
+            }
+            return (
           <div className="divide-y divide-gray-50">
             {localChecklist.map((item) => (
               <div
@@ -410,8 +419,22 @@ export function DocumentChecklist({
                   !item.isRequiredByExpert && "opacity-60"
                 )}
               >
-                {/* 上段: チェックボックス + 書類名 + ステータス */}
+                {/* 上段: 番号 + チェックボックス + 書類名 + ステータス */}
                 <div className="flex items-center gap-3">
+                  {/* 連番バッジ */}
+                  {item.isRequiredByExpert && (
+                    <div className="flex-shrink-0 w-7 text-center">
+                      {numMap[item.id] != null ? (
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
+                          {numMap[item.id]}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
+                    </div>
+                  )}
+                  {!item.isRequiredByExpert && <div className="flex-shrink-0 w-7" />}
+
                   {isExpert ? (
                     <button
                       onClick={() => handleToggleExpert(item)}
@@ -525,7 +548,9 @@ export function DocumentChecklist({
               </div>
             ))}
           </div>
-        )}
+        );
+          })()
+        }
 
         {/* ── 全書類提出済み → 下書き作成バナー ── */}
         {allRequiredSubmitted && (

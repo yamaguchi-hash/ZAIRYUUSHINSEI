@@ -130,12 +130,13 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
     startAddRequired(async () => {
       const result = await addRequiredDocumentsToChecklist(applicationId);
       if (result.success) {
-        setMessage(
-          result.count && result.count > 0
-            ? `✓ 必須書類 ${result.count}件 を自動追加しました`
-            : "追加できる必須書類はありません（すべて追加済み）"
-        );
-        setTimeout(() => setMessage(""), 4000);
+        if (result.count && result.count > 0) {
+          // 追加成功 → ページ再読み込みして反映
+          window.location.reload();
+        } else {
+          setMessage("追加できる必須書類はありません（すべて追加済み）");
+          setTimeout(() => setMessage(""), 4000);
+        }
       } else {
         setMessage(`エラー: ${result.error}`);
       }

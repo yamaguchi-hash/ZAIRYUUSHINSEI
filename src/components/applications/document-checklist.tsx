@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import {
   toggleExpertCheckmark,
   updateDocumentStatus,
@@ -232,6 +232,11 @@ export function DocumentChecklist({
 }: DocumentChecklistProps) {
   const [isPending, startTransition] = useTransition();
   const [localChecklist, setLocalChecklist] = useState(checklist);
+
+  // props が更新されたら state を同期（必須書類自動追加後など）
+  useEffect(() => {
+    setLocalChecklist(checklist);
+  }, [checklist]);
   const [isCheckRunning, setIsCheckRunning] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState("");

@@ -4,15 +4,18 @@ import { useState, useTransition, useRef, useEffect } from "react";
 import {
   toggleExpertCheckmark,
   updateDocumentStatus,
+  updateChecklistNotes,
   runConsistencyCheck,
   saveChecklistDocumentAndOcr,
   shareApplicantDocumentsToChecklist,
+  generateApplicationFormDraft,
 } from "@/actions/applications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   CheckSquare, Square, CheckCircle, XCircle, AlertCircle,
   Clock, RefreshCw, Loader2, FileText, Upload, Sparkles,
-  ChevronDown, ChevronRight, Share2,
+  ChevronDown, ChevronRight, Share2, Pencil, Check, X,
+  FileEdit, ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -240,6 +243,12 @@ export function DocumentChecklist({
   const [isCheckRunning, setIsCheckRunning] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+  // 備考編集中のアイテムIDと入力値
+  const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
+  const [editingNotesValue, setEditingNotesValue] = useState("");
+  // 下書き生成
+  const [isDraftGenerating, setIsDraftGenerating] = useState(false);
+  const [draftMessage, setDraftMessage] = useState("");
 
   const isExpert = userRole === "expert" || userRole === "admin";
   const requiredItems = localChecklist.filter((i) => i.isRequiredByExpert);
@@ -289,6 +298,46 @@ export function DocumentChecklist({
       }
     } finally {
       setIsSharing(false);
+    }
+  }
+
+  function startEditNotes(item: ChecklistItem) {
+    setEditingNotesId(item.id);
+    setEditingNotesValue(item.expertNotes ?? "");
+  }
+
+  async function saveNotes(itemId: string) {
+    const notes = editingNotesValue.trim();
+    setLocalChecklist((prev) =>
+      prev.map((i) => (i.id === itemId ? { ...i, expertNotes: notes || null } : i))
+    );
+    setEditingNotesId(null);
+    await updateChecklistNotes(itemId, notes);
+  }
+
+  function cancelEditNotes() {
+    setEditingNotesId(null);
+    setEditingNotesValue("");
+  }
+
+  // 全必須書類が提出済みかどうか
+  const allRequiredSubmitted =
+    requiredItems.length > 0 &&
+    requiredItems.every((i) => i.status !== "not_submitted");
+
+  async function handleGenerateDraft() {
+    setIsDraftGenerating(true);
+    setDraftMessage("");
+    try {
+      const result = await generateApplicationFormDraft(applicationId);
+      if (result.success) {
+        setDraftMessage("✓ 申請書類の下書きを生成しました。画面をリロードして確認してください。");
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        setDraftMessage(`エラー: ${result.error}`);
+      }
+    } finally {
+      setIsDraftGenerating(false);
     }
   }
 
@@ -390,8 +439,53 @@ export function DocumentChecklist({
                         <span className="ml-2 text-xs text-red-500 font-normal">必須</span>
                       )}
                     </p>
-                    {item.expertNotes && (
-                      <p className="text-xs text-orange-600 mt-0.5">{item.expertNotes}</p>
+                    {/* 備考（インライン編集） */}
+                    {editingNotesId === item.id ? (
+                      <div className="flex items-center gap-1 mt-1">
+                        <input
+                          type="text"
+                          value={editingNotesValue}
+                          onChange={(e) => setEditingNotesValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveNotes(item.id);
+                            if (e.key === "Escape") cancelEditNotes();
+                          }}
+                          placeholder="例：結婚証明書、出生証明書 など"
+                          autoFocus
+                          className="flex-1 text-xs border border-orange-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50"
+                        />
+                        <button
+                          onClick={() => saveNotes(item.id)}
+                          className="p-1 text-green-600 hover:bg-green-50 rounded"
+                          title="保存"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={cancelEditNotes}
+                          className="p-1 text-gray-400 hover:bg-gray-50 rounded"
+                          title="キャンセル"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 mt-0.5 group/notes">
+                        {item.expertNotes ? (
+                          <p className="text-xs text-orange-600">{item.expertNotes}</p>
+                        ) : (
+                          <p className="text-xs text-gray-300 hidden group-hover/notes:block">備考を追加...</p>
+                        )}
+                        {isExpert && (
+                          <button
+                            onClick={() => startEditNotes(item)}
+                            className="p-0.5 text-gray-300 hover:text-orange-400 rounded opacity-0 group-hover/notes:opacity-100 transition-opacity"
+                            title="備考を編集"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -430,6 +524,48 @@ export function DocumentChecklist({
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ── 全書類提出済み → 下書き作成バナー ── */}
+        {allRequiredSubmitted && (
+          <div className="border-t border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-green-800">
+                    必要書類がすべて提出されました
+                  </p>
+                  <p className="text-xs text-green-600 mt-0.5">
+                    次のステップ：AIが収集した書類情報をもとに申請書類の下書きを作成します
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleGenerateDraft}
+                disabled={isDraftGenerating}
+                className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex-shrink-0"
+              >
+                {isDraftGenerating ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" />AIが生成中...</>
+                ) : (
+                  <><FileEdit className="w-4 h-4" />申請書類の下書きを作成<ArrowRight className="w-4 h-4" /></>
+                )}
+              </button>
+            </div>
+            {draftMessage && (
+              <p className={cn(
+                "mt-3 text-xs px-3 py-2 rounded-lg",
+                draftMessage.startsWith("エラー")
+                  ? "bg-red-50 text-red-700 border border-red-200"
+                  : "bg-green-100 text-green-700 border border-green-200"
+              )}>
+                {draftMessage}
+              </p>
+            )}
           </div>
         )}
       </CardContent>

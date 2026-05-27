@@ -96,109 +96,121 @@ export async function createApplication(data: {
   organizationId?: string;
   applicationType: string;
   visaType: string;
-}) {
-  const session = await auth();
-  if (!session?.user) throw new Error("認証が必要です");
-  const tenantId = requireTenantId((session.user as any).tenantId);
+}): Promise<{ success: boolean; error?: string; data?: { id: string } }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
 
-  const caseNumber = `APP-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const caseNumber = `APP-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-  const [newApp] = await db
-    .insert(applications)
-    .values({
-      tenantId,
-      applicantId: data.applicantId,
-      organizationId: data.organizationId,
-      applicationType: data.applicationType as any,
-      visaType: data.visaType as any,
-      caseNumber,
-      status: "draft",
-    })
-    .returning();
+    // 基本情報入力＋必須書類リスト自動生成が完了するので、
+    // 初期ステータスは「③書類収集中」(documents_collecting) から開始
+    const [newApp] = await db
+      .insert(applications)
+      .values({
+        tenantId,
+        applicantId: data.applicantId,
+        organizationId: data.organizationId,
+        applicationType: data.applicationType as any,
+        visaType: data.visaType as any,
+        caseNumber,
+        status: "documents_collecting" as any,
+      })
+      .returning();
 
-  // 必須書類（isAlwaysRequired=true）を自動追加
-  const visaTypeStr = String(data.visaType);
-  const appTypeStr  = String(data.applicationType);
-  const requiredDocs = await db
-    .select()
-    .from(documentRequirementMaster)
-    .where(
-      and(
-        or(
-          eq(documentRequirementMaster.visaType, visaTypeStr),
-          eq(documentRequirementMaster.visaType, "common")
-        ),
-        or(
-          eq(documentRequirementMaster.applicationType, appTypeStr),
-          eq(documentRequirementMaster.applicationType, "all")
-        ),
-        eq(documentRequirementMaster.isAlwaysRequired, true),
-        eq(documentRequirementMaster.isActive, true)
+    // 必須書類（isAlwaysRequired=true）を自動追加
+    const visaTypeStr = String(data.visaType);
+    const appTypeStr  = String(data.applicationType);
+    const requiredDocs = await db
+      .select()
+      .from(documentRequirementMaster)
+      .where(
+        and(
+          or(
+            eq(documentRequirementMaster.visaType, visaTypeStr),
+            eq(documentRequirementMaster.visaType, "common")
+          ),
+          or(
+            eq(documentRequirementMaster.applicationType, appTypeStr),
+            eq(documentRequirementMaster.applicationType, "all")
+          ),
+          eq(documentRequirementMaster.isAlwaysRequired, true),
+          eq(documentRequirementMaster.isActive, true)
+        )
       )
-    )
-    .orderBy(documentRequirementMaster.sortOrder);
-  console.log("[createApplication] requiredDocs count:", requiredDocs.length, "visaType:", visaTypeStr, "applicationType:", appTypeStr);
+      .orderBy(documentRequirementMaster.sortOrder);
 
-  if (requiredDocs.length > 0) {
-    await db.insert(applicationDocumentChecklist).values(
-      requiredDocs.map((doc) => ({
-        applicationId: newApp.id,
-        documentRequirementId: doc.id,
-        documentName: doc.documentName,
-        isRequiredByExpert: true,
-        status: "not_submitted" as const,
-      }))
-    );
+    if (requiredDocs.length > 0) {
+      await db.insert(applicationDocumentChecklist).values(
+        requiredDocs.map((doc) => ({
+          applicationId: newApp.id,
+          documentRequirementId: doc.id,
+          documentName: doc.documentName,
+          isRequiredByExpert: true,
+          status: "not_submitted" as const,
+        }))
+      );
+    }
+
+    await db.insert(auditLog).values({
+      tenantId,
+      applicationId: newApp.id,
+      userId: session.user.id,
+      action: "create",
+      entityType: "application",
+      entityId: newApp.id,
+      newValue: JSON.stringify({ caseNumber, status: "documents_collecting" }),
+    });
+
+    revalidatePath("/applications");
+    return { success: true, data: { id: newApp.id } };
+  } catch (err: any) {
+    console.error("[createApplication]", err);
+    return { success: false, error: err.message ?? "申請の作成に失敗しました" };
   }
-
-  await db.insert(auditLog).values({
-    tenantId,
-    applicationId: newApp.id,
-    userId: session.user.id,
-    action: "create",
-    entityType: "application",
-    entityId: newApp.id,
-    newValue: JSON.stringify({ caseNumber, status: "draft" }),
-  });
-
-  revalidatePath("/applications");
-  return newApp;
 }
 
 export async function updateApplicationStatus(
   applicationId: string,
   status: string
-) {
-  const session = await auth();
-  if (!session?.user) throw new Error("認証が必要です");
-  const tenantId = requireTenantId((session.user as any).tenantId);
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
 
-  const [current] = await db
-    .select({ status: applications.status })
-    .from(applications)
-    .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
-    .limit(1);
+    const [current] = await db
+      .select({ status: applications.status })
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
 
-  if (!current) throw new Error("申請案件が見つかりません");
+    if (!current) return { success: false, error: "申請案件が見つかりません" };
 
-  await db
-    .update(applications)
-    .set({ status: status as any, updatedAt: new Date() })
-    .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
+    await db
+      .update(applications)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
 
-  await db.insert(auditLog).values({
-    tenantId,
-    applicationId,
-    userId: session.user.id,
-    action: "status_change",
-    entityType: "application",
-    entityId: applicationId,
-    fieldKey: "status",
-    oldValue: current.status,
-    newValue: status,
-  });
+    await db.insert(auditLog).values({
+      tenantId,
+      applicationId,
+      userId: session.user.id,
+      action: "status_change",
+      entityType: "application",
+      entityId: applicationId,
+      fieldKey: "status",
+      oldValue: current.status,
+      newValue: status,
+    });
 
-  revalidatePath(`/applications/${applicationId}`);
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("[updateApplicationStatus]", err);
+    return { success: false, error: err.message ?? "ステータス更新に失敗しました" };
+  }
 }
 
 export async function approveApplication(applicationId: string) {
@@ -270,6 +282,24 @@ export async function updateDocumentStatus(
       expertNotes,
       reviewedAt: new Date(),
       reviewedBy: session.user.id,
+      updatedAt: new Date(),
+    })
+    .where(eq(applicationDocumentChecklist.id, checklistItemId));
+
+  revalidatePath("/applications");
+}
+
+export async function updateChecklistNotes(
+  checklistItemId: string,
+  notes: string
+) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+
+  await db
+    .update(applicationDocumentChecklist)
+    .set({
+      expertNotes: notes || null,
       updatedAt: new Date(),
     })
     .where(eq(applicationDocumentChecklist.id, checklistItemId));
@@ -913,5 +943,420 @@ export async function addRequiredDocumentsToChecklist(
     return { success: true, count: newDocs.length };
   } catch (err: any) {
     return { success: false, error: err.message ?? "追加に失敗しました" };
+  }
+}
+
+// ── 申請書類の下書き生成（Gemini AI） ─────────────────────────────────────────
+export async function generateApplicationFormDraft(
+  applicationId: string
+): Promise<{ success: boolean; error?: string; draft?: Record<string, any> }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    // 申請案件・申請人・組織を取得
+    const [app] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    const [applicant] = await db
+      .select()
+      .from(applicantMaster)
+      .where(eq(applicantMaster.id, app.applicantId))
+      .limit(1);
+
+    const org = app.organizationId
+      ? await db.select().from(organizationMaster)
+          .where(eq(organizationMaster.id, app.organizationId)).limit(1).then(r => r[0])
+      : null;
+
+    // チェックリスト（OCRデータ含む）を取得
+    const checklist = await db
+      .select()
+      .from(applicationDocumentChecklist)
+      .where(and(
+        eq(applicationDocumentChecklist.applicationId, applicationId),
+        eq(applicationDocumentChecklist.isRequiredByExpert, true),
+      ));
+
+    // OCRデータのサマリーを構築
+    const ocrSummary = checklist
+      .filter(c => c.ocrExtractedData)
+      .map(c => {
+        const ocr = c.ocrExtractedData as Record<string, any>;
+        const fields = Object.entries(ocr)
+          .filter(([, v]) => v !== null && v !== "null" && v !== "")
+          .map(([k, v]) => `  ${k}: ${v}`)
+          .join("\n");
+        return `【${c.documentName}】\n${fields}`;
+      })
+      .join("\n\n");
+
+    // visa/申請種別ラベル
+    const VISA_LABELS: Record<string, string> = {
+      engineer_humanities: "技術・人文知識・国際業務",
+      intra_company_transferee: "企業内転勤",
+      skilled_labor: "技能",
+      specified_skilled_worker_1: "特定技能1号",
+      business_manager: "経営・管理",
+      researcher: "研究",
+      professor: "教授",
+      highly_skilled_professional_1: "高度専門職1号",
+      student: "留学",
+      dependent: "家族滞在",
+      spouse_of_japanese: "日本人の配偶者等",
+      long_term_resident: "定住者",
+      permanent_resident: "永住者",
+    };
+    const APP_LABELS: Record<string, string> = {
+      certification: "在留資格認定証明書交付申請",
+      change: "在留資格変更許可申請",
+      renewal: "在留期間更新許可申請",
+      permanent_residence: "永住許可申請",
+    };
+    const visaLabel = VISA_LABELS[app.visaType] ?? app.visaType;
+    const appTypeLabel = APP_LABELS[app.applicationType] ?? app.applicationType;
+
+    // Gemini プロンプト
+    const prompt = `あなたは日本の在留資格申請を専門とする行政書士です。
+以下の情報をもとに、入管への申請書類（申請理由書・説明書）の下書きを作成してください。
+
+【申請概要】
+- 申請種別: ${appTypeLabel}
+- 在留資格: ${visaLabel}
+- 申請人氏名: ${applicant.familyNameEn} ${applicant.givenNameEn}${applicant.familyNameJa ? `（${applicant.familyNameJa}${applicant.givenNameJa}）` : ""}
+- 国籍: ${applicant.nationality ?? "不明"}
+- 生年月日: ${applicant.dateOfBirth ?? "不明"}
+${org ? `- 所属機関: ${org.nameJa}${org.nameEn ? `（${org.nameEn}）` : ""}
+- 従業員数: ${org.employeeCount ?? "不明"}名
+- 業種: ${org.industry ?? "不明"}
+- カテゴリー: ${org.category ?? "不明"}` : "（所属機関なし）"}
+
+【書類OCR読取データ】
+${ocrSummary || "（OCRデータなし）"}
+
+以下の5つのセクションを、実際の申請書に使用できるレベルで具体的に日本語で記述してください。
+
+必ずJSON形式のみで返答してください（説明文・前置き不要）：
+{
+  "applicationReason": "申請理由（申請に至った経緯、目的、日本滞在の必要性を3〜5文で説明）",
+  "jobDescription": "業務内容（具体的な職務内容、担当業務、使用技術・スキルを詳細に記述）",
+  "contractDetails": {
+    "salary": "契約年収または月収（数値と通貨単位）",
+    "workingHours": "勤務時間（例：9:00〜18:00、週40時間）",
+    "workLocation": "勤務地（都道府県・市区町村）",
+    "contractPeriod": "雇用期間または契約期間",
+    "contractType": "雇用形態（正社員・契約社員・パート等）"
+  },
+  "qualificationsAndBackground": "申請人の学歴・職歴・資格等、在留資格に関連する経歴の説明（3〜5文）",
+  "additionalNotes": "特記事項（添付書類の補足説明、特殊な事情、審査官へのアピールポイントなど）"
+}`;
+
+    let draft: Record<string, any> = {
+      generatedAt: new Date().toISOString(),
+      visaType: app.visaType,
+      applicationType: app.applicationType,
+      applicationReason: "",
+      jobDescription: "",
+      contractDetails: { salary: "", workingHours: "", workLocation: "", contractPeriod: "", contractType: "" },
+      qualificationsAndBackground: "",
+      additionalNotes: "",
+    };
+
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{ parts: [{ text: prompt }] }],
+        });
+        const text = response.text ?? "{}";
+        const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+          draft = { ...draft, ...parsed, generatedAt: draft.generatedAt, visaType: draft.visaType, applicationType: draft.applicationType };
+        }
+      } catch (aiErr: any) {
+        console.error("[Draft] Gemini error:", aiErr?.message);
+        // AI失敗でも保存は続行（空の下書きとして）
+      }
+    }
+
+    // draftDataに保存し、ステータスを更新
+    await db
+      .update(applications)
+      .set({
+        draftData: draft,
+        status: "ocr_processing" as any,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true, draft };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "下書き生成に失敗しました" };
+  }
+}
+
+// ── 質問書の自動生成（下書きの不足情報をAIが抽出） ───────────────────────────
+export async function generateQuestionnaire(
+  applicationId: string
+): Promise<{ success: boolean; error?: string; count?: number }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    const draft = (app.draftData ?? {}) as Record<string, any>;
+    const contract = (draft.contractDetails ?? {}) as Record<string, any>;
+
+    const draftSummary = [
+      `申請理由: ${draft.applicationReason || "（未記入）"}`,
+      `業務内容: ${draft.jobDescription || "（未記入）"}`,
+      `年収/月収: ${contract.salary || "（未記入）"}`,
+      `勤務時間: ${contract.workingHours || "（未記入）"}`,
+      `勤務地: ${contract.workLocation || "（未記入）"}`,
+      `雇用期間: ${contract.contractPeriod || "（未記入）"}`,
+      `雇用形態: ${contract.contractType || "（未記入）"}`,
+      `学歴・職歴: ${draft.qualificationsAndBackground || "（未記入）"}`,
+      `特記事項: ${draft.additionalNotes || "（未記入）"}`,
+    ].join("\n");
+
+    const prompt = `あなたは日本の在留資格申請を専門とする行政書士です。
+以下は申請書の下書きです。入管審査で必要になる情報のうち、不足・不明確な点を洗い出し、
+お客様（申請人）に確認すべき質問を生成してください。
+
+【申請書下書き】
+${draftSummary}
+
+以下のJSONのみを返してください（前置き・説明文不要）：
+[
+  {
+    "fieldKey": "フィールドキー（英語スネークケース）",
+    "questionJa": "お客様への質問文（日本語・丁寧語）",
+    "answerType": "text",
+    "isRequired": true
+  },
+  ...
+]
+
+重要なルール：
+- 未記入・不明確な項目についてのみ質問を生成する（記入済みは除外）
+- 質問は具体的で答えやすい表現にする
+- 最大10問まで
+- 在留資格審査で重要度の高いものを優先する`;
+
+    let questions: Array<{ fieldKey: string; questionJa: string; answerType: string; isRequired: boolean }> = [];
+
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{ parts: [{ text: prompt }] }],
+        });
+        const text = response.text ?? "[]";
+        const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\[[\s\S]*\])/);
+        if (jsonMatch) {
+          try { questions = JSON.parse(jsonMatch[1] ?? jsonMatch[0]); } catch { questions = []; }
+        }
+      } catch (aiErr: any) {
+        console.error("[Questionnaire] Gemini error:", aiErr?.message);
+      }
+    }
+
+    // フォールバック: 基本的な質問
+    if (questions.length === 0) {
+      questions = [
+        { fieldKey: "salary_confirm", questionJa: "年収（税込）はいくらですか？", answerType: "text", isRequired: true },
+        { fieldKey: "job_detail", questionJa: "具体的な業務内容・担当プロジェクトを教えてください", answerType: "text", isRequired: true },
+        { fieldKey: "work_location", questionJa: "主な勤務地（都道府県・市区町村）を教えてください", answerType: "text", isRequired: true },
+      ];
+    }
+
+    // 既存の質問を削除して新しく挿入
+    await db.delete(questionnaireQuestions).where(eq(questionnaireQuestions.applicationId, applicationId));
+    await db.insert(questionnaireQuestions).values(
+      questions.map((q) => ({
+        applicationId,
+        fieldKey: q.fieldKey,
+        questionJa: q.questionJa,
+        answerType: q.answerType ?? "text",
+        isRequired: q.isRequired ?? true,
+      }))
+    );
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true, count: questions.length };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "質問書生成に失敗しました" };
+  }
+}
+
+// ── 質問書の回答を保存 ────────────────────────────────────────────────────────
+export async function updateQuestionnaireAnswer(
+  questionId: string,
+  answer: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+
+    await db
+      .update(questionnaireQuestions)
+      .set({ answer: answer || null, answeredAt: answer ? new Date() : null })
+      .where(eq(questionnaireQuestions.id, questionId));
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "保存に失敗しました" };
+  }
+}
+
+// ── 質問書の回答を申請書下書きに反映（AI） ───────────────────────────────────
+export async function applyQuestionnaireToDraft(
+  applicationId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    const questions = await db
+      .select()
+      .from(questionnaireQuestions)
+      .where(eq(questionnaireQuestions.applicationId, applicationId));
+
+    const answeredQA = questions
+      .filter((q) => q.answer)
+      .map((q) => `Q: ${q.questionJa}\nA: ${q.answer}`)
+      .join("\n\n");
+
+    const draft = (app.draftData ?? {}) as Record<string, any>;
+
+    if (!answeredQA || !process.env.GEMINI_API_KEY) {
+      // AI不使用の場合は additionalNotes に Q&A を追記
+      const notes = questions
+        .filter((q) => q.answer)
+        .map((q) => `・${q.questionJa}：${q.answer}`)
+        .join("\n");
+      const updated = {
+        ...draft,
+        additionalNotes: [draft.additionalNotes, notes].filter(Boolean).join("\n\n"),
+      };
+      await db.update(applications)
+        .set({ draftData: updated, updatedAt: new Date() })
+        .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
+      revalidatePath(`/applications/${applicationId}`);
+      return { success: true };
+    }
+
+    const prompt = `あなたは日本の在留資格申請を専門とする行政書士です。
+以下の申請書下書きに、お客様から得た回答を反映させ、申請書を更新してください。
+
+【現在の申請書下書き】
+申請理由: ${draft.applicationReason || ""}
+業務内容: ${draft.jobDescription || ""}
+年収/月収: ${(draft.contractDetails as any)?.salary || ""}
+勤務時間: ${(draft.contractDetails as any)?.workingHours || ""}
+勤務地: ${(draft.contractDetails as any)?.workLocation || ""}
+雇用期間: ${(draft.contractDetails as any)?.contractPeriod || ""}
+雇用形態: ${(draft.contractDetails as any)?.contractType || ""}
+学歴・職歴: ${draft.qualificationsAndBackground || ""}
+特記事項: ${draft.additionalNotes || ""}
+
+【お客様からの回答（Q&A）】
+${answeredQA}
+
+上記の回答を反映して申請書を更新してください。
+以下のJSONのみを返してください：
+{
+  "applicationReason": "更新された申請理由",
+  "jobDescription": "更新された業務内容",
+  "contractDetails": {
+    "salary": "年収",
+    "workingHours": "勤務時間",
+    "workLocation": "勤務地",
+    "contractPeriod": "雇用期間",
+    "contractType": "雇用形態"
+  },
+  "qualificationsAndBackground": "更新された学歴・職歴",
+  "additionalNotes": "更新された特記事項"
+}`;
+
+    try {
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ parts: [{ text: prompt }] }],
+      });
+      const text = response.text ?? "{}";
+      const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+        const updated = {
+          ...draft,
+          ...parsed,
+          generatedAt: draft.generatedAt,
+          visaType: draft.visaType,
+          applicationType: draft.applicationType,
+          updatedFromQuestionnaire: new Date().toISOString(),
+        };
+        await db.update(applications)
+          .set({ draftData: updated, updatedAt: new Date() })
+          .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
+      }
+    } catch (aiErr: any) {
+      console.error("[Apply QA] Gemini error:", aiErr?.message);
+    }
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "反映に失敗しました" };
+  }
+}
+
+// ── 申請書類下書きの保存（手動編集） ─────────────────────────────────────────
+export async function saveApplicationDraft(
+  applicationId: string,
+  draftData: Record<string, any>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    await db
+      .update(applications)
+      .set({ draftData, updatedAt: new Date() })
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "保存に失敗しました" };
   }
 }

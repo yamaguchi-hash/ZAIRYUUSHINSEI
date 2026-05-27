@@ -205,17 +205,17 @@ export function NewApplicationForm({ applicants, organizations }: Props) {
     }
     setError("");
     startTransition(async () => {
-      try {
-        const app = await createApplication({
-          applicantId: formData.applicantId,
-          organizationId: formData.organizationId || undefined,
-          applicationType: formData.applicationType,
-          visaType: formData.visaType,
-        });
-        router.push(`/applications/${app.id}`);
-      } catch (err: any) {
-        setError(err.message ?? "申請の作成に失敗しました");
+      const result = await createApplication({
+        applicantId: formData.applicantId,
+        organizationId: formData.organizationId || undefined,
+        applicationType: formData.applicationType,
+        visaType: formData.visaType,
+      });
+      if (!result.success || !result.data) {
+        setError(result.error ?? "申請の作成に失敗しました");
+        return;
       }
+      router.push(`/applications/${result.data.id}`);
     });
   }
 

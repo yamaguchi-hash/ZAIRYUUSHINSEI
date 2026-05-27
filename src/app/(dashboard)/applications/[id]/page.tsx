@@ -29,19 +29,21 @@ import { DocumentChecklist } from "@/components/applications/document-checklist"
 import { DocumentSelector } from "@/components/applications/document-selector";
 import { ConsistencyCheckPanel } from "@/components/applications/consistency-check-panel";
 import { ApproveButton } from "@/components/applications/approve-button";
+import { ApplicationDraftPanel } from "@/components/applications/application-draft-panel";
+import { QuestionnairePanel } from "@/components/applications/questionnaire-panel";
 import { getDocumentRequirements } from "@/actions/applications";
 import { DeleteApplicationButton } from "./delete-application-button";
 import { FileDown } from "lucide-react";
 
+// 7ステップのワークフロー
 const WORKFLOW_STEPS = [
-  { key: "draft", label: "基本情報セットアップ" },
-  { key: "documents_requested", label: "書類リスト生成" },
-  { key: "documents_collecting", label: "書類収集中" },
-  { key: "ocr_processing", label: "OCR処理" },
-  { key: "questionnaire_sent", label: "動的質問書" },
-  { key: "under_review", label: "専門家審査" },
-  { key: "approved", label: "承認" },
-  { key: "submitted", label: "提出完了" },
+  { key: "draft",                label: "①基本設定" },
+  { key: "documents_requested",  label: "②書類リスト" },
+  { key: "documents_collecting", label: "③書類収集" },
+  { key: "ocr_processing",       label: "④申請書作成" },
+  { key: "questionnaire_sent",   label: "⑤質問書聴取" },
+  { key: "under_review",         label: "⑥申請書反映" },
+  { key: "submitted",            label: "⑦署名・提出" },
 ];
 
 export default async function ApplicationDetailPage({
@@ -117,7 +119,7 @@ export default async function ApplicationDetailPage({
         <div className="flex items-center gap-3">
           {/* PDF出力ボタン */}
           <Link
-            href={`/applications/${application.id}/print`}
+            href={`/print/${application.id}`}
             target="_blank"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
@@ -139,7 +141,7 @@ export default async function ApplicationDetailPage({
       {/* Workflow stepper */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>ワークフロー進捗（11ステップ）</CardTitle>
+          <CardTitle>ワークフロー進捗（7ステップ）</CardTitle>
         </CardHeader>
         <CardContent>
           <WorkflowStepper
@@ -147,6 +149,8 @@ export default async function ApplicationDetailPage({
             currentStep={application.status}
             applicationId={application.id}
             userRole={userRole}
+            hasDraft={!!application.draftData}
+            hasQuestionnaire={questionnaire.length > 0}
           />
         </CardContent>
       </Card>
@@ -307,6 +311,35 @@ export default async function ApplicationDetailPage({
       {issues.length > 0 && (
         <div className="mb-6">
           <ConsistencyCheckPanel issues={issues} applicationId={application.id} />
+        </div>
+      )}
+
+      {/* 申請書類下書きパネル（常に表示・未生成時は作成ボタンを表示） */}
+      <div className="mb-6">
+        <ApplicationDraftPanel
+          applicationId={application.id}
+          draftData={(application.draftData as Record<string, any>) ?? null}
+          currentStatus={application.status}
+          userRole={userRole}
+        />
+      </div>
+
+      {/* ⑤ 質問書パネル（ステップ5以降に表示） */}
+      {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted") && (
+        <div className="mb-6">
+          <QuestionnairePanel
+            questions={questionnaire.map((q) => ({
+              id: q.id,
+              fieldKey: q.fieldKey,
+              questionJa: q.questionJa,
+              answer: q.answer,
+              answeredAt: q.answeredAt,
+              isRequired: q.isRequired,
+              answerType: q.answerType,
+            }))}
+            applicationId={application.id}
+            userRole={userRole}
+          />
         </div>
       )}
 

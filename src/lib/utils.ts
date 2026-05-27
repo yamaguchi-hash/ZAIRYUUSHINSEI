@@ -60,14 +60,14 @@ export const APPLICATION_TYPE_LABELS: Record<string, string> = {
 };
 
 export const APPLICATION_STATUS_LABELS: Record<string, string> = {
-  draft: "下書き",
-  documents_requested: "書類請求中",
-  documents_collecting: "書類収集中",
-  ocr_processing: "OCR処理中",
-  questionnaire_sent: "質問書送付済",
-  under_review: "審査中",
+  draft: "①基本情報設定",
+  documents_requested: "②書類リスト作成",
+  documents_collecting: "③書類収集中",
+  ocr_processing: "④申請書下書き作成",
+  questionnaire_sent: "⑤質問書・顧客聴取",
+  under_review: "⑥申請書反映・確認",
   approved: "承認済",
-  submitted: "提出済",
+  submitted: "⑦署名・提出",
   completed: "完了",
   rejected: "却下",
   cancelled: "削除済",

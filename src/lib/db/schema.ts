@@ -18,7 +18,7 @@ export const userRoleEnum = pgEnum("user_role", ["applicant", "hr_manager", "exp
 
 export const applicationStatusEnum = pgEnum("application_status", [
   "draft", "documents_requested", "documents_collecting", "ocr_processing",
-  "questionnaire_sent", "under_review", "approved", "submitted", "completed", "rejected",
+  "questionnaire_sent", "under_review", "approved", "submitted", "completed", "rejected", "cancelled",
 ]);
 
 export const documentStatusEnum = pgEnum("document_status", [

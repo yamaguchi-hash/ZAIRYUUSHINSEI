@@ -70,6 +70,7 @@ export const APPLICATION_STATUS_LABELS: Record<string, string> = {
   submitted: "提出済",
   completed: "完了",
   rejected: "却下",
+  cancelled: "削除済",
 };
 
 export const STATUS_COLORS: Record<string, string> = {
@@ -83,6 +84,7 @@ export const STATUS_COLORS: Record<string, string> = {
   submitted: "bg-teal-100 text-teal-700",
   completed: "bg-emerald-100 text-emerald-700",
   rejected: "bg-red-100 text-red-700",
+  cancelled: "bg-gray-100 text-gray-500",
 };
 
 export const ROLE_LABELS: Record<string, string> = {

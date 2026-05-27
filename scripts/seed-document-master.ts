@@ -27,9 +27,7 @@ const DOCUMENTS: DocDef[] = [
   // ══════════════════════════════════════════════════════════════
   // 【全在留資格共通】申請書・写真・パスポート等
   // ══════════════════════════════════════════════════════════════
-  { visaType: "common", applicationType: "certification", category: "共通書類（認定）", documentName: "在留資格認定証明書交付申請書", description: "入管指定書式（出国前に取得）", isAlwaysRequired: true, sortOrder: 10 },
-  { visaType: "common", applicationType: "change",        category: "共通書類（変更）", documentName: "在留資格変更許可申請書", description: "入管指定書式", isAlwaysRequired: true, sortOrder: 10 },
-  { visaType: "common", applicationType: "renewal",       category: "共通書類（更新）", documentName: "在留期間更新許可申請書", description: "入管指定書式", isAlwaysRequired: true, sortOrder: 10 },
+  // 申請書（申請書類）はシステムが生成するため書類マスターには含めない
   { visaType: "common", applicationType: "all",           category: "共通書類",         documentName: "写真（縦4cm×横3cm）", description: "3か月以内撮影・背景白・正面・無帽", isAlwaysRequired: true, sortOrder: 20 },
   { visaType: "common", applicationType: "all",           category: "共通書類",         documentName: "パスポート（提示）", description: "有効期限内のもの", isAlwaysRequired: true, sortOrder: 30 },
   { visaType: "common", applicationType: "change",        category: "共通書類（変更）", documentName: "在留カード（表面）", description: "氏名・在留資格・在留期限等が記載された表面", isAlwaysRequired: true, sortOrder: 35 },

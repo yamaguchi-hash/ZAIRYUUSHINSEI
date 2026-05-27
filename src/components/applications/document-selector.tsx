@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition, useMemo, useRef } from "react";
-import { addDocumentsToChecklist, removeDocumentFromChecklist, addCustomDocumentToChecklist } from "@/actions/applications";
+import { addDocumentsToChecklist, removeDocumentFromChecklist, addCustomDocumentToChecklist, addRequiredDocumentsToChecklist } from "@/actions/applications";
 import {
   PlusCircle, Trash2, ChevronDown, ChevronRight, CheckSquare,
-  Square, Loader2, Search, ListChecks, X, FilePlus,
+  Square, Loader2, Search, ListChecks, X, FilePlus, Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +38,7 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
   const [isPending, startTransition] = useTransition();
   const [isRemoving, startRemove] = useTransition();
   const [isAddingCustom, startAddCustom] = useTransition();
+  const [isAddingRequired, startAddRequired] = useTransition();
   const [message, setMessage] = useState("");
   const [customName, setCustomName] = useState("");
   const [customError, setCustomError] = useState("");
@@ -124,22 +125,55 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
     });
   }
 
+  function handleAddRequired() {
+    setMessage("");
+    startAddRequired(async () => {
+      const result = await addRequiredDocumentsToChecklist(applicationId);
+      if (result.success) {
+        setMessage(
+          result.count && result.count > 0
+            ? `✓ 必須書類 ${result.count}件 を自動追加しました`
+            : "追加できる必須書類はありません（すべて追加済み）"
+        );
+        setTimeout(() => setMessage(""), 4000);
+      } else {
+        setMessage(`エラー: ${result.error}`);
+      }
+    });
+  }
+
   // 未追加の選択件数
   const selectableCount = [...selected].filter((id) => !addedIds.has(id)).length;
 
   return (
     <div className="mt-4">
-      {/* 書類選択パネルトグル */}
-      <button
-        onClick={() => setIsOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors text-sm font-medium text-blue-800"
-      >
-        <span className="flex items-center gap-2">
-          <ListChecks className="w-4 h-4" />
-          入管必要書類から選択して追加
-        </span>
-        {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-      </button>
+      {/* 操作ボタン行 */}
+      <div className="flex gap-2">
+        {/* 必須書類を自動追加 */}
+        <button
+          onClick={handleAddRequired}
+          disabled={isAddingRequired}
+          className="flex items-center gap-1.5 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-colors text-sm font-medium disabled:opacity-50"
+          title="isAlwaysRequired=trueの書類を一括追加"
+        >
+          {isAddingRequired
+            ? <Loader2 className="w-4 h-4 animate-spin" />
+            : <Zap className="w-4 h-4" />}
+          必須書類を自動追加
+        </button>
+
+        {/* 書類選択パネルトグル */}
+        <button
+          onClick={() => setIsOpen((v) => !v)}
+          className="flex-1 flex items-center justify-between px-4 py-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors text-sm font-medium text-blue-800"
+        >
+          <span className="flex items-center gap-2">
+            <ListChecks className="w-4 h-4" />
+            入管必要書類から選択して追加
+          </span>
+          {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </button>
+      </div>
 
       {isOpen && (
         <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden">

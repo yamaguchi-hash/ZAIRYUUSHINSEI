@@ -13,7 +13,7 @@ import {
   auditLog,
   applicantDocuments,
 } from "@/lib/db/schema";
-import { eq, and, ne, desc, ilike, or } from "drizzle-orm";
+import { eq, and, ne, inArray, desc, ilike, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 function requireTenantId(tenantId: string | undefined | null): string {
@@ -116,17 +116,20 @@ export async function createApplication(data: {
     })
     .returning();
 
-  // Auto-generate document checklist from master data
+  // 必須書類（isAlwaysRequired=true）を自動追加
+  // common（全ビザ共通）+ 指定visaType、all（全申請種別）+ 指定applicationType を対象
   const requiredDocs = await db
     .select()
     .from(documentRequirementMaster)
     .where(
       and(
-        eq(documentRequirementMaster.visaType, data.visaType as any),
-        eq(documentRequirementMaster.applicationType, data.applicationType as any),
+        inArray(documentRequirementMaster.visaType, [data.visaType, "common"]),
+        inArray(documentRequirementMaster.applicationType, [data.applicationType, "all"]),
+        eq(documentRequirementMaster.isAlwaysRequired, true),
         eq(documentRequirementMaster.isActive, true)
       )
-    );
+    )
+    .orderBy(documentRequirementMaster.sortOrder);
 
   if (requiredDocs.length > 0) {
     await db.insert(applicationDocumentChecklist).values(
@@ -134,7 +137,7 @@ export async function createApplication(data: {
         applicationId: newApp.id,
         documentRequirementId: doc.id,
         documentName: doc.documentName,
-        isRequiredByExpert: doc.isAlwaysRequired,
+        isRequiredByExpert: true,
         status: "not_submitted" as const,
       }))
     );
@@ -832,6 +835,65 @@ export async function addCustomDocumentToChecklist(
 
     revalidatePath(`/applications/${applicationId}`);
     return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "追加に失敗しました" };
+  }
+}
+
+// ── 既存申請に必須書類を追加 ───────────────────────────────────────────────────
+export async function addRequiredDocumentsToChecklist(
+  applicationId: string
+): Promise<{ success: boolean; error?: string; count?: number }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db
+      .select({ id: applications.id, visaType: applications.visaType, applicationType: applications.applicationType })
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    // 必須書類を取得（common + visaType固有、all + applicationType固有）
+    const requiredDocs = await db
+      .select()
+      .from(documentRequirementMaster)
+      .where(
+        and(
+          inArray(documentRequirementMaster.visaType, [app.visaType, "common"]),
+          inArray(documentRequirementMaster.applicationType, [app.applicationType, "all"]),
+          eq(documentRequirementMaster.isAlwaysRequired, true),
+          eq(documentRequirementMaster.isActive, true)
+        )
+      )
+      .orderBy(documentRequirementMaster.sortOrder);
+
+    // 既にチェックリストにあるものを除外
+    const existing = await db
+      .select({ documentRequirementId: applicationDocumentChecklist.documentRequirementId })
+      .from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.applicationId, applicationId));
+    const existingIds = new Set(existing.map((e) => e.documentRequirementId).filter(Boolean));
+
+    const newDocs = requiredDocs.filter((d) => !existingIds.has(d.id));
+    if (newDocs.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    await db.insert(applicationDocumentChecklist).values(
+      newDocs.map((doc) => ({
+        applicationId,
+        documentRequirementId: doc.id,
+        documentName: doc.documentName,
+        isRequiredByExpert: true,
+        status: "not_submitted" as const,
+      }))
+    );
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true, count: newDocs.length };
   } catch (err: any) {
     return { success: false, error: err.message ?? "追加に失敗しました" };
   }

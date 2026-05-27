@@ -117,19 +117,27 @@ export async function createApplication(data: {
     .returning();
 
   // 必須書類（isAlwaysRequired=true）を自動追加
-  // common（全ビザ共通）+ 指定visaType、all（全申請種別）+ 指定applicationType を対象
+  const visaTypeStr = String(data.visaType);
+  const appTypeStr  = String(data.applicationType);
   const requiredDocs = await db
     .select()
     .from(documentRequirementMaster)
     .where(
       and(
-        inArray(documentRequirementMaster.visaType, [data.visaType, "common"]),
-        inArray(documentRequirementMaster.applicationType, [data.applicationType, "all"]),
+        or(
+          eq(documentRequirementMaster.visaType, visaTypeStr),
+          eq(documentRequirementMaster.visaType, "common")
+        ),
+        or(
+          eq(documentRequirementMaster.applicationType, appTypeStr),
+          eq(documentRequirementMaster.applicationType, "all")
+        ),
         eq(documentRequirementMaster.isAlwaysRequired, true),
         eq(documentRequirementMaster.isActive, true)
       )
     )
     .orderBy(documentRequirementMaster.sortOrder);
+  console.log("[createApplication] requiredDocs count:", requiredDocs.length, "visaType:", visaTypeStr, "applicationType:", appTypeStr);
 
   if (requiredDocs.length > 0) {
     await db.insert(applicationDocumentChecklist).values(
@@ -857,18 +865,27 @@ export async function addRequiredDocumentsToChecklist(
     if (!app) return { success: false, error: "申請案件が見つかりません" };
 
     // 必須書類を取得（common + visaType固有、all + applicationType固有）
+    const vtStr = String(app.visaType);
+    const atStr = String(app.applicationType);
     const requiredDocs = await db
       .select()
       .from(documentRequirementMaster)
       .where(
         and(
-          inArray(documentRequirementMaster.visaType, [app.visaType, "common"]),
-          inArray(documentRequirementMaster.applicationType, [app.applicationType, "all"]),
+          or(
+            eq(documentRequirementMaster.visaType, vtStr),
+            eq(documentRequirementMaster.visaType, "common")
+          ),
+          or(
+            eq(documentRequirementMaster.applicationType, atStr),
+            eq(documentRequirementMaster.applicationType, "all")
+          ),
           eq(documentRequirementMaster.isAlwaysRequired, true),
           eq(documentRequirementMaster.isActive, true)
         )
       )
       .orderBy(documentRequirementMaster.sortOrder);
+    console.log("[addRequired] requiredDocs count:", requiredDocs.length, "visaType:", vtStr, "applicationType:", atStr);
 
     // 既にチェックリストにあるものを除外
     const existing = await db

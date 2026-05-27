@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
-import { addDocumentsToChecklist, removeDocumentFromChecklist } from "@/actions/applications";
+import { useState, useTransition, useMemo, useRef } from "react";
+import { addDocumentsToChecklist, removeDocumentFromChecklist, addCustomDocumentToChecklist } from "@/actions/applications";
 import {
   PlusCircle, Trash2, ChevronDown, ChevronRight, CheckSquare,
-  Square, Loader2, Search, ListChecks, X,
+  Square, Loader2, Search, ListChecks, X, FilePlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +37,11 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [isRemoving, startRemove] = useTransition();
+  const [isAddingCustom, startAddCustom] = useTransition();
   const [message, setMessage] = useState("");
+  const [customName, setCustomName] = useState("");
+  const [customError, setCustomError] = useState("");
+  const customInputRef = useRef<HTMLInputElement>(null);
 
   // 既にチェックリストに登録済みのdocumentRequirementId
   const addedIds = useMemo(
@@ -100,6 +104,23 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
   function handleRemove(itemId: string) {
     startRemove(async () => {
       await removeDocumentFromChecklist(itemId);
+    });
+  }
+
+  function handleAddCustom() {
+    const name = customName.trim();
+    if (!name) { setCustomError("書類名を入力してください"); return; }
+    setCustomError("");
+    startAddCustom(async () => {
+      const result = await addCustomDocumentToChecklist(applicationId, name);
+      if (result.success) {
+        setCustomName("");
+        setMessage(`「${name}」を追加しました`);
+        setTimeout(() => setMessage(""), 3000);
+        customInputRef.current?.focus();
+      } else {
+        setCustomError(result.error ?? "追加に失敗しました");
+      }
     });
   }
 
@@ -171,6 +192,38 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
                   onToggle={toggleSelect}
                 />
               ))
+            )}
+          </div>
+
+          {/* ── その他書類を直接追加 ── */}
+          <div className="border-t border-gray-200 bg-gray-50 p-3">
+            <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1">
+              <FilePlus className="w-3.5 h-3.5" />
+              その他必要書類を追加
+            </p>
+            <div className="flex gap-2">
+              <input
+                ref={customInputRef}
+                type="text"
+                value={customName}
+                onChange={(e) => { setCustomName(e.target.value); setCustomError(""); }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCustom(); } }}
+                placeholder="書類名を入力（例：推薦状、雇用証明書等）"
+                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
+              />
+              <button
+                onClick={handleAddCustom}
+                disabled={isAddingCustom || !customName.trim()}
+                className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {isAddingCustom
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <PlusCircle className="w-3.5 h-3.5" />}
+                追加
+              </button>
+            </div>
+            {customError && (
+              <p className="text-xs text-red-500 mt-1">{customError}</p>
             )}
           </div>
         </div>

@@ -802,3 +802,37 @@ export async function deleteApplication(
     return { success: false, error: err.message ?? "削除に失敗しました" };
   }
 }
+
+// ── カスタム書類をチェックリストに直接追加 ────────────────────────────────────
+export async function addCustomDocumentToChecklist(
+  applicationId: string,
+  documentName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    if (!documentName.trim()) return { success: false, error: "書類名を入力してください" };
+
+    const [app] = await db
+      .select({ id: applications.id })
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    await db.insert(applicationDocumentChecklist).values({
+      applicationId,
+      documentRequirementId: null,
+      documentName: documentName.trim(),
+      isRequiredByExpert: true,
+      status: "not_submitted",
+    });
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "追加に失敗しました" };
+  }
+}

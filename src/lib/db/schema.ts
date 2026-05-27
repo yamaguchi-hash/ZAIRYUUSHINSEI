@@ -119,6 +119,7 @@ export const applications = pgTable("applications", {
   expertUserId: uuid("expert_user_id").references(() => users.id),
   hrUserId: uuid("hr_user_id").references(() => users.id),
   draftData: jsonb("draft_data"),
+  formData: jsonb("form_data"),
   ocrData: jsonb("ocr_data"),
   consistencyCheckResult: jsonb("consistency_check_result"),
   isApproved: boolean("is_approved").notNull().default(false),

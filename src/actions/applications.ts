@@ -1339,6 +1339,146 @@ ${answeredQA}
   }
 }
 
+// ── 申請書フォームデータ保存 ──────────────────────────────────────────────────
+export async function saveApplicationFormData(
+  applicationId: string,
+  formData: Record<string, any>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    await db
+      .update(applications)
+      .set({ formData: { ...formData, lastUpdated: new Date().toISOString() }, updatedAt: new Date() })
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "保存に失敗しました" };
+  }
+}
+
+// ── 申請書フォームデータをAIで自動入力 ───────────────────────────────────────
+export async function prefillApplicationFormData(
+  applicationId: string
+): Promise<{ success: boolean; error?: string; formData?: Record<string, any> }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    // 申請案件・申請人・所属機関を取得
+    const [app] = await db.select().from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId))).limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    const [applicant] = await db.select().from(applicantMaster)
+      .where(eq(applicantMaster.id, app.applicantId)).limit(1);
+
+    const org = app.organizationId
+      ? await db.select().from(organizationMaster)
+          .where(eq(organizationMaster.id, app.organizationId)).limit(1).then(r => r[0])
+      : null;
+
+    // チェックリストOCRデータを集約
+    const checklist = await db.select().from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.applicationId, applicationId));
+
+    const ocrMap: Record<string, any> = {};
+    for (const item of checklist) {
+      if (item.ocrExtractedData) {
+        Object.assign(ocrMap, item.ocrExtractedData as Record<string, any>);
+      }
+    }
+
+    // 既存のフォームデータを取得
+    const existingForm = (app.formData ?? {}) as Record<string, any>;
+
+    // 既存データをベースに申請人マスター・組織マスター・OCRデータで上書き
+    const prefilled: Record<string, any> = {
+      ...existingForm,
+      // 申請人情報
+      nationality:                applicant?.nationality ?? existingForm.nationality ?? '',
+      dateOfBirth:                applicant?.dateOfBirth ?? existingForm.dateOfBirth ?? '',
+      familyNameEn:               applicant?.familyNameEn ?? existingForm.familyNameEn ?? '',
+      givenNameEn:                applicant?.givenNameEn ?? existingForm.givenNameEn ?? '',
+      familyNameJa:               applicant?.familyNameJa ?? existingForm.familyNameJa ?? '',
+      givenNameJa:                applicant?.givenNameJa ?? existingForm.givenNameJa ?? '',
+      sex:                        applicant?.gender ?? existingForm.sex ?? '',
+      addressInJapan:             applicant?.japanAddress ?? existingForm.addressInJapan ?? '',
+      telephoneNo:                applicant?.phone ?? existingForm.telephoneNo ?? '',
+      passportNumber:             applicant?.passportNumber ?? existingForm.passportNumber ?? '',
+      passportExpiry:             applicant?.passportExpiry ?? existingForm.passportExpiry ?? '',
+      currentStatusOfResidence:   applicant?.currentVisaType ?? existingForm.currentStatusOfResidence ?? '',
+      currentPeriodExpiry:        applicant?.currentVisaExpiry ?? existingForm.currentPeriodExpiry ?? '',
+      residenceCardNumber:        applicant?.residenceCardNumber ?? existingForm.residenceCardNumber ?? '',
+      // 申請情報
+      desiredStatusOfResidence:   app.visaType ?? existingForm.desiredStatusOfResidence ?? '',
+      formType:                   app.applicationType ?? existingForm.formType ?? '',
+      // 勤務先（組織マスター）
+      employerName:               org?.nameJa ?? existingForm.employerName ?? '',
+      employerAddress:            [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join('') || existingForm.employerAddress || '',
+      employerPhone:              org?.phone ?? existingForm.employerPhone ?? '',
+      orgName:                    org?.nameJa ?? existingForm.orgName ?? '',
+      orgCorporateNumber:         org?.corporateNumber ?? existingForm.orgCorporateNumber ?? '',
+      orgAddress:                 [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join('') || existingForm.orgAddress || '',
+      orgPhone:                   org?.phone ?? existingForm.orgPhone ?? '',
+      orgCapital:                 org?.capital ? String(org.capital) : existingForm.orgCapital ?? '',
+      orgEmployeeCount:           org?.employeeCount ? String(org.employeeCount) : existingForm.orgEmployeeCount ?? '',
+      orgBusinessType:            org?.industry ?? existingForm.orgBusinessType ?? '',
+      // OCRデータから補完
+      monthlySalary:              ocrMap.monthly_salary ? String(ocrMap.monthly_salary) : existingForm.monthlySalary ?? '',
+      annualSalary:               ocrMap.annual_salary ? String(ocrMap.annual_salary) : existingForm.annualSalary ?? '',
+      position:                   ocrMap.position ?? existingForm.position ?? '',
+      educationSchoolName:        ocrMap.school_name ?? existingForm.educationSchoolName ?? '',
+      educationDegree:            ocrMap.degree ?? existingForm.educationDegree ?? '',
+      educationGraduationDate:    ocrMap.graduation_date ?? existingForm.educationGraduationDate ?? '',
+      majorField:                 ocrMap.major ?? existingForm.majorField ?? '',
+      jobDescription:             ocrMap.position ?? existingForm.jobDescription ?? '',
+    };
+
+    // Gemini で補完できる場合はAI追記
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const prompt = `以下の情報を元に、入管申請書の空欄フィールドを日本語で補完してください。
+情報: ${JSON.stringify({ applicant: { nationality: applicant?.nationality, dateOfBirth: applicant?.dateOfBirth }, org: org?.nameJa, visaType: app.visaType, ocr: ocrMap }, null, 2)}
+
+以下の項目だけJSONで返してください（推測が難しいものは空文字列）:
+{
+  "placeOfBirth": "出生地（国名）",
+  "homeTownCity": "本国での居住地",
+  "occupation": "職業（例：会社員）",
+  "reasonForApplication": "申請理由（1〜2文）",
+  "reasonForHiring": "採用理由（1〜2文）"
+}`;
+        const resp = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: [{ parts: [{ text: prompt }] }] });
+        const text = resp.text ?? "{}";
+        const m = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+        if (m) {
+          const ai_data = JSON.parse(m[1] ?? m[0]);
+          Object.entries(ai_data).forEach(([k, v]) => {
+            if (v && !prefilled[k]) prefilled[k] = v;
+          });
+        }
+      } catch { /* AI失敗は無視 */ }
+    }
+
+    await db.update(applications)
+      .set({ formData: prefilled, updatedAt: new Date() })
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true, formData: prefilled };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "自動入力に失敗しました" };
+  }
+}
+
 // ── 申請書類下書きの保存（手動編集） ─────────────────────────────────────────
 export async function saveApplicationDraft(
   applicationId: string,

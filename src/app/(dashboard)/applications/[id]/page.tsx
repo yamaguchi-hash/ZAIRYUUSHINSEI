@@ -117,6 +117,14 @@ export default async function ApplicationDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* 申請書作成ボタン */}
+          <Link
+            href={`/applications/${application.id}/shinsei-form`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+          >
+            <FileText className="w-4 h-4" />
+            申請書を作成
+          </Link>
           {/* PDF出力ボタン */}
           <Link
             href={`/print/${application.id}`}

@@ -31,6 +31,7 @@ import { ConsistencyCheckPanel } from "@/components/applications/consistency-che
 import { ApproveButton } from "@/components/applications/approve-button";
 import { getDocumentRequirements } from "@/actions/applications";
 import { DeleteApplicationButton } from "./delete-application-button";
+import { FileDown } from "lucide-react";
 
 const WORKFLOW_STEPS = [
   { key: "draft", label: "基本情報セットアップ" },
@@ -114,6 +115,15 @@ export default async function ApplicationDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* PDF出力ボタン */}
+          <Link
+            href={`/applications/${application.id}/print`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            書類一覧PDF
+          </Link>
           {(userRole === "expert" || userRole === "admin") && !application.isApproved && (
             <ApproveButton applicationId={application.id} />
           )}

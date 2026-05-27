@@ -13,7 +13,7 @@ import {
   auditLog,
   applicantDocuments,
 } from "@/lib/db/schema";
-import { eq, and, desc, ilike, or } from "drizzle-orm";
+import { eq, and, ne, desc, ilike, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 function requireTenantId(tenantId: string | undefined | null): string {
@@ -43,7 +43,7 @@ export async function getApplications(searchQuery?: string) {
     .from(applications)
     .leftJoin(applicantMaster, eq(applications.applicantId, applicantMaster.id))
     .leftJoin(organizationMaster, eq(applications.organizationId, organizationMaster.id))
-    .where(eq(applications.tenantId, tenantId))
+    .where(and(eq(applications.tenantId, tenantId), ne(applications.status, "cancelled")))
     .orderBy(desc(applications.updatedAt));
 
   return query;

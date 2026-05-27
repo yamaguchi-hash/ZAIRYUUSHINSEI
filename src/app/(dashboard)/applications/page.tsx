@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { applications, applicantMaster, organizationMaster } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, and, ne, desc } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   FileText,
@@ -45,7 +45,7 @@ export default async function ApplicationsPage({
     .from(applications)
     .leftJoin(applicantMaster, eq(applications.applicantId, applicantMaster.id))
     .leftJoin(organizationMaster, eq(applications.organizationId, organizationMaster.id))
-    .where(eq(applications.tenantId, tenantId ?? ""))
+    .where(and(eq(applications.tenantId, tenantId ?? ""), ne(applications.status, "cancelled")))
     .orderBy(desc(applications.updatedAt));
 
   return (

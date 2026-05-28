@@ -632,12 +632,21 @@ export async function saveChecklistDocumentAndOcr(
 - issue_date: 発行日（YYYY-MM-DD形式）
 - expiry_date: 有効期限（YYYY-MM-DD形式）
 - marriage_date: 婚姻年月日（YYYY-MM-DD形式）
-- marriage_place: 婚姻届出先・婚姻登録地
+- marriage_notification_place_japan: 日本国での婚姻・出生・縁組の届出先（市区町村役場名。例：東京都新宿区役所）
+- marriage_notification_date_japan: 日本国での届出年月日（YYYY-MM-DD形式）
+- marriage_notification_place_foreign: 本国等での婚姻・出生・縁組の届出先・登録機関名（例：中国民政局、韓国家族関係登録事務所）
+- marriage_notification_date_foreign: 本国等での届出年月日（YYYY-MM-DD形式）
 - notes: その他の重要事項
 
 【在留カードの場合】
 在留カード表面に記載の「在留期間」（例：3年、1年）を必ず current_period_of_stay に抽出すること。
 在留期間の満了日（例：2026年10月15日）は current_visa_expiry に YYYY-MM-DD形式で抽出すること。
+
+【婚姻届受理証明書・戸籍謄本・戸籍抄本の場合】
+日本の市区町村に届け出た情報を marriage_notification_place_japan と marriage_notification_date_japan に抽出すること。
+
+【外国の婚姻証明書・出生証明書・縁組証明書の場合】
+本国等の登録機関名を marriage_notification_place_foreign、登録年月日を marriage_notification_date_foreign に抽出すること。
 
 読み取れない項目はnullにしてください（省略不要）。
 JSONのみを返し、説明文は不要です。`;
@@ -1448,9 +1457,15 @@ address(日本の住所), phone(電話番号),
 company_name(勤務先名称), corporate_number(法人番号13桁), position(役職),
 annual_salary(年収・数値円), monthly_salary(月収・数値円),
 school_name(学校名), degree(学位), graduation_date(卒業日YYYY-MM-DD), major(専攻),
-marriage_date(婚姻年月日YYYY-MM-DD), marriage_place(婚姻届出先),
+marriage_date(婚姻年月日YYYY-MM-DD),
+marriage_notification_place_japan(日本国への婚姻・出生・縁組届出先の市区町村役場名。例：大阪市北区役所),
+marriage_notification_date_japan(日本国への届出年月日YYYY-MM-DD),
+marriage_notification_place_foreign(本国等への婚姻・出生・縁組届出先の登録機関名。例：中国民政局),
+marriage_notification_date_foreign(本国等への届出年月日YYYY-MM-DD),
 family_members(在日家族の配列: [{name, relationship, nationality, dateOfBirth, employer}]),
 notes(その他重要事項)
+【婚姻届受理証明書・戸籍謄本の場合】日本の届出先をmarriage_notification_place_japanへ。
+【外国の婚姻/出生証明書の場合】本国登録機関をmarriage_notification_place_foreignへ。
 読み取れない項目はnull。JSONのみ返答。`;
           const resp = await ai.models.generateContent({
             model: "gemini-2.5-flash",
@@ -1536,6 +1551,11 @@ notes(その他重要事項)
       // currentPeriodOfStay（在留期間）: マスターに専用フィールドがないため
       // OCRデータ→既存フォームの順で取得する（AIで補完）
       currentPeriodOfStay:      ocrMap.current_period_of_stay ?? existingForm.currentPeriodOfStay ?? '',
+      // 17. 婚姻・出生・縁組届出情報（OCRデータ→既存フォームの順）
+      marriageNotificationPlaceJapan:   ocrMap.marriage_notification_place_japan   ?? existingForm.marriageNotificationPlaceJapan   ?? '',
+      marriageNotificationDateJapan:    ocrMap.marriage_notification_date_japan    ?? existingForm.marriageNotificationDateJapan    ?? '',
+      marriageNotificationPlaceForeign: ocrMap.marriage_notification_place_foreign ?? existingForm.marriageNotificationPlaceForeign ?? '',
+      marriageNotificationDateForeign:  ocrMap.marriage_notification_date_foreign  ?? existingForm.marriageNotificationDateForeign  ?? '',
       currentPeriodExpiry:      applicant?.currentVisaExpiry ?? existingForm.currentPeriodExpiry ?? '',
       residenceCardNumber:      applicant?.residenceCardNumber ?? existingForm.residenceCardNumber ?? '',
       // 申請情報
@@ -1622,10 +1642,10 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
   "marriageRegistrationPlace": "婚姻届出市区町村",
   "cohabitation": "同居の有無（有（Yes）または無（No））",
 
-  "marriageNotificationPlaceJapan": "婚姻届出先（日本）",
-  "marriageNotificationDateJapan": "日本での届出年月日（YYYY-MM-DD）",
-  "marriageNotificationPlaceForeign": "婚姻届出先（本国等）",
-  "marriageNotificationDateForeign": "本国等での届出年月日（YYYY-MM-DD）",
+  "marriageNotificationPlaceJapan": "日本国への婚姻・出生・縁組の届出先（市区町村役場名。婚姻届受理証明書・戸籍謄本から抽出。例：大阪市北区役所）",
+  "marriageNotificationDateJapan": "日本国への届出年月日（YYYY-MM-DD。婚姻届受理証明書・戸籍謄本に記載の届出受理日）",
+  "marriageNotificationPlaceForeign": "本国等への婚姻・出生・縁組の届出先・登録機関名（外国の婚姻証明書・出生証明書から抽出。例：中国民政局、韓国家族関係登録事務所）",
+  "marriageNotificationDateForeign": "本国等への届出年月日（YYYY-MM-DD。外国の証明書に記載の登録日）",
   "fundingMethod": "滞在費支弁方法（親族負担/外国からの送金/身元保証人負担/その他）",
 
   "supporterFamilyNameEn": "扶養者 姓（ローマ字）",

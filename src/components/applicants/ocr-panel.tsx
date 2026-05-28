@@ -84,6 +84,71 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
 
   return (
     <div className="space-y-4">
+      {/* ── Uploaded documents gallery ── */}
+      {docs.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Eye className="w-4 h-4 text-blue-500" />
+              保存済み書類（クリックで閲覧）
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {docs.map((doc) => (
+                <DocumentViewTrigger
+                  key={doc.id}
+                  url={doc.fileUrl}
+                  fileName={doc.fileName}
+                  documentType={doc.documentType}
+                >
+                  <div className="border border-gray-200 rounded-xl overflow-hidden hover:border-blue-400 hover:shadow-md transition-all group bg-gray-50">
+                    {/* Thumbnail */}
+                    <div className="aspect-[3/2] flex items-center justify-center bg-gray-100 relative">
+                      {isPdf(doc.fileName) ? (
+                        <div className="flex flex-col items-center gap-1 text-gray-400">
+                          <FileText className="w-8 h-8" />
+                          <span className="text-xs">PDF</span>
+                        </div>
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={doc.fileUrl}
+                          alt={doc.fileName}
+                          className="object-contain w-full h-full p-2"
+                        />
+                      )}
+                      {/* Hover overlay */}
+                      <div className="absolute inset-0 bg-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="bg-white rounded-full p-2 shadow">
+                          <Eye className="w-4 h-4 text-blue-600" />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Label */}
+                    <div className="px-2 py-1.5">
+                      <p className="text-xs font-medium text-gray-700 truncate">
+                        {DOC_TYPE_LABELS[doc.documentType] ?? doc.documentType}
+                      </p>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <p className="text-xs text-gray-400 truncate">{doc.fileName}</p>
+                        {doc.ocrProcessedAt ? (
+                          <span className="flex-shrink-0 text-xs text-green-600 flex items-center gap-0.5">
+                            <CheckCircle className="w-3 h-3" />OCR済
+                          </span>
+                        ) : (
+                          <span className="flex-shrink-0 text-xs text-gray-400">未処理</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </DocumentViewTrigger>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Upload & OCR card ── */}
       <Card>
         <CardHeader className="pb-3">
@@ -202,71 +267,6 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
           </CardContent>
         )}
       </Card>
-
-      {/* ── Uploaded documents gallery ── */}
-      {docs.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Eye className="w-4 h-4 text-blue-500" />
-              保存済み書類（クリックで閲覧）
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              {docs.map((doc) => (
-                <DocumentViewTrigger
-                  key={doc.id}
-                  url={doc.fileUrl}
-                  fileName={doc.fileName}
-                  documentType={doc.documentType}
-                >
-                  <div className="border border-gray-200 rounded-xl overflow-hidden hover:border-blue-400 hover:shadow-md transition-all group bg-gray-50">
-                    {/* Thumbnail */}
-                    <div className="aspect-[3/2] flex items-center justify-center bg-gray-100 relative">
-                      {isPdf(doc.fileName) ? (
-                        <div className="flex flex-col items-center gap-1 text-gray-400">
-                          <FileText className="w-8 h-8" />
-                          <span className="text-xs">PDF</span>
-                        </div>
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={doc.fileUrl}
-                          alt={doc.fileName}
-                          className="object-contain w-full h-full p-2"
-                        />
-                      )}
-                      {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <div className="bg-white rounded-full p-2 shadow">
-                          <Eye className="w-4 h-4 text-blue-600" />
-                        </div>
-                      </div>
-                    </div>
-                    {/* Label */}
-                    <div className="px-2 py-1.5">
-                      <p className="text-xs font-medium text-gray-700 truncate">
-                        {DOC_TYPE_LABELS[doc.documentType] ?? doc.documentType}
-                      </p>
-                      <div className="flex items-center justify-between mt-0.5">
-                        <p className="text-xs text-gray-400 truncate">{doc.fileName}</p>
-                        {doc.ocrProcessedAt ? (
-                          <span className="flex-shrink-0 text-xs text-green-600 flex items-center gap-0.5">
-                            <CheckCircle className="w-3 h-3" />OCR済
-                          </span>
-                        ) : (
-                          <span className="flex-shrink-0 text-xs text-gray-400">未処理</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </DocumentViewTrigger>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

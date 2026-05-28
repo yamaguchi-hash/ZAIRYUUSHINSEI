@@ -29,7 +29,6 @@ import { DocumentChecklist } from "@/components/applications/document-checklist"
 import { DocumentSelector } from "@/components/applications/document-selector";
 import { ConsistencyCheckPanel } from "@/components/applications/consistency-check-panel";
 import { ApproveButton } from "@/components/applications/approve-button";
-import { ApplicationDraftPanel } from "@/components/applications/application-draft-panel";
 import { QuestionnairePanel } from "@/components/applications/questionnaire-panel";
 import { getDocumentRequirements } from "@/actions/applications";
 import { DeleteApplicationButton } from "./delete-application-button";
@@ -157,7 +156,6 @@ export default async function ApplicationDetailPage({
             currentStep={application.status}
             applicationId={application.id}
             userRole={userRole}
-            hasDraft={!!application.draftData}
             hasQuestionnaire={questionnaire.length > 0}
           />
         </CardContent>
@@ -321,16 +319,6 @@ export default async function ApplicationDetailPage({
           <ConsistencyCheckPanel issues={issues} applicationId={application.id} />
         </div>
       )}
-
-      {/* 申請書類下書きパネル（常に表示・未生成時は作成ボタンを表示） */}
-      <div className="mb-6">
-        <ApplicationDraftPanel
-          applicationId={application.id}
-          draftData={(application.draftData as Record<string, any>) ?? null}
-          currentStatus={application.status}
-          userRole={userRole}
-        />
-      </div>
 
       {/* ⑤ 質問書パネル（ステップ5以降に表示） */}
       {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted") && (

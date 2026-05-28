@@ -3,9 +3,7 @@
 import { useState } from "react";
 import {
   updateApplicationStatus,
-  generateApplicationFormDraft,
   generateQuestionnaire,
-  applyQuestionnaireToDraft,
 } from "@/actions/applications";
 import { CheckCircle, ArrowRight, ArrowLeft, Loader2, Info, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,7 +18,6 @@ interface WorkflowStepperProps {
   currentStep: string;
   applicationId: string;
   userRole?: string;
-  hasDraft?: boolean;
   hasQuestionnaire?: boolean;
 }
 
@@ -50,15 +47,15 @@ const STEP_DESCRIPTIONS: Record<string, { action: string; hint: string }> = {
     hint: "全書類が揃ったら「申請書類の下書きを作成」ボタンが表示されます",
   },
   ocr_processing: {
-    action: "④ 申請書類の下書きを作成するステップです",
-    hint: "このページを下にスクロールすると「申請書類 下書き」パネルが表示されます。AIで自動作成するか、内容を編集してください。",
+    action: "④ 申請書を作成するステップです",
+    hint: "「申請書を作成」ボタンから申請書の各項目を入力・編集してください",
   },
   questionnaire_sent: {
     action: "不足情報の質問書をAIが自動生成しました。お客様に確認して回答を入力してください",
-    hint: "全質問への回答を保存してから、次のステップへ進むと申請書に自動反映されます",
+    hint: "全質問への回答を保存してから、次のステップへ進んでください",
   },
   under_review: {
-    action: "質問書の回答が申請書に反映されました。内容を最終確認してください",
+    action: "申請書の内容を最終確認してください",
     hint: "問題なければ「PDF出力・署名」ステップへ進んでください",
   },
   submitted: {
@@ -72,7 +69,6 @@ export function WorkflowStepper({
   currentStep,
   applicationId,
   userRole,
-  hasDraft,
 }: WorkflowStepperProps) {
   const [optimisticStep, setOptimisticStep] = useState(currentStep);
   const [isLoading, setIsLoading] = useState(false);
@@ -120,15 +116,9 @@ export function WorkflowStepper({
   }
 
   async function runAutoProcess(nextStep: string) {
-    if (nextStep === "ocr_processing" && !hasDraft) {
-      setProcessingMessage("AIが申請書の下書きを生成中...");
-      await generateApplicationFormDraft(applicationId);
-    } else if (nextStep === "questionnaire_sent") {
+    if (nextStep === "questionnaire_sent") {
       setProcessingMessage("AIが質問書を生成中...");
       await generateQuestionnaire(applicationId);
-    } else if (nextStep === "under_review") {
-      setProcessingMessage("質問書の回答を申請書に反映中...");
-      await applyQuestionnaireToDraft(applicationId);
     }
   }
 

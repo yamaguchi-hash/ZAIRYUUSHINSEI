@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { createApplicant } from "@/actions/applicants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserPlus, Loader2, CheckCircle } from "lucide-react";
+import { AddressWithZip } from "@/components/ui/postal-code-input";
 
 export function AddApplicantForm() {
   const [isPending, startTransition] = useTransition();
@@ -23,6 +24,7 @@ export function AddApplicantForm() {
     residenceCardNumber: "",
     phone: "",
     emailAddress: "",
+    postalCode: "",
     japanAddress: "",
   });
 
@@ -41,7 +43,7 @@ export function AddApplicantForm() {
         setForm({
           familyNameEn: "", givenNameEn: "", familyNameJa: "", givenNameJa: "",
           nationality: "", dateOfBirth: "", gender: "", passportNumber: "",
-          passportExpiry: "", residenceCardNumber: "", phone: "", emailAddress: "", japanAddress: "",
+          passportExpiry: "", residenceCardNumber: "", phone: "", emailAddress: "", postalCode: "", japanAddress: "",
         });
       } catch (err: any) {
         setError(err.message ?? "登録に失敗しました");
@@ -124,10 +126,14 @@ export function AddApplicantForm() {
             <label className="block text-xs font-medium text-gray-600 mb-1">連絡先メール</label>
             <input name="emailAddress" type="email" value={form.emailAddress} onChange={handleChange} className="input-field" />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">日本の住所</label>
-            <input name="japanAddress" value={form.japanAddress} onChange={handleChange} placeholder="東京都..." className="input-field" />
-          </div>
+          <AddressWithZip
+            postalValue={form.postalCode}
+            onPostalChange={(v) => setForm(prev => ({ ...prev, postalCode: v }))}
+            addressValue={form.japanAddress}
+            onAddressChange={(v) => setForm(prev => ({ ...prev, japanAddress: v }))}
+            addressPlaceholder="東京都渋谷区..."
+            inputClassName="input-field w-full"
+          />
           <button
             type="submit"
             disabled={isPending}

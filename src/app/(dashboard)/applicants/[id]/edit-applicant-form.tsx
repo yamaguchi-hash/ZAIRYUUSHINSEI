@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { updateApplicant } from "@/actions/applicants";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { AddressWithZip } from "@/components/ui/postal-code-input";
 
 interface EditApplicantFormProps {
   applicant: {
@@ -158,16 +159,13 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
         <label className="block text-xs font-medium text-gray-600 mb-1">メールアドレス</label>
         <input name="emailAddress" type="email" value={form.emailAddress} onChange={handleChange} className="input-field text-sm py-1.5" />
       </div>
-      <div className="grid grid-cols-[140px_1fr] gap-2">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">郵便番号</label>
-          <input name="postalCode" value={form.postalCode} onChange={handleChange} placeholder="123-4567" className="input-field text-sm py-1.5 font-mono" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">日本の住所</label>
-          <input name="japanAddress" value={form.japanAddress} onChange={handleChange} className="input-field text-sm py-1.5" />
-        </div>
-      </div>
+      <AddressWithZip
+        postalValue={form.postalCode}
+        onPostalChange={(v) => setForm(prev => ({ ...prev, postalCode: v }))}
+        addressValue={form.japanAddress}
+        onAddressChange={(v) => setForm(prev => ({ ...prev, japanAddress: v }))}
+        inputClassName="input-field text-sm py-1.5 w-full"
+      />
 
       <button
         type="submit"

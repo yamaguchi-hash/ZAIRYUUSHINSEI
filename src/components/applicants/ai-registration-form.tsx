@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ocrFilesForRegistration, createApplicantWithDocuments } from "@/actions/ocr";
 import { DocumentViewTrigger } from "./document-viewer";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
+import { AddressWithZip } from "@/components/ui/postal-code-input";
 import {
   Sparkles, Upload, X, Loader2, CheckCircle, AlertCircle,
   FileText, ChevronRight, ChevronLeft, UserPlus,
@@ -366,10 +367,13 @@ export function AiRegistrationForm() {
         </div>
         <div><label className="label-xs">電話番号</label><input name="phone" value={form.phone} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
         <div><label className="label-xs">メールアドレス</label><input name="emailAddress" type="email" value={form.emailAddress} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
-        <div className="grid grid-cols-[130px_1fr] gap-2">
-          <div><label className="label-xs">郵便番号</label><input name="postalCode" value={form.postalCode} onChange={handleChange} placeholder="123-4567" className="input-field text-sm py-1.5 font-mono" /></div>
-          <div><label className="label-xs">日本の住所</label><input name="japanAddress" value={form.japanAddress} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
-        </div>
+        <AddressWithZip
+          postalValue={form.postalCode}
+          onPostalChange={(v) => setForm(prev => ({ ...prev, postalCode: v }))}
+          addressValue={form.japanAddress}
+          onAddressChange={(v) => setForm(prev => ({ ...prev, japanAddress: v }))}
+          inputClassName="input-field text-sm py-1.5 w-full"
+        />
 
         <button
           onClick={handleSave}

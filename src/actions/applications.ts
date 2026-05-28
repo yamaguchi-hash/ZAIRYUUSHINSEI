@@ -1407,7 +1407,7 @@ export async function prefillApplicationFormData(
       givenNameEn:                applicant?.givenNameEn ?? existingForm.givenNameEn ?? '',
       familyNameJa:               applicant?.familyNameJa ?? existingForm.familyNameJa ?? '',
       givenNameJa:                applicant?.givenNameJa ?? existingForm.givenNameJa ?? '',
-      sex:                        applicant?.gender ?? existingForm.sex ?? '',
+      sex:                        (applicant?.gender === 'M' ? '男（Male）' : applicant?.gender === 'F' ? '女（Female）' : null) ?? existingForm.sex ?? '',
       addressInJapan:             applicant?.japanAddress ?? existingForm.addressInJapan ?? '',
       telephoneNo:                applicant?.phone ?? existingForm.telephoneNo ?? '',
       passportNumber:             applicant?.passportNumber ?? existingForm.passportNumber ?? '',

@@ -25,17 +25,27 @@ export default async function ShinseiFormPage({
   // 既存のformDataがあれば使い、なければ空フォームをベースに自動埋め
   const savedForm = (application.formData ?? null) as ApplicationFormData | null;
 
+  // applicationType（DBの値）→ ApplicationFormType（form-types.tsの値）マッピング
+  const toFormType = (t: string): import("@/lib/form-types").ApplicationFormType => {
+    if (t === "coe" || t === "certification") return "coe";
+    if (t === "change") return "change";
+    if (t === "extension" || t === "renewal") return "extension";
+    if (t === "permanent" || t === "permanent_residence") return "permanent";
+    return "extension";
+  };
+
   // 自動埋め: 申請人・組織マスターから初期値を構築
   const initialForm: ApplicationFormData = savedForm ?? {
     ...EMPTY_FORM_DATA,
-    formType:                   application.applicationType,
+    applicationFormType:        toFormType(application.applicationType),
     nationality:                applicant.nationality ?? '',
     dateOfBirth:                applicant.dateOfBirth ?? '',
     familyNameEn:               applicant.familyNameEn ?? '',
     givenNameEn:                applicant.givenNameEn ?? '',
     familyNameJa:               applicant.familyNameJa ?? '',
     givenNameJa:                applicant.givenNameJa ?? '',
-    sex:                        applicant.gender ?? '',
+    sex:                        applicant.gender === 'M' ? '男（Male）' : applicant.gender === 'F' ? '女（Female）' : '',
+    postalCodeInJapan:          (applicant as any).postalCode ?? '',
     addressInJapan:             applicant.japanAddress ?? '',
     telephoneNo:                applicant.phone ?? '',
     passportNumber:             applicant.passportNumber ?? '',
@@ -53,7 +63,6 @@ export default async function ShinseiFormPage({
     orgPhone:                   organization?.phone ?? '',
     orgCapital:                 organization?.capital ? String(organization.capital) : '',
     orgEmployeeCount:           organization?.employeeCount ? String(organization.employeeCount) : '',
-    orgBusinessType:            organization?.industry ?? '',
   };
 
   const visaLabel = VISA_TYPE_LABELS[application.visaType] ?? application.visaType;

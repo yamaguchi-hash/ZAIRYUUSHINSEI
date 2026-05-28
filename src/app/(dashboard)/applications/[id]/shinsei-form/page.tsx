@@ -88,13 +88,22 @@ export default async function ShinseiFormPage({
     residenceCardNumber:      applicant.residenceCardNumber ?? '',
   };
 
+  // 取次者情報（固定値）
+  const fixedAgentFields = {
+    agentName:         '山口忠士',
+    agentOrganization: '兵庫県行政書士会',
+    agentAddress:      '〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B',
+    agentPhone:        '090-2596-0128',
+  };
+
   // EMPTY_FORM_DATA を基底として savedForm（または masterData）を上書きマージしたうえで、
-  // 「8. 日本における連絡先」と「現在の在留資格」は常にマスターの最新値で上書きする。
+  // 「8. 日本における連絡先」「現在の在留資格」「取次者」は常にマスター/固定値で上書きする。
   const initialForm: ApplicationFormData = {
     ...EMPTY_FORM_DATA,
     ...(savedForm ?? masterData),
     ...masterContactFields,   // ← 連絡先は savedForm に関わらずマスターを使用
     ...masterStatusFields,    // ← 在留資格・期限・カード番号は savedForm に関わらずマスターを使用
+    ...fixedAgentFields,      // ← 取次者は常に固定値
   } as ApplicationFormData;
 
   const visaLabel = VISA_TYPE_LABELS[application.visaType] ?? application.visaType;

@@ -221,17 +221,44 @@ export interface ApplicationFormData {
 
   // ══════════════════════════════════════════════════════════════════════════
   // 申請人等作成用 Part 2 — R型（家族滞在）
-  // 扶養者（別記第三十号の二様式 B 項目21）
+  // 別記第三十号の二様式 B（更新）申請人用２Ｒ
   // ══════════════════════════════════════════════════════════════════════════
+  // 17. 配偶者については婚姻、子については出生又は縁組の届出先及び届出年月日
+  marriageNotificationPlaceJapan: string;    // (1) 日本国届出先
+  marriageNotificationDateJapan: string;     // (1) 届出年月日
+  marriageNotificationPlaceForeign: string;  // (2) 本国等届出先
+  marriageNotificationDateForeign: string;   // (2) 届出年月日
+  // 18. 滞在費支弁方法
+  fundingMethod: string;        // 親族負担 / 外国からの送金 / 身元保証人負担 / その他
+  fundingMethodOther: string;   // その他の詳細
+  // 19. 資格外活動の有無
+  partTimeWorkExistsR: string;       // 有 / 無
+  partTimeWorkTypeR: string;         // (1) 内容
+  partTimeWorkOrgNameR: string;      // (2) 名称
+  partTimeWorkBranchNameR: string;   // (2) 支店・事業所名
+  partTimeWorkPhoneR: string;        // (2) 電話番号
+  partTimeWorkHoursR: string;        // (3) 週間稼働時間
+  partTimeWorkSalaryR: string;       // (4) 報酬（円）
+  partTimeWorkSalaryTypeR: string;   // 月額 / 日額
+  // ── 扶養者用Ｒ（扶養者等作成用 Part 1 R）─────────────────────────────────
+  // 2. 扶養者
   supporterFamilyNameEn: string;
   supporterGivenNameEn: string;
   supporterFamilyNameJa: string;
   supporterGivenNameJa: string;
   supporterDob: string;
-  supporterAddress: string;
-  supporterStatusOfResidence: string;
-  supporterResidenceCard: string;
-  supporterEmployer: string;        // 勤務先または通学先
+  supporterNationality: string;      // (3) 国籍・地域
+  supporterAddress: string;          // 住居地（扶養者）
+  supporterStatusOfResidence: string; // (5) 在留資格
+  supporterPeriodOfStay: string;     // (6) 在留期間
+  supporterPeriodExpiry: string;     // (7) 在留期間の満了日
+  supporterRelationship: string;     // (8) 申請人との関係: 夫/妻/父/母/養父/養母/その他
+  supporterRelationshipOther: string; // その他の詳細
+  supporterResidenceCard: string;    // (4) 在留カード番号
+  supporterEmployer: string;         // (9) 勤務先名称（留学生を除く）
+  supporterCorporateNumber: string;  // (10) 法人番号（13桁）
+  supporterBranchName: string;       // (11) 支店・事業所名
+  supporterAnnualIncome: string;     // (13) 年収（円）
 
   // ══════════════════════════════════════════════════════════════════════════
   // 申請人等作成用 Part 2 — P型（留学）
@@ -357,11 +384,24 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   marriageDate: '', marriageRegistrationDate: '', marriageRegistrationPlace: '',
   cohabitation: '有', separationReason: '',
   longTermResidentReason: '',
-  // Part 2 R
+  // Part 2 R — 項目17: 婚姻・出生届出
+  marriageNotificationPlaceJapan: '', marriageNotificationDateJapan: '',
+  marriageNotificationPlaceForeign: '', marriageNotificationDateForeign: '',
+  // Part 2 R — 項目18: 滞在費支弁方法
+  fundingMethod: '親族負担', fundingMethodOther: '',
+  // Part 2 R — 項目19: 資格外活動
+  partTimeWorkExistsR: '無',
+  partTimeWorkTypeR: '', partTimeWorkOrgNameR: '', partTimeWorkBranchNameR: '',
+  partTimeWorkPhoneR: '', partTimeWorkHoursR: '', partTimeWorkSalaryR: '', partTimeWorkSalaryTypeR: '月額',
+  // Part 2 R — 扶養者
   supporterFamilyNameEn: '', supporterGivenNameEn: '',
   supporterFamilyNameJa: '', supporterGivenNameJa: '',
-  supporterDob: '', supporterAddress: '', supporterStatusOfResidence: '',
+  supporterDob: '', supporterNationality: '',
+  supporterAddress: '', supporterStatusOfResidence: '',
+  supporterPeriodOfStay: '', supporterPeriodExpiry: '',
+  supporterRelationship: '夫', supporterRelationshipOther: '',
   supporterResidenceCard: '', supporterEmployer: '',
+  supporterCorporateNumber: '', supporterBranchName: '', supporterAnnualIncome: '',
   // Part 2 P
   schoolName: '', schoolType: '', schoolAddress: '', schoolPhone: '',
   enrollmentDate: '', expectedGraduationDate: '', courseOfStudy: '',

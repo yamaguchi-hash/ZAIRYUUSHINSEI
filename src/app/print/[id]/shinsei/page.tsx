@@ -463,28 +463,243 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
             </>
           )}
 
-          {/* ── R型 Part 2（家族滞在：扶養者情報） ──────────────────────────── */}
-          {isRtype && form.supporterFamilyNameEn && (
+          {/* ── R型 Part 2（申請人用２Ｒ：項目17〜20 + 取次者） ──────────────── */}
+          {isRtype && (
             <>
-              <div className="section page-break">申請人等作成用　Part 2 R　— 扶養者の情報（項目 21）</div>
+              <div className="section page-break">
+                申請人等作成用　２　Ｒ　—「家族滞在」在留期間更新用　（項目 17〜20）
+              </div>
+
+              <div className="section3">17. 婚姻・出生又は縁組の届出先及び届出年月日</div>
               <table>
                 <tbody>
                   <tr>
-                    <td className="lbl">氏名（ローマ字）</td>
-                    <td>{fmt(form.supporterFamilyNameEn)}　{fmt(form.supporterGivenNameEn)}</td>
-                    <td className="lbl">氏名（漢字）</td>
-                    <td>{fmt(form.supporterFamilyNameJa)}　{fmt(form.supporterGivenNameJa)}</td>
+                    <td className="lbl" style={{width:'25%'}}>(1) 日本国届出先</td>
+                    <td style={{width:'25%'}}>{fmt(form.marriageNotificationPlaceJapan)}</td>
+                    <td className="lbl" style={{width:'25%'}}>　届出年月日</td>
+                    <td style={{width:'25%'}}>{fmtDate(form.marriageNotificationDateJapan)}</td>
                   </tr>
                   <tr>
-                    <td className="lbl">生年月日</td><td>{fmtDate(form.supporterDob)}</td>
-                    <td className="lbl">在留資格</td><td>{fmt(form.supporterStatusOfResidence)}</td>
+                    <td className="lbl">(2) 本国等届出先</td>
+                    <td>{fmt(form.marriageNotificationPlaceForeign)}</td>
+                    <td className="lbl">　届出年月日</td>
+                    <td>{fmtDate(form.marriageNotificationDateForeign)}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="section3">18. 滞在費支弁方法</div>
+              <table>
+                <tbody>
+                  <tr>
+                    <td style={{padding:'5px 8px'}}>
+                      {['親族負担','外国からの送金','身元保証人負担'].map(opt => (
+                        <span key={opt} style={{marginRight:'20px'}}>
+                          {form.fundingMethod === opt ? '■' : '□'} {opt}
+                        </span>
+                      ))}
+                      <span>
+                        {form.fundingMethod === 'その他' ? '■' : '□'} その他
+                        {form.fundingMethod === 'その他' && form.fundingMethodOther ? `（${form.fundingMethodOther}）` : '（　　　　　）'}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="section3">19. 資格外活動の有無</div>
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{width:'30%'}}>資格外活動</td>
+                    <td colSpan={3}>
+                      {form.partTimeWorkExistsR === '有（Yes）'
+                        ? '有（Yes）'
+                        : '無（No）'}
+                    </td>
+                  </tr>
+                  {form.partTimeWorkExistsR === '有（Yes）' && (
+                    <>
+                      <tr>
+                        <td className="lbl">(1) 内容</td>
+                        <td colSpan={3}>{fmt(form.partTimeWorkTypeR)}</td>
+                      </tr>
+                      <tr>
+                        <td className="lbl">(2) 名称</td>
+                        <td>{fmt(form.partTimeWorkOrgNameR)}</td>
+                        <td className="lbl">支店・事業所名</td>
+                        <td>{fmt(form.partTimeWorkBranchNameR)}</td>
+                      </tr>
+                      <tr>
+                        <td className="lbl">　 電話番号</td>
+                        <td colSpan={3}>{fmt(form.partTimeWorkPhoneR)}</td>
+                      </tr>
+                      <tr>
+                        <td className="lbl">(3) 週間稼働時間</td>
+                        <td>{form.partTimeWorkHoursR ? `${form.partTimeWorkHoursR} 時間` : '　'}</td>
+                        <td className="lbl">(4) 報酬</td>
+                        <td>
+                          {form.partTimeWorkSalaryR
+                            ? `${Number(form.partTimeWorkSalaryR).toLocaleString()}円（${form.partTimeWorkSalaryTypeR ?? '月額'}）`
+                            : '　'}
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                </tbody>
+              </table>
+
+              <div className="section3">20. 代理人（法定代理人による申請の場合に記入）</div>
+              <table className="sign-table">
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{width:'25%'}}>(1) 氏名</td>
+                    <td style={{width:'25%'}}>{fmt(form.representativeName)}</td>
+                    <td className="lbl" style={{width:'25%'}}>(2) 本人との関係</td>
+                    <td style={{width:'25%'}}>{fmt(form.representativeRelationship)}</td>
                   </tr>
                   <tr>
-                    <td className="lbl">在留カード番号</td><td>{fmt(form.supporterResidenceCard)}</td>
-                    <td className="lbl">勤務先・通学先</td><td>{fmt(form.supporterEmployer)}</td>
+                    <td className="lbl">(3) 住所</td>
+                    <td colSpan={3}>{fmt(form.representativeAddress)}</td>
                   </tr>
                   <tr>
-                    <td className="lbl">住居地</td><td colSpan={3}>{fmt(form.supporterAddress)}</td>
+                    <td className="lbl">電話番号</td>
+                    <td>{fmt(form.representativePhone)}</td>
+                    <td className="lbl">携帯電話番号</td>
+                    <td>{fmt(form.representativeCellular)}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* 申請人署名欄 */}
+              <table className="sign-table" style={{marginTop:'8px'}}>
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{width:'40%'}}>申請人（法定代理人）の署名</td>
+                    <td style={{width:'30%'}}></td>
+                    <td className="lbl" style={{width:'12%'}}>署名日</td>
+                    <td style={{width:'18%'}}>　　年　　月　　日</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* 取次者（固定） */}
+              <div className="section3" style={{marginTop:'10px'}}>※ 取次者</div>
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{width:'20%'}}>(1) 氏名</td>
+                    <td style={{width:'30%'}}>山口忠士</td>
+                    <td className="lbl" style={{width:'20%'}}>(2) 住所</td>
+                    <td style={{width:'30%'}}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(3) 所属機関等</td>
+                    <td>兵庫県行政書士会</td>
+                    <td className="lbl">電話番号</td>
+                    <td>090-2596-0128</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* ── 扶養者用Ｒ（別ページ） ─────────────────────────────────────── */}
+              <div className="section page-break">
+                扶養者等作成用　１　Ｒ　—「家族滞在」在留期間更新用
+              </div>
+
+              <div className="section3">1. 扶養している家族（申請人）の氏名及び在留カード番号</div>
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{width:'30%'}}>(1) 氏名</td>
+                    <td colSpan={3}>
+                      {form.familyNameEn ? `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}` : '　'}
+                      {(form.familyNameJa || form.givenNameJa) ? `　${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}` : ''}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(2) 在留カード番号</td>
+                    <td colSpan={3}>{fmt(form.residenceCardNumber)}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="section3">2. 扶養者</div>
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{width:'30%'}}>(1) 氏名（ローマ字）</td>
+                    <td colSpan={3}>
+                      {fmt(form.supporterFamilyNameEn)}　{fmt(form.supporterGivenNameEn)}
+                      {(form.supporterFamilyNameJa || form.supporterGivenNameJa)
+                        ? `　（${fmt(form.supporterFamilyNameJa)}　${fmt(form.supporterGivenNameJa)}）`
+                        : ''}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(2) 生年月日</td>
+                    <td>{fmtDate(form.supporterDob)}</td>
+                    <td className="lbl">(3) 国籍・地域</td>
+                    <td>{fmt(form.supporterNationality)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(4) 在留カード番号</td>
+                    <td colSpan={3}>{fmt(form.supporterResidenceCard)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(5) 在留資格</td>
+                    <td>{fmt(form.supporterStatusOfResidence)}</td>
+                    <td className="lbl">(6) 在留期間</td>
+                    <td>{fmt(form.supporterPeriodOfStay)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(7) 在留期間の満了日</td>
+                    <td colSpan={3}>{fmtDate(form.supporterPeriodExpiry)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(8) 申請人との関係</td>
+                    <td colSpan={3}>
+                      {(['夫','妻','父','母','養父','養母'] as string[]).map(opt => (
+                        <span key={opt} style={{marginRight:'16px'}}>
+                          {form.supporterRelationship === opt ? '■' : '□'} {opt}
+                        </span>
+                      ))}
+                      <span>
+                        {form.supporterRelationship === 'その他' ? '■' : '□'} その他
+                        {form.supporterRelationship === 'その他' && form.supporterRelationshipOther
+                          ? `（${form.supporterRelationshipOther}）` : ''}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(9) 勤務先名称</td>
+                    <td>{fmt(form.supporterEmployer)}</td>
+                    <td className="lbl">(10) 法人番号</td>
+                    <td>{fmt(form.supporterCorporateNumber)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(11) 支店・事業所名</td>
+                    <td colSpan={3}>{fmt(form.supporterBranchName)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(12) 勤務先所在地</td>
+                    <td colSpan={3}>{fmt(form.supporterAddress)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(13) 年収</td>
+                    <td colSpan={3}>{form.supporterAnnualIncome ? `${Number(form.supporterAnnualIncome).toLocaleString()} 円` : '　'}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* 扶養者署名欄 */}
+              <table className="sign-table" style={{marginTop:'10px'}}>
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{width:'35%'}}>扶養者の署名</td>
+                    <td style={{width:'35%'}}></td>
+                    <td className="lbl" style={{width:'12%'}}>署名日</td>
+                    <td style={{width:'18%'}}>　　年　　月　　日</td>
                   </tr>
                 </tbody>
               </table>
@@ -555,34 +770,38 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
             </>
           )}
 
-          {/* ── 共通：代理人・取次者 ──────────────────────────────────────── */}
-          <div className="section3">{isCoe ? "27." : "22."} 代理人（法定代理人）/ 取次者</div>
-          <table>
-            <tbody>
-              <tr>
-                <td className="lbl">代理人氏名</td><td>{fmt(form.representativeName)}</td>
-                <td className="lbl">続柄・資格</td><td>{fmt(form.representativeRelationship)}</td>
-              </tr>
-              {form.representativeAddress && (
-                <tr>
-                  <td className="lbl">代理人住所</td><td colSpan={3}>{fmt(form.representativeAddress)}</td>
-                </tr>
-              )}
-              <tr>
-                <td className="lbl">取次者氏名</td><td>{fmt(form.agentName)}</td>
-                <td className="lbl">所属機関</td><td>{fmt(form.agentOrganization)}</td>
-              </tr>
-              {form.agentAddress && (
-                <tr>
-                  <td className="lbl">取次者住所</td><td colSpan={3}>{fmt(form.agentAddress)}</td>
-                </tr>
-              )}
-              <tr>
-                <td className="lbl">取次者電話</td><td>{fmt(form.agentPhone)}</td>
-                <td className="lbl"></td><td></td>
-              </tr>
-            </tbody>
-          </table>
+          {/* ── 共通：代理人・取次者（R型以外）──────────────────────────────── */}
+          {/* R型は申請人用２Ｒ内に含むため、ここでは非R型のみ表示 */}
+          {!isRtype && (
+            <>
+              <div className="section3">{isCoe ? "27." : "22."} 代理人（法定代理人）/ 取次者</div>
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl">代理人氏名</td><td>{fmt(form.representativeName)}</td>
+                    <td className="lbl">続柄・資格</td><td>{fmt(form.representativeRelationship)}</td>
+                  </tr>
+                  {form.representativeAddress && (
+                    <tr>
+                      <td className="lbl">代理人住所</td><td colSpan={3}>{fmt(form.representativeAddress)}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td className="lbl">取次者氏名</td><td>山口忠士</td>
+                    <td className="lbl">所属機関</td><td>兵庫県行政書士会</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">取次者住所</td>
+                    <td colSpan={3}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">取次者電話</td><td>090-2596-0128</td>
+                    <td className="lbl"></td><td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </>
+          )}
 
           {/* ══ 所属機関等作成用 Part 1（就労系のみ） ══════════════════════════ */}
           {needsOrg && isNtype && (

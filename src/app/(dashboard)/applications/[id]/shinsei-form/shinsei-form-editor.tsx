@@ -762,50 +762,169 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
             </>
           )}
 
-          {/* ── R型 Part 2（家族滞在：扶養者情報） ─────────────────────────── */}
+          {/* ── R型 Part 2（家族滞在）─────────────────────────────────────────── */}
           {isRtype && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <User className="w-4 h-4" />
-                  扶養者の情報（家族滞在 — 項目 21）
-                </CardTitle>
-                <p className="text-xs text-gray-500 mt-1">在留期間更新 別記第三十号の二様式（B版）の項目21に対応</p>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="氏名 Family Name（ローマ字）">
-                  <input className={inputCls} value={form.supporterFamilyNameEn} onChange={e => set("supporterFamilyNameEn", e.target.value)} />
-                </Field>
-                <Field label="氏名 Given Name（ローマ字）">
-                  <input className={inputCls} value={form.supporterGivenNameEn} onChange={e => set("supporterGivenNameEn", e.target.value)} />
-                </Field>
-                <Field label="氏名（漢字・姓）">
-                  <input className={inputCls} value={form.supporterFamilyNameJa} onChange={e => set("supporterFamilyNameJa", e.target.value)} />
-                </Field>
-                <Field label="氏名（漢字・名）">
-                  <input className={inputCls} value={form.supporterGivenNameJa} onChange={e => set("supporterGivenNameJa", e.target.value)} />
-                </Field>
-                <Field label="生年月日">
-                  <input className={inputCls} type="date" value={form.supporterDob} onChange={e => set("supporterDob", e.target.value)} />
-                </Field>
-                <Field label="在留資格">
-                  <input className={inputCls} value={form.supporterStatusOfResidence} onChange={e => set("supporterStatusOfResidence", e.target.value)} placeholder="例: 技術・人文知識・国際業務" />
-                </Field>
-                <Field label="在留カード番号">
-                  <input className={inputCls} value={form.supporterResidenceCard} onChange={e => set("supporterResidenceCard", e.target.value)} />
-                </Field>
-                <div className="sm:col-span-2">
-                  <Field label="住居地">
-                    <input className={inputCls} value={form.supporterAddress} onChange={e => set("supporterAddress", e.target.value)} />
+            <>
+              {/* 17. 婚姻・出生届出 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Heart className="w-4 h-4 text-red-500" />
+                    17. 婚姻・出生又は縁組の届出先及び届出年月日
+                  </CardTitle>
+                  <p className="text-xs text-gray-500 mt-1">配偶者→婚姻届、子→出生届又は縁組届</p>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="(1) 日本国届出先">
+                    <input className={inputCls} value={form.marriageNotificationPlaceJapan} onChange={e => set("marriageNotificationPlaceJapan", e.target.value)} placeholder="例: 東京都渋谷区" />
                   </Field>
-                </div>
-                <div className="sm:col-span-2">
-                  <Field label="勤務先または通学先">
+                  <Field label="    届出年月日">
+                    <input className={inputCls} type="date" value={form.marriageNotificationDateJapan} onChange={e => set("marriageNotificationDateJapan", e.target.value)} />
+                  </Field>
+                  <Field label="(2) 本国等届出先">
+                    <input className={inputCls} value={form.marriageNotificationPlaceForeign} onChange={e => set("marriageNotificationPlaceForeign", e.target.value)} placeholder="例: 中国民政局" />
+                  </Field>
+                  <Field label="    届出年月日">
+                    <input className={inputCls} type="date" value={form.marriageNotificationDateForeign} onChange={e => set("marriageNotificationDateForeign", e.target.value)} />
+                  </Field>
+                </CardContent>
+              </Card>
+
+              {/* 18. 滞在費支弁方法 */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">18. 滞在費支弁方法</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    {['親族負担', '外国からの送金', '身元保証人負担', 'その他'].map(opt => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" value={opt} checked={form.fundingMethod === opt}
+                          onChange={() => set("fundingMethod", opt)} className="text-blue-600" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {form.fundingMethod === 'その他' && (
+                    <Field label="その他の詳細">
+                      <input className={inputCls} value={form.fundingMethodOther} onChange={e => set("fundingMethodOther", e.target.value)} />
+                    </Field>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 19. 資格外活動の有無 */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">19. 資格外活動の有無</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <RadioGroup value={form.partTimeWorkExistsR} onChange={v => set("partTimeWorkExistsR", v)} options={["有（Yes）", "無（No）"]} />
+                  {form.partTimeWorkExistsR === "有（Yes）" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                      <div className="sm:col-span-2">
+                        <Field label="(1) 内容">
+                          <input className={inputCls} value={form.partTimeWorkTypeR} onChange={e => set("partTimeWorkTypeR", e.target.value)} placeholder="例: 飲食店のアルバイト" />
+                        </Field>
+                      </div>
+                      <Field label="(2) 名称">
+                        <input className={inputCls} value={form.partTimeWorkOrgNameR} onChange={e => set("partTimeWorkOrgNameR", e.target.value)} />
+                      </Field>
+                      <Field label="    支店・事業所名">
+                        <input className={inputCls} value={form.partTimeWorkBranchNameR} onChange={e => set("partTimeWorkBranchNameR", e.target.value)} />
+                      </Field>
+                      <Field label="    電話番号">
+                        <input className={inputCls} value={form.partTimeWorkPhoneR} onChange={e => set("partTimeWorkPhoneR", e.target.value)} />
+                      </Field>
+                      <Field label="(3) 週間稼働時間" note="時間">
+                        <input className={inputCls} value={form.partTimeWorkHoursR} onChange={e => set("partTimeWorkHoursR", e.target.value)} placeholder="例: 28" />
+                      </Field>
+                      <Field label="(4) 報酬（円）">
+                        <div className="flex gap-2">
+                          <input className={inputCls} value={form.partTimeWorkSalaryR} onChange={e => set("partTimeWorkSalaryR", e.target.value)} placeholder="例: 100000" />
+                          <select className="text-sm border border-gray-300 rounded-lg px-2 bg-white" value={form.partTimeWorkSalaryTypeR} onChange={e => set("partTimeWorkSalaryTypeR", e.target.value)}>
+                            <option value="月額">月額</option>
+                            <option value="日額">日額</option>
+                          </select>
+                        </div>
+                      </Field>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 扶養者情報（扶養者用Ｒ）*/}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <User className="w-4 h-4" />
+                    扶養者の情報（扶養者用Ｒ）
+                  </CardTitle>
+                  <p className="text-xs text-gray-500 mt-1">別紙「扶養者等作成用 Part 1 R」に対応</p>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="(1) 氏名 Family Name（ローマ字）">
+                    <input className={inputCls} value={form.supporterFamilyNameEn} onChange={e => set("supporterFamilyNameEn", e.target.value)} />
+                  </Field>
+                  <Field label="    氏名 Given Name（ローマ字）">
+                    <input className={inputCls} value={form.supporterGivenNameEn} onChange={e => set("supporterGivenNameEn", e.target.value)} />
+                  </Field>
+                  <Field label="    氏名（漢字・姓）">
+                    <input className={inputCls} value={form.supporterFamilyNameJa} onChange={e => set("supporterFamilyNameJa", e.target.value)} />
+                  </Field>
+                  <Field label="    氏名（漢字・名）">
+                    <input className={inputCls} value={form.supporterGivenNameJa} onChange={e => set("supporterGivenNameJa", e.target.value)} />
+                  </Field>
+                  <Field label="(2) 生年月日">
+                    <input className={inputCls} type="date" value={form.supporterDob} onChange={e => set("supporterDob", e.target.value)} />
+                  </Field>
+                  <Field label="(3) 国籍・地域">
+                    <input className={inputCls} value={form.supporterNationality} onChange={e => set("supporterNationality", e.target.value)} placeholder="例: 日本" />
+                  </Field>
+                  <Field label="(4) 在留カード番号">
+                    <input className={inputCls} value={form.supporterResidenceCard} onChange={e => set("supporterResidenceCard", e.target.value)} placeholder="日本国籍の場合は不要" />
+                  </Field>
+                  <Field label="(5) 在留資格">
+                    <input className={inputCls} value={form.supporterStatusOfResidence} onChange={e => set("supporterStatusOfResidence", e.target.value)} placeholder="例: 技術・人文知識・国際業務" />
+                  </Field>
+                  <Field label="(6) 在留期間">
+                    <input className={inputCls} value={form.supporterPeriodOfStay} onChange={e => set("supporterPeriodOfStay", e.target.value)} placeholder="例: 3年" />
+                  </Field>
+                  <Field label="(7) 在留期間の満了日">
+                    <input className={inputCls} type="date" value={form.supporterPeriodExpiry} onChange={e => set("supporterPeriodExpiry", e.target.value)} />
+                  </Field>
+                  <div className="sm:col-span-2">
+                    <Field label="(8) 申請人との関係（続柄）">
+                      <div className="flex flex-wrap gap-4 text-sm">
+                        {['夫', '妻', '父', '母', '養父', '養母', 'その他'].map(opt => (
+                          <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" value={opt} checked={form.supporterRelationship === opt}
+                              onChange={() => set("supporterRelationship", opt)} className="text-blue-600" />
+                            <span>{opt}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {form.supporterRelationship === 'その他' && (
+                        <input className={cn(inputCls, "mt-2")} value={form.supporterRelationshipOther} onChange={e => set("supporterRelationshipOther", e.target.value)} placeholder="その他の続柄を入力" />
+                      )}
+                    </Field>
+                  </div>
+                  <Field label="(9) 勤務先名称（留学生を除く）">
                     <input className={inputCls} value={form.supporterEmployer} onChange={e => set("supporterEmployer", e.target.value)} />
                   </Field>
-                </div>
-              </CardContent>
-            </Card>
+                  <Field label="(10) 法人番号（13桁）">
+                    <input className={inputCls} value={form.supporterCorporateNumber} onChange={e => set("supporterCorporateNumber", e.target.value)} placeholder="1234567890123" maxLength={13} />
+                  </Field>
+                  <Field label="(11) 支店・事業所名">
+                    <input className={inputCls} value={form.supporterBranchName} onChange={e => set("supporterBranchName", e.target.value)} />
+                  </Field>
+                  <div className="sm:col-span-2">
+                    <Field label="(12) 勤務先所在地">
+                      <input className={inputCls} value={form.supporterAddress} onChange={e => set("supporterAddress", e.target.value)} />
+                    </Field>
+                  </div>
+                  <Field label="(13) 年収（円）">
+                    <input className={inputCls} value={form.supporterAnnualIncome} onChange={e => set("supporterAnnualIncome", e.target.value)} placeholder="例: 5000000" />
+                  </Field>
+                </CardContent>
+              </Card>
+            </>
           )}
 
           {/* ── P型 Part 2（留学） ──────────────────────────────────────────── */}
@@ -923,12 +1042,21 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">取次者（行政書士・受入機関職員等）</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="(1) 氏名"><input className={inputCls} value={form.agentName} onChange={e => set("agentName", e.target.value)} /></Field>
-              <div className="sm:col-span-2"><Field label="(2) 住所"><input className={inputCls} value={form.agentAddress} onChange={e => set("agentAddress", e.target.value)} /></Field></div>
-              <Field label="(3) 所属機関等"><input className={inputCls} value={form.agentOrganization} onChange={e => set("agentOrganization", e.target.value)} placeholder="例: 行政書士法人JLS" /></Field>
-              <Field label="電話番号"><input className={inputCls} value={form.agentPhone} onChange={e => set("agentPhone", e.target.value)} /></Field>
+            <CardHeader><CardTitle className="text-base">取次者（固定）</CardTitle></CardHeader>
+            <CardContent>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm space-y-1">
+                <p className="text-xs text-amber-700 font-semibold mb-2">※ 取次者情報は固定です（変更不可）</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-700">
+                  <span className="font-medium text-gray-500">(1) 氏名</span>
+                  <span>{form.agentName}</span>
+                  <span className="font-medium text-gray-500">(2) 住所</span>
+                  <span>{form.agentAddress}</span>
+                  <span className="font-medium text-gray-500">(3) 所属機関等</span>
+                  <span>{form.agentOrganization}</span>
+                  <span className="font-medium text-gray-500">電話番号</span>
+                  <span>{form.agentPhone}</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

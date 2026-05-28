@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { getApplicationById } from "@/actions/applications";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, FileDown } from "lucide-react";
+import { ArrowLeft, FileDown, ClipboardList } from "lucide-react";
 import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
 import { ShinseiFormEditor } from "./shinsei-form-editor";
 import type { ApplicationFormData } from "@/lib/form-types";
@@ -54,7 +54,7 @@ export default async function ShinseiFormPage({
     telephoneNo:                applicant.phone ?? '',
     passportNumber:             applicant.passportNumber ?? '',
     passportExpiry:             applicant.passportExpiry ?? '',
-    currentStatusOfResidence:   applicant.currentVisaType ?? '',
+    currentStatusOfResidence:   VISA_TYPE_LABELS[applicant.currentVisaType ?? ''] ?? applicant.currentVisaType ?? '',
     currentPeriodExpiry:        applicant.currentVisaExpiry ?? '',
     residenceCardNumber:        applicant.residenceCardNumber ?? '',
     desiredStatusOfResidence:   application.visaType ?? '',
@@ -81,9 +81,15 @@ export default async function ShinseiFormPage({
     telephoneNo:    applicant.phone        ?? '',
   };
 
+  // 在留資格の英語キー → 日本語ラベル変換
+  const toJaVisaType = (v: string | null | undefined): string => {
+    if (!v) return '';
+    return VISA_TYPE_LABELS[v] ?? v;  // キーが一致すれば日本語、なければ値をそのまま
+  };
+
   // 現在の在留資格・在留期限・在留カード番号（申請人マスターから常に取得）
   const masterStatusFields = {
-    currentStatusOfResidence: applicant.currentVisaType    ?? '',
+    currentStatusOfResidence: toJaVisaType(applicant.currentVisaType),
     currentPeriodExpiry:      applicant.currentVisaExpiry  ?? '',
     residenceCardNumber:      applicant.residenceCardNumber ?? '',
   };
@@ -121,14 +127,24 @@ export default async function ShinseiFormPage({
           <span className="text-gray-300">/</span>
           <span className="text-sm text-gray-700 font-medium">申請書作成</span>
         </div>
-        <Link
-          href={`/print/${id}/shinsei`}
-          target="_blank"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-        >
-          <FileDown className="w-4 h-4" />
-          申請書を印刷・PDF出力
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/print/${id}/questionnaire`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 bg-amber-50 border border-amber-300 hover:bg-amber-100 rounded-lg transition-colors"
+          >
+            <ClipboardList className="w-4 h-4" />
+            顧客向け質問書
+          </Link>
+          <Link
+            href={`/print/${id}/shinsei`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            申請書を印刷・PDF出力
+          </Link>
+        </div>
       </div>
 
       <div className="mb-6">

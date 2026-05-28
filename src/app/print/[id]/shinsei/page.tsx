@@ -323,18 +323,6 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
             </table>
           )}
 
-          {/* 申請人署名欄 */}
-          <table className="sign-table" style={{ marginTop: "10px" }}>
-            <tbody>
-              <tr>
-                <td className="lbl" style={{ width: "28%" }}>申請人署名</td>
-                <td style={{ width: "42%" }}></td>
-                <td className="lbl" style={{ width: "15%" }}>署名日</td>
-                <td style={{ width: "15%" }}></td>
-              </tr>
-            </tbody>
-          </table>
-
           {/* ══ 申請人等作成用 Part 2 ══════════════════════════════════════════ */}
 
           {/* ── N型 Part 2（就労系） ─────────────────────────────────────────── */}
@@ -571,17 +559,6 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 </tbody>
               </table>
 
-              {/* 申請人署名欄 */}
-              <table className="sign-table" style={{marginTop:'8px'}}>
-                <tbody>
-                  <tr>
-                    <td className="lbl" style={{width:'40%'}}>申請人（法定代理人）の署名</td>
-                    <td style={{width:'30%'}}></td>
-                    <td className="lbl" style={{width:'12%'}}>署名日</td>
-                    <td style={{width:'18%'}}>　　年　　月　　日</td>
-                  </tr>
-                </tbody>
-              </table>
 
               {/* 取次者（固定） */}
               <div className="section3" style={{marginTop:'10px'}}>※ 取次者</div>
@@ -993,18 +970,20 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   </tr>
                 </tbody>
               </table>
-              <table className="sign-table" style={{ marginTop: "10px" }}>
-                <tbody>
-                  <tr>
-                    <td className="lbl" style={{ width: "30%" }}>申請人署名</td>
-                    <td style={{ width: "40%" }}></td>
-                    <td className="lbl" style={{ width: "15%" }}>署名日</td>
-                    <td style={{ width: "15%" }}></td>
-                  </tr>
-                </tbody>
-              </table>
             </>
           )}
+
+          {/* ── 申請人署名欄（1か所のみ） ──────────────────────────────────── */}
+          <table className="sign-table" style={{ marginTop: "16px" }}>
+            <tbody>
+              <tr>
+                <td className="lbl" style={{ width: "40%" }}>申請人（法定代理人）の署名／申請書作成年月日</td>
+                <td style={{ width: "30%" }}></td>
+                <td className="lbl" style={{ width: "12%" }}>署名日</td>
+                <td style={{ width: "18%" }}>　　年　　月　　日</td>
+              </tr>
+            </tbody>
+          </table>
 
           {/* ── フッター ──────────────────────────────────────────────────── */}
           <div style={{

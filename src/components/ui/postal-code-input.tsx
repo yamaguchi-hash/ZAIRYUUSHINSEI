@@ -35,20 +35,18 @@ export async function fetchAddressFromZip(zip: string): Promise<ZipResult | null
   }
 }
 
-// ─── 住所 → 郵便番号（zipcloud address search） ──────────────────────────────
+// ─── 住所 → 郵便番号（サーバーサイド API ルート経由） ───────────────────────────
+// /api/zip-from-address が zipcloud → Nominatim の順で試行する
 export async function fetchZipFromAddress(address: string): Promise<string | null> {
   const trimmed = address.trim();
   if (!trimmed) return null;
   try {
     const res = await fetch(
-      `https://zipcloud.ibsnet.co.jp/api/search?address=${encodeURIComponent(trimmed)}&limit=1`,
+      `/api/zip-from-address?address=${encodeURIComponent(trimmed)}`,
       { cache: "no-store" }
     );
     const json = await res.json();
-    const zip = json.results?.[0]?.zipcode as string | undefined;
-    if (!zip) return null;
-    // 7桁 → "123-4567" 形式
-    return zip.length === 7 ? `${zip.slice(0, 3)}-${zip.slice(3)}` : zip;
+    return (json.zipcode as string | null) ?? null;
   } catch {
     return null;
   }

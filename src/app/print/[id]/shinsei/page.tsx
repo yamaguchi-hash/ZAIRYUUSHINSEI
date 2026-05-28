@@ -589,15 +589,19 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 <tbody>
                   <tr>
                     <td className="lbl" style={{width:'20%'}}>(1) 氏名</td>
-                    <td style={{width:'30%'}}>山口忠士</td>
-                    <td className="lbl" style={{width:'20%'}}>(2) 住所</td>
-                    <td style={{width:'30%'}}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
+                    <td colSpan={3}>山口忠士</td>
                   </tr>
                   <tr>
                     <td className="lbl">(3) 所属機関等</td>
-                    <td>兵庫県行政書士会</td>
+                    <td colSpan={3}>兵庫県行政書士会</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(2) 住所</td>
+                    <td colSpan={3}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
+                  </tr>
+                  <tr>
                     <td className="lbl">電話番号</td>
-                    <td>090-2596-0128</td>
+                    <td colSpan={3}>090-2596-0128</td>
                   </tr>
                 </tbody>
               </table>
@@ -787,16 +791,17 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     </tr>
                   )}
                   <tr>
-                    <td className="lbl">取次者氏名</td><td>山口忠士</td>
-                    <td className="lbl">所属機関</td><td>兵庫県行政書士会</td>
+                    <td className="lbl">取次者氏名</td><td colSpan={3}>山口忠士</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">所属機関</td><td colSpan={3}>兵庫県行政書士会</td>
                   </tr>
                   <tr>
                     <td className="lbl">取次者住所</td>
                     <td colSpan={3}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
                   </tr>
                   <tr>
-                    <td className="lbl">取次者電話</td><td>090-2596-0128</td>
-                    <td className="lbl"></td><td></td>
+                    <td className="lbl">取次者電話</td><td colSpan={3}>090-2596-0128</td>
                   </tr>
                 </tbody>
               </table>

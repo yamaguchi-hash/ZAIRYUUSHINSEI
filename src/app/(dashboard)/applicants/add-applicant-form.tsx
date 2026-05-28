@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { createApplicant } from "@/actions/applicants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserPlus, Loader2, CheckCircle } from "lucide-react";
-import { AddressWithZip } from "@/components/ui/postal-code-input";
+import { AddressSplitInput } from "@/components/ui/postal-code-input";
 
 export function AddApplicantForm() {
   const [isPending, startTransition] = useTransition();
@@ -25,7 +25,9 @@ export function AddApplicantForm() {
     phone: "",
     emailAddress: "",
     postalCode: "",
-    japanAddress: "",
+    japanPrefecture: "",
+    japanCity: "",
+    japanAddressLine: "",
   });
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
@@ -43,7 +45,8 @@ export function AddApplicantForm() {
         setForm({
           familyNameEn: "", givenNameEn: "", familyNameJa: "", givenNameJa: "",
           nationality: "", dateOfBirth: "", gender: "", passportNumber: "",
-          passportExpiry: "", residenceCardNumber: "", phone: "", emailAddress: "", postalCode: "", japanAddress: "",
+          passportExpiry: "", residenceCardNumber: "", phone: "", emailAddress: "",
+          postalCode: "", japanPrefecture: "", japanCity: "", japanAddressLine: "",
         });
       } catch (err: any) {
         setError(err.message ?? "登録に失敗しました");
@@ -126,12 +129,20 @@ export function AddApplicantForm() {
             <label className="block text-xs font-medium text-gray-600 mb-1">連絡先メール</label>
             <input name="emailAddress" type="email" value={form.emailAddress} onChange={handleChange} className="input-field" />
           </div>
-          <AddressWithZip
-            postalValue={form.postalCode}
-            onPostalChange={(v) => setForm(prev => ({ ...prev, postalCode: v }))}
-            addressValue={form.japanAddress}
-            onAddressChange={(v) => setForm(prev => ({ ...prev, japanAddress: v }))}
-            addressPlaceholder="東京都渋谷区..."
+          <AddressSplitInput
+            value={{
+              postalCode: form.postalCode,
+              prefecture: form.japanPrefecture,
+              city: form.japanCity,
+              addressLine: form.japanAddressLine,
+            }}
+            onChange={(fields) => setForm(prev => ({
+              ...prev,
+              ...(fields.postalCode !== undefined && { postalCode: fields.postalCode }),
+              ...(fields.prefecture !== undefined && { japanPrefecture: fields.prefecture }),
+              ...(fields.city !== undefined && { japanCity: fields.city }),
+              ...(fields.addressLine !== undefined && { japanAddressLine: fields.addressLine }),
+            }))}
             inputClassName="input-field w-full"
           />
           <button

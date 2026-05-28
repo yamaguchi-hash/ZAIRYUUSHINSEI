@@ -3,15 +3,13 @@
 import { useState, useTransition } from "react";
 import { createOrganization } from "@/actions/organizations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Loader2, CheckCircle, Search } from "lucide-react";
-import { PostalCodeInput, fetchZipFromAddress } from "@/components/ui/postal-code-input";
+import { Building2, Loader2, CheckCircle } from "lucide-react";
+import { AddressSplitInput } from "@/components/ui/postal-code-input";
 
 export function AddOrganizationForm() {
   const [isPending, startTransition] = useTransition();
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const [zipLoading, setZipLoading] = useState(false);
-  const [zipError, setZipError] = useState("");
 
   const [form, setForm] = useState({
     nameJa: "",
@@ -88,61 +86,22 @@ export function AddOrganizationForm() {
             <label className="block text-xs font-medium text-gray-600 mb-1">法人番号</label>
             <input name="corporateNumber" value={form.corporateNumber} onChange={handleChange} placeholder="1234567890123" maxLength={13} className="input-field font-mono" />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              郵便番号
-              <span className="text-gray-400 font-normal ml-1">（7桁入力で都道府県・市区町村を自動入力）</span>
-            </label>
-            <PostalCodeInput
-              value={form.postalCode}
-              onChange={(v) => setForm(prev => ({ ...prev, postalCode: v }))}
-              onAddressFound={({ prefecture, city, town }) => {
-                setForm(prev => ({ ...prev, prefecture, city: city + town }));
-              }}
-              placeholder="1234567"
-              inputClassName="input-field w-full"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">都道府県</label>
-              <input name="prefecture" value={form.prefecture} onChange={handleChange} placeholder="東京都" className="input-field" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">市区町村</label>
-              <input name="city" value={form.city} onChange={handleChange} placeholder="渋谷区" className="input-field" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              番地・建物
-              <span className="text-gray-400 font-normal ml-1">（住所入力後「〒検索」で郵便番号を自動入力）</span>
-            </label>
-            <div className="flex gap-1.5">
-              <input name="addressLine" value={form.addressLine} onChange={handleChange} placeholder="1-1-1 〇〇ビル" className="input-field flex-1" />
-              <button
-                type="button"
-                disabled={zipLoading || !(form.prefecture || form.city)}
-                onClick={async () => {
-                  setZipLoading(true);
-                  setZipError("");
-                  const fullAddr = `${form.prefecture}${form.city}${form.addressLine}`;
-                  const zip = await fetchZipFromAddress(fullAddr);
-                  if (zip) {
-                    setForm(prev => ({ ...prev, postalCode: zip }));
-                  } else {
-                    setZipError("郵便番号が見つかりませんでした");
-                  }
-                  setZipLoading(false);
-                }}
-                className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors"
-              >
-                {zipLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-                〒検索
-              </button>
-            </div>
-            {zipError && <p className="text-xs text-red-500 mt-1">{zipError}</p>}
-          </div>
+          <AddressSplitInput
+            value={{
+              postalCode: form.postalCode,
+              prefecture: form.prefecture,
+              city: form.city,
+              addressLine: form.addressLine,
+            }}
+            onChange={(fields) => setForm(prev => ({
+              ...prev,
+              ...(fields.postalCode !== undefined && { postalCode: fields.postalCode }),
+              ...(fields.prefecture !== undefined && { prefecture: fields.prefecture }),
+              ...(fields.city !== undefined && { city: fields.city }),
+              ...(fields.addressLine !== undefined && { addressLine: fields.addressLine }),
+            }))}
+            inputClassName="input-field w-full"
+          />
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">電話番号</label>

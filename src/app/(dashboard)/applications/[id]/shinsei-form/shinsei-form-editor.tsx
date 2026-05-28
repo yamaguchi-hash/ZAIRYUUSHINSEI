@@ -8,7 +8,7 @@ import {
   Plus, Trash2, FileText, Settings, Heart, GraduationCap as School,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AddressWithZip } from "@/components/ui/postal-code-input";
+import { AddressSplitInput } from "@/components/ui/postal-code-input";
 import type { ApplicationFormData, WorkHistoryEntry, FamilyMember, ApplicationFormType, VisaFormCategory } from "@/lib/form-types";
 import {
   FORM_TYPE_LABELS, PURPOSE_OF_ENTRY_OPTIONS,
@@ -283,13 +283,27 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
           <Card>
             <CardHeader><CardTitle className="text-base">{isCoe ? '9' : '8'}. 日本における連絡先</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <AddressWithZip
-                postalValue={form.postalCodeInJapan}
-                onPostalChange={v => set("postalCodeInJapan", v)}
-                addressValue={form.addressInJapan}
-                onAddressChange={v => set("addressInJapan", v)}
-                addressPlaceholder="東京都○○区○○町1-1-1（郵便番号入力後に番地を追記）"
+              <AddressSplitInput
+                value={{
+                  postalCode: form.postalCodeInJapan,
+                  prefecture: form.prefectureInJapan,
+                  city: form.cityInJapan,
+                  addressLine: form.addressLineInJapan,
+                }}
+                onChange={(fields) => {
+                  if (fields.postalCode !== undefined) set("postalCodeInJapan", fields.postalCode);
+                  if (fields.prefecture !== undefined) set("prefectureInJapan", fields.prefecture);
+                  if (fields.city !== undefined) set("cityInJapan", fields.city);
+                  if (fields.addressLine !== undefined) set("addressLineInJapan", fields.addressLine);
+                  // addressInJapan を自動結合（印刷用）
+                  const p = fields.prefecture ?? form.prefectureInJapan;
+                  const c = fields.city ?? form.cityInJapan;
+                  const a = fields.addressLine ?? form.addressLineInJapan;
+                  set("addressInJapan", `${p}${c}${a}`);
+                }}
                 inputClassName={inputCls}
+                labelClassName="block text-xs font-medium text-gray-600 mb-1"
+                required
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="電話番号">

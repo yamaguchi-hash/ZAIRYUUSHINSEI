@@ -46,6 +46,11 @@ export default async function ShinseiFormPage({
     givenNameJa:                applicant.givenNameJa ?? '',
     sex:                        applicant.gender === 'M' ? '男（Male）' : applicant.gender === 'F' ? '女（Female）' : '',
     postalCodeInJapan:          (applicant as any).postalCode ?? '',
+    prefectureInJapan:          (applicant as any).japanPrefecture ?? '',
+    cityInJapan:                (applicant as any).japanCity ?? '',
+    addressLineInJapan:         (applicant as any).japanAddressLine ?? (
+      !(applicant as any).japanPrefecture ? (applicant.japanAddress ?? '') : ''
+    ),
     addressInJapan:             applicant.japanAddress ?? '',
     telephoneNo:                applicant.phone ?? '',
     passportNumber:             applicant.passportNumber ?? '',

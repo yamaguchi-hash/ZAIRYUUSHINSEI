@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { updateApplicant } from "@/actions/applicants";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
-import { AddressWithZip } from "@/components/ui/postal-code-input";
+import { AddressSplitInput } from "@/components/ui/postal-code-input";
 
 interface EditApplicantFormProps {
   applicant: {
@@ -24,6 +24,9 @@ interface EditApplicantFormProps {
     phone: string | null;
     emailAddress: string | null;
     postalCode?: string | null;
+    japanPrefecture?: string | null;
+    japanCity?: string | null;
+    japanAddressLine?: string | null;
     japanAddress: string | null;
   };
 }
@@ -49,6 +52,12 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
     phone: applicant.phone ?? "",
     emailAddress: applicant.emailAddress ?? "",
     postalCode: applicant.postalCode ?? "",
+    japanPrefecture: applicant.japanPrefecture ?? "",
+    japanCity: applicant.japanCity ?? "",
+    // 既存データ: 分割フィールドが空なら japanAddress をそのまま addressLine へ
+    japanAddressLine: applicant.japanAddressLine ?? (
+      !applicant.japanPrefecture && !applicant.japanCity ? (applicant.japanAddress ?? "") : ""
+    ),
     japanAddress: applicant.japanAddress ?? "",
   });
 
@@ -61,7 +70,12 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
     e.preventDefault();
     startTransition(async () => {
       try {
-        await updateApplicant(applicant.id, form);
+        await updateApplicant(applicant.id, {
+          ...form,
+          japanPrefecture: form.japanPrefecture,
+          japanCity: form.japanCity,
+          japanAddressLine: form.japanAddressLine,
+        });
         setStatus("success");
         setMessage("保存しました");
       } catch (err: any) {
@@ -159,12 +173,22 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
         <label className="block text-xs font-medium text-gray-600 mb-1">メールアドレス</label>
         <input name="emailAddress" type="email" value={form.emailAddress} onChange={handleChange} className="input-field text-sm py-1.5" />
       </div>
-      <AddressWithZip
-        postalValue={form.postalCode}
-        onPostalChange={(v) => setForm(prev => ({ ...prev, postalCode: v }))}
-        addressValue={form.japanAddress}
-        onAddressChange={(v) => setForm(prev => ({ ...prev, japanAddress: v }))}
+      <AddressSplitInput
+        value={{
+          postalCode: form.postalCode,
+          prefecture: form.japanPrefecture,
+          city: form.japanCity,
+          addressLine: form.japanAddressLine,
+        }}
+        onChange={(fields) => setForm(prev => ({
+          ...prev,
+          ...(fields.postalCode !== undefined && { postalCode: fields.postalCode }),
+          ...(fields.prefecture !== undefined && { japanPrefecture: fields.prefecture }),
+          ...(fields.city !== undefined && { japanCity: fields.city }),
+          ...(fields.addressLine !== undefined && { japanAddressLine: fields.addressLine }),
+        }))}
         inputClassName="input-field text-sm py-1.5 w-full"
+        labelClassName="block text-xs font-medium text-gray-600 mb-1"
       />
 
       <button

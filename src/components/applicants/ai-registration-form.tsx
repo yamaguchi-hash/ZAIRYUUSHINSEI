@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ocrFilesForRegistration, createApplicantWithDocuments } from "@/actions/ocr";
 import { DocumentViewTrigger } from "./document-viewer";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
-import { AddressWithZip } from "@/components/ui/postal-code-input";
+import { AddressSplitInput } from "@/components/ui/postal-code-input";
 import {
   Sparkles, Upload, X, Loader2, CheckCircle, AlertCircle,
   FileText, ChevronRight, ChevronLeft, UserPlus,
@@ -37,7 +37,7 @@ const emptyForm = {
   nationality: "", dateOfBirth: "", gender: "",
   passportNumber: "", passportExpiry: "",
   residenceCardNumber: "", currentVisaType: "", currentVisaExpiry: "",
-  phone: "", emailAddress: "", postalCode: "", japanAddress: "",
+  phone: "", emailAddress: "", postalCode: "", japanPrefecture: "", japanCity: "", japanAddressLine: "",
 };
 
 export function AiRegistrationForm() {
@@ -110,8 +110,10 @@ export function AiRegistrationForm() {
         currentVisaExpiry: result.currentVisaExpiry,
         phone: "",
         emailAddress: "",
-        postalCode: result.japanPostalCode,
-        japanAddress: result.japanAddress,
+        postalCode: result.japanPostalCode ?? "",
+        japanPrefecture: "",
+        japanCity: "",
+        japanAddressLine: result.japanAddress ?? "",
       });
       setPhase("review");
     });
@@ -367,12 +369,22 @@ export function AiRegistrationForm() {
         </div>
         <div><label className="label-xs">電話番号</label><input name="phone" value={form.phone} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
         <div><label className="label-xs">メールアドレス</label><input name="emailAddress" type="email" value={form.emailAddress} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
-        <AddressWithZip
-          postalValue={form.postalCode}
-          onPostalChange={(v) => setForm(prev => ({ ...prev, postalCode: v }))}
-          addressValue={form.japanAddress}
-          onAddressChange={(v) => setForm(prev => ({ ...prev, japanAddress: v }))}
+        <AddressSplitInput
+          value={{
+            postalCode: form.postalCode,
+            prefecture: form.japanPrefecture,
+            city: form.japanCity,
+            addressLine: form.japanAddressLine,
+          }}
+          onChange={(fields) => setForm(prev => ({
+            ...prev,
+            ...(fields.postalCode !== undefined && { postalCode: fields.postalCode }),
+            ...(fields.prefecture !== undefined && { japanPrefecture: fields.prefecture }),
+            ...(fields.city !== undefined && { japanCity: fields.city }),
+            ...(fields.addressLine !== undefined && { japanAddressLine: fields.addressLine }),
+          }))}
           inputClassName="input-field text-sm py-1.5 w-full"
+          labelClassName="label-xs"
         />
 
         <button

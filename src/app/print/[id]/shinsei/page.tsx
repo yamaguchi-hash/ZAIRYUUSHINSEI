@@ -156,8 +156,18 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               <tr>
                 <td className="lbl">{hasBirthplace ? '9.' : '8.'} 住居地（日本）</td>
                 <td colSpan={3}>
-                  {form.postalCodeInJapan ? `〒${form.postalCodeInJapan}　` : ""}
-                  {fmt(form.addressInJapan)}
+                  {(() => {
+                    const zip = form.postalCodeInJapan;
+                    const pref = form.prefectureInJapan;
+                    const city = form.cityInJapan;
+                    const line = form.addressLineInJapan;
+                    // 分割フィールドが使われている場合
+                    if (pref || city || line) {
+                      return `${zip ? "〒" + zip + "　" : ""}${pref ?? ""}${city ?? ""}${line ?? ""}`;
+                    }
+                    // 旧来の結合フィールド
+                    return `${zip ? "〒" + zip + "　" : ""}${fmt(form.addressInJapan)}`;
+                  })()}
                 </td>
               </tr>
               <tr>

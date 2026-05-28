@@ -107,9 +107,12 @@ export interface ApplicationFormData {
   occupation: string;
   // 7/8. 本国における居住地
   homeTownCity: string;
-  // 8/9. 住居地・電話番号（郵便番号を含む）
-  postalCodeInJapan: string;  // 郵便番号（例: 160-0023）
-  addressInJapan: string;
+  // 8/9. 住居地・電話番号（分割入力）
+  postalCodeInJapan: string;   // 郵便番号（例: 160-0023）
+  prefectureInJapan: string;   // 都道府県
+  cityInJapan: string;         // 市区町村
+  addressLineInJapan: string;  // 番地・建物・部屋番号
+  addressInJapan: string;      // 結合値（後方互換・印刷用）
   telephoneNo: string;
   cellularPhoneNo: string;
   // 9/10. 旅券番号・有効期限
@@ -317,7 +320,7 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   familyNameEn: '', givenNameEn: '', familyNameJa: '', givenNameJa: '',
   sex: '', placeOfBirth: '', maritalStatus: '',
   occupation: '', homeTownCity: '',
-  postalCodeInJapan: '',
+  postalCodeInJapan: '', prefectureInJapan: '', cityInJapan: '', addressLineInJapan: '',
   addressInJapan: '', telephoneNo: '', cellularPhoneNo: '',
   passportNumber: '', passportExpiry: '',
   // COE固有

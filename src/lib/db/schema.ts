@@ -98,7 +98,11 @@ export const applicantMaster = pgTable("applicant_master", {
   currentVisaExpiry: date("current_visa_expiry"),
   phone: text("phone"),
   emailAddress: text("email_address"),
-  japanAddress: text("japan_address"),
+  postalCode: text("postal_code"),
+  japanPrefecture: text("japan_prefecture"),
+  japanCity: text("japan_city"),
+  japanAddressLine: text("japan_address_line"),
+  japanAddress: text("japan_address"),   // 後方互換用（prefecture+city+addressLine の結合値）
   educationHistory: jsonb("education_history"),
   workHistory: jsonb("work_history"),
   isActive: boolean("is_active").notNull().default(true),

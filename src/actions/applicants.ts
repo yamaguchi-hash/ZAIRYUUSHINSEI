@@ -65,17 +65,25 @@ export async function createApplicant(data: {
   phone?: string;
   emailAddress?: string;
   postalCode?: string;
+  japanPrefecture?: string;
+  japanCity?: string;
+  japanAddressLine?: string;
   japanAddress?: string;
 }) {
   const session = await auth();
   if (!session?.user) throw new Error("認証が必要です");
   const tenantId = requireTenantId((session.user as any).tenantId);
 
+  // 分割フィールドを結合して japanAddress を生成
+  const combined = [data.japanPrefecture, data.japanCity, data.japanAddressLine].filter(Boolean).join("");
+  const japanAddress = combined || data.japanAddress || null;
+
   const [newApplicant] = await db
     .insert(applicantMaster)
     .values({
       tenantId,
       ...data,
+      japanAddress,
       dateOfBirth: data.dateOfBirth || null,
       passportExpiry: data.passportExpiry || null,
     })
@@ -109,6 +117,9 @@ export async function updateApplicant(
     phone: string;
     emailAddress: string;
     postalCode: string;
+    japanPrefecture: string;
+    japanCity: string;
+    japanAddressLine: string;
     japanAddress: string;
     educationHistory: any;
     workHistory: any;
@@ -118,9 +129,13 @@ export async function updateApplicant(
   if (!session?.user) throw new Error("認証が必要です");
   const tenantId = requireTenantId((session.user as any).tenantId);
 
+  // 分割フィールドを結合して japanAddress を自動生成
+  const combined = [data.japanPrefecture, data.japanCity, data.japanAddressLine].filter(Boolean).join("");
+  const japanAddress = combined || data.japanAddress;
+
   await db
     .update(applicantMaster)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...data, ...(japanAddress ? { japanAddress } : {}), updatedAt: new Date() })
     .where(and(eq(applicantMaster.id, id), eq(applicantMaster.tenantId, tenantId)));
 
   await db.insert(auditLog).values({

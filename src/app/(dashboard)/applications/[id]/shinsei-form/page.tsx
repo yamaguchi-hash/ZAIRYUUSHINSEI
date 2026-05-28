@@ -69,12 +69,32 @@ export default async function ShinseiFormPage({
     orgEmployeeCount:           organization?.employeeCount ? String(organization.employeeCount) : '',
   };
 
-  // EMPTY_FORM_DATA を基底として savedForm（または masterData）を上書きマージ。
-  // これにより、旧バージョンの savedForm に新フィールドが存在しない場合でも
-  // 必ずデフォルト値（空文字列等）が保証される。
+  // 8. 日本における連絡先（申請人マスターから常に取得）
+  const masterContactFields = {
+    postalCodeInJapan:  (applicant as any).postalCode      ?? '',
+    prefectureInJapan:  (applicant as any).japanPrefecture ?? '',
+    cityInJapan:        (applicant as any).japanCity        ?? '',
+    addressLineInJapan: (applicant as any).japanAddressLine ?? (
+      !(applicant as any).japanPrefecture ? (applicant.japanAddress ?? '') : ''
+    ),
+    addressInJapan: applicant.japanAddress ?? '',
+    telephoneNo:    applicant.phone        ?? '',
+  };
+
+  // 現在の在留資格・在留期限・在留カード番号（申請人マスターから常に取得）
+  const masterStatusFields = {
+    currentStatusOfResidence: applicant.currentVisaType    ?? '',
+    currentPeriodExpiry:      applicant.currentVisaExpiry  ?? '',
+    residenceCardNumber:      applicant.residenceCardNumber ?? '',
+  };
+
+  // EMPTY_FORM_DATA を基底として savedForm（または masterData）を上書きマージしたうえで、
+  // 「8. 日本における連絡先」と「現在の在留資格」は常にマスターの最新値で上書きする。
   const initialForm: ApplicationFormData = {
     ...EMPTY_FORM_DATA,
     ...(savedForm ?? masterData),
+    ...masterContactFields,   // ← 連絡先は savedForm に関わらずマスターを使用
+    ...masterStatusFields,    // ← 在留資格・期限・カード番号は savedForm に関わらずマスターを使用
   } as ApplicationFormData;
 
   const visaLabel = VISA_TYPE_LABELS[application.visaType] ?? application.visaType;

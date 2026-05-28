@@ -285,10 +285,10 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
             <CardContent className="space-y-4">
               <AddressSplitInput
                 value={{
-                  postalCode: form.postalCodeInJapan,
-                  prefecture: form.prefectureInJapan,
-                  city: form.cityInJapan,
-                  addressLine: form.addressLineInJapan,
+                  postalCode: form.postalCodeInJapan ?? '',
+                  prefecture: form.prefectureInJapan ?? '',
+                  city: form.cityInJapan ?? '',
+                  addressLine: form.addressLineInJapan ?? '',
                 }}
                 onChange={(fields) => {
                   if (fields.postalCode !== undefined) set("postalCodeInJapan", fields.postalCode);
@@ -296,9 +296,9 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   if (fields.city !== undefined) set("cityInJapan", fields.city);
                   if (fields.addressLine !== undefined) set("addressLineInJapan", fields.addressLine);
                   // addressInJapan を自動結合（印刷用）
-                  const p = fields.prefecture ?? form.prefectureInJapan;
-                  const c = fields.city ?? form.cityInJapan;
-                  const a = fields.addressLine ?? form.addressLineInJapan;
+                  const p = fields.prefecture ?? form.prefectureInJapan ?? '';
+                  const c = fields.city ?? form.cityInJapan ?? '';
+                  const a = fields.addressLine ?? form.addressLineInJapan ?? '';
                   set("addressInJapan", `${p}${c}${a}`);
                 }}
                 inputClassName={inputCls}

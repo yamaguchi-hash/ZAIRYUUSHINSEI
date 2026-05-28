@@ -23,7 +23,7 @@ export default async function ShinseiFormPage({
   const { application, applicant, organization } = data;
 
   // 既存のformDataがあれば使い、なければ空フォームをベースに自動埋め
-  const savedForm = (application.formData ?? null) as ApplicationFormData | null;
+  const savedForm = (application.formData ?? null) as Partial<ApplicationFormData> | null;
 
   // applicationType（DBの値）→ ApplicationFormType（form-types.tsの値）マッピング
   const toFormType = (t: string): import("@/lib/form-types").ApplicationFormType => {
@@ -34,9 +34,8 @@ export default async function ShinseiFormPage({
     return "extension";
   };
 
-  // 自動埋め: 申請人・組織マスターから初期値を構築
-  const initialForm: ApplicationFormData = savedForm ?? {
-    ...EMPTY_FORM_DATA,
+  // マスターデータからの初期値（savedForm がない場合に使用）
+  const masterData: Partial<ApplicationFormData> = {
     applicationFormType:        toFormType(application.applicationType),
     nationality:                applicant.nationality ?? '',
     dateOfBirth:                applicant.dateOfBirth ?? '',
@@ -69,6 +68,14 @@ export default async function ShinseiFormPage({
     orgCapital:                 organization?.capital ? String(organization.capital) : '',
     orgEmployeeCount:           organization?.employeeCount ? String(organization.employeeCount) : '',
   };
+
+  // EMPTY_FORM_DATA を基底として savedForm（または masterData）を上書きマージ。
+  // これにより、旧バージョンの savedForm に新フィールドが存在しない場合でも
+  // 必ずデフォルト値（空文字列等）が保証される。
+  const initialForm: ApplicationFormData = {
+    ...EMPTY_FORM_DATA,
+    ...(savedForm ?? masterData),
+  } as ApplicationFormData;
 
   const visaLabel = VISA_TYPE_LABELS[application.visaType] ?? application.visaType;
   const appTypeLabel = APPLICATION_TYPE_LABELS[application.applicationType] ?? application.applicationType;

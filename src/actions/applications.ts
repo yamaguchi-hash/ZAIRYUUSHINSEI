@@ -1370,7 +1370,7 @@ export async function prefillApplicationFormData(
     if (!session?.user) return { success: false, error: "認証が必要です" };
     const tenantId = requireTenantId((session.user as any).tenantId);
 
-    // 申請案件・申請人・所属機関を取得
+    // ── 1. 申請案件・申請人・所属機関を取得 ────────────────────────────────────
     const [app] = await db.select().from(applications)
       .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId))).limit(1);
     if (!app) return { success: false, error: "申請案件が見つかりません" };
@@ -1383,91 +1383,318 @@ export async function prefillApplicationFormData(
           .where(eq(organizationMaster.id, app.organizationId)).limit(1).then(r => r[0])
       : null;
 
-    // チェックリストOCRデータを集約
+    const existingForm = (app.formData ?? {}) as Record<string, any>;
+
+    // ── 2. 必要書類チェックリストを全件取得 ────────────────────────────────────
     const checklist = await db.select().from(applicationDocumentChecklist)
       .where(eq(applicationDocumentChecklist.applicationId, applicationId));
 
-    const ocrMap: Record<string, any> = {};
-    for (const item of checklist) {
-      if (item.ocrExtractedData) {
-        Object.assign(ocrMap, item.ocrExtractedData as Record<string, any>);
+    // ── 3. 申請人マスターの保存書類も取得（パスポート・在留カード等） ─────────────
+    const applicantDocs = applicant
+      ? await db.select().from(applicantDocuments)
+          .where(eq(applicantDocuments.applicantId, applicant.id))
+      : [];
+
+    // ── 4. OCR未処理の書類ファイルをここで処理 ─────────────────────────────────
+    if (process.env.GEMINI_API_KEY) {
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+      // Gemini でファイルを読み取る内部ヘルパー
+      const ocrFile = async (fileUrl: string, mimeType: string | null, docName: string) => {
+        try {
+          let base64: string;
+          let useMime: string;
+          if (fileUrl.startsWith("data:")) {
+            const ci = fileUrl.indexOf(",");
+            base64 = fileUrl.slice(ci + 1);
+            useMime = fileUrl.slice(5, ci).split(";")[0];
+          } else {
+            const res = await fetch(fileUrl);
+            if (!res.ok) return null;
+            base64 = Buffer.from(await res.arrayBuffer()).toString("base64");
+            useMime = mimeType ?? "image/jpeg";
+          }
+          const supported = ["image/jpeg","image/png","image/webp","image/heic","image/heif","application/pdf"];
+          if (!supported.includes(useMime)) return null;
+
+          const ocrPrompt = `あなたは在留資格申請書類の読み取り専門家です。書類「${docName}」から全情報をJSON抽出してください。
+読み取り対象: 氏名(ja/en)・国籍・生年月日・出生地・住所(日本/本国)・電話番号・
+パスポート番号・有効期限・在留資格・在留期間・在留期間満了日・在留カード番号・
+婚姻年月日・婚姻届出先・就労先名称・法人番号・役職・年収・月収・学校名・学位・卒業年月日・
+家族氏名・家族続柄・家族国籍・その他重要事項
+読み取れない項目はnull。JSONのみ返答。`;
+          const resp = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{ parts: [{ inlineData: { mimeType: useMime, data: base64 } }, { text: ocrPrompt }] }],
+          });
+          const txt = resp.text ?? "{}";
+          const m = txt.match(/```json\s*([\s\S]*?)```/) ?? txt.match(/(\{[\s\S]*\})/);
+          return m ? JSON.parse(m[1] ?? m[0]) : null;
+        } catch { return null; }
+      };
+
+      // チェックリスト書類でOCR未済のものを処理（最大10件）
+      let processed = 0;
+      for (const item of checklist) {
+        if (!item.fileUrl || item.ocrExtractedData || processed >= 10) continue;
+        const extracted = await ocrFile(item.fileUrl, item.mimeType, item.documentName);
+        if (extracted) {
+          await db.update(applicationDocumentChecklist)
+            .set({ ocrExtractedData: extracted, updatedAt: new Date() })
+            .where(eq(applicationDocumentChecklist.id, item.id));
+          (item as any).ocrExtractedData = extracted;
+          processed++;
+        }
+      }
+
+      // 申請人マスター書類でOCR未済のものを処理（最大5件）
+      let procAd = 0;
+      for (const doc of applicantDocs) {
+        if (!(doc as any).ocrExtractedData && doc.fileUrl && procAd < 5) {
+          const extracted = await ocrFile(doc.fileUrl, null, String(doc.documentType));
+          if (extracted) {
+            await db.update(applicantDocuments)
+              .set({ ocrExtractedData: extracted })
+              .where(eq(applicantDocuments.id, doc.id));
+            (doc as any).ocrExtractedData = extracted;
+            procAd++;
+          }
+        }
       }
     }
 
-    // 既存のフォームデータを取得
-    const existingForm = (app.formData ?? {}) as Record<string, any>;
+    // ── 5. 全書類のOCRデータを集約（書類名付きで保持） ──────────────────────────
+    interface DocEntry { name: string; data: Record<string, any> }
+    const allDocs: DocEntry[] = [];
+    for (const item of checklist) {
+      if (item.ocrExtractedData) {
+        allDocs.push({ name: item.documentName, data: item.ocrExtractedData as Record<string, any> });
+      }
+    }
+    for (const doc of applicantDocs) {
+      if ((doc as any).ocrExtractedData) {
+        allDocs.push({ name: String(doc.documentType), data: (doc as any).ocrExtractedData as Record<string, any> });
+      }
+    }
 
-    // 既存データをベースに申請人マスター・組織マスター・OCRデータで上書き
+    // 後方互換: フラット ocrMap も作成
+    const ocrMap: Record<string, any> = {};
+    for (const d of allDocs) Object.assign(ocrMap, d.data);
+
+    // ── 6. マスターデータをベースに基本フィールドをセット ──────────────────────
+    const { VISA_TYPE_LABELS: VTL } = await import("@/lib/utils");
+    const toJaVisa = (v: string | null | undefined) => (v ? (VTL[v] ?? v) : '');
+
     const prefilled: Record<string, any> = {
       ...existingForm,
-      // 申請人情報
-      nationality:                applicant?.nationality ?? existingForm.nationality ?? '',
-      dateOfBirth:                applicant?.dateOfBirth ?? existingForm.dateOfBirth ?? '',
-      familyNameEn:               applicant?.familyNameEn ?? existingForm.familyNameEn ?? '',
-      givenNameEn:                applicant?.givenNameEn ?? existingForm.givenNameEn ?? '',
-      familyNameJa:               applicant?.familyNameJa ?? existingForm.familyNameJa ?? '',
-      givenNameJa:                applicant?.givenNameJa ?? existingForm.givenNameJa ?? '',
-      sex:                        (applicant?.gender === 'M' ? '男（Male）' : applicant?.gender === 'F' ? '女（Female）' : null) ?? existingForm.sex ?? '',
-      addressInJapan:             applicant?.japanAddress ?? existingForm.addressInJapan ?? '',
-      telephoneNo:                applicant?.phone ?? existingForm.telephoneNo ?? '',
-      passportNumber:             applicant?.passportNumber ?? existingForm.passportNumber ?? '',
-      passportExpiry:             applicant?.passportExpiry ?? existingForm.passportExpiry ?? '',
-      currentStatusOfResidence:   applicant?.currentVisaType ?? existingForm.currentStatusOfResidence ?? '',
-      currentPeriodExpiry:        applicant?.currentVisaExpiry ?? existingForm.currentPeriodExpiry ?? '',
-      residenceCardNumber:        applicant?.residenceCardNumber ?? existingForm.residenceCardNumber ?? '',
+      // 申請人マスター（高信頼度: 常に上書き）
+      nationality:              applicant?.nationality ?? existingForm.nationality ?? '',
+      dateOfBirth:              applicant?.dateOfBirth ?? existingForm.dateOfBirth ?? '',
+      familyNameEn:             applicant?.familyNameEn ?? existingForm.familyNameEn ?? '',
+      givenNameEn:              applicant?.givenNameEn ?? existingForm.givenNameEn ?? '',
+      familyNameJa:             applicant?.familyNameJa ?? existingForm.familyNameJa ?? '',
+      givenNameJa:              applicant?.givenNameJa ?? existingForm.givenNameJa ?? '',
+      sex:                      (applicant?.gender === 'M' ? '男（Male）' : applicant?.gender === 'F' ? '女（Female）' : null) ?? existingForm.sex ?? '',
+      postalCodeInJapan:        (applicant as any)?.postalCode ?? existingForm.postalCodeInJapan ?? '',
+      prefectureInJapan:        (applicant as any)?.japanPrefecture ?? existingForm.prefectureInJapan ?? '',
+      cityInJapan:              (applicant as any)?.japanCity ?? existingForm.cityInJapan ?? '',
+      addressLineInJapan:       (applicant as any)?.japanAddressLine ?? existingForm.addressLineInJapan ?? '',
+      addressInJapan:           applicant?.japanAddress ?? existingForm.addressInJapan ?? '',
+      telephoneNo:              applicant?.phone ?? existingForm.telephoneNo ?? '',
+      passportNumber:           applicant?.passportNumber ?? existingForm.passportNumber ?? '',
+      passportExpiry:           applicant?.passportExpiry ?? existingForm.passportExpiry ?? '',
+      currentStatusOfResidence: toJaVisa(applicant?.currentVisaType) || existingForm.currentStatusOfResidence || '',
+      currentPeriodExpiry:      applicant?.currentVisaExpiry ?? existingForm.currentPeriodExpiry ?? '',
+      residenceCardNumber:      applicant?.residenceCardNumber ?? existingForm.residenceCardNumber ?? '',
       // 申請情報
-      desiredStatusOfResidence:   app.visaType ?? existingForm.desiredStatusOfResidence ?? '',
-      formType:                   app.applicationType ?? existingForm.formType ?? '',
-      // 勤務先（組織マスター）
-      employerName:               org?.nameJa ?? existingForm.employerName ?? '',
-      employerAddress:            [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join('') || existingForm.employerAddress || '',
-      employerPhone:              org?.phone ?? existingForm.employerPhone ?? '',
-      orgName:                    org?.nameJa ?? existingForm.orgName ?? '',
-      orgCorporateNumber:         org?.corporateNumber ?? existingForm.orgCorporateNumber ?? '',
-      orgAddress:                 [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join('') || existingForm.orgAddress || '',
-      orgPhone:                   org?.phone ?? existingForm.orgPhone ?? '',
-      orgCapital:                 org?.capital ? String(org.capital) : existingForm.orgCapital ?? '',
-      orgEmployeeCount:           org?.employeeCount ? String(org.employeeCount) : existingForm.orgEmployeeCount ?? '',
-      orgBusinessType:            org?.industry ?? existingForm.orgBusinessType ?? '',
-      // OCRデータから補完
-      monthlySalary:              ocrMap.monthly_salary ? String(ocrMap.monthly_salary) : existingForm.monthlySalary ?? '',
-      annualSalary:               ocrMap.annual_salary ? String(ocrMap.annual_salary) : existingForm.annualSalary ?? '',
-      position:                   ocrMap.position ?? existingForm.position ?? '',
-      educationSchoolName:        ocrMap.school_name ?? existingForm.educationSchoolName ?? '',
-      educationDegree:            ocrMap.degree ?? existingForm.educationDegree ?? '',
-      educationGraduationDate:    ocrMap.graduation_date ?? existingForm.educationGraduationDate ?? '',
-      majorField:                 ocrMap.major ?? existingForm.majorField ?? '',
-      jobDescription:             ocrMap.position ?? existingForm.jobDescription ?? '',
+      desiredStatusOfResidence: app.visaType ?? existingForm.desiredStatusOfResidence ?? '',
+      // 組織マスター
+      employerName:             org?.nameJa ?? existingForm.employerName ?? '',
+      employerAddress:          [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join('') || existingForm.employerAddress || '',
+      employerPhone:            org?.phone ?? existingForm.employerPhone ?? '',
+      orgName:                  org?.nameJa ?? existingForm.orgName ?? '',
+      orgCorporateNumber:       org?.corporateNumber ?? existingForm.orgCorporateNumber ?? '',
+      orgAddress:               [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join('') || existingForm.orgAddress || '',
+      orgPhone:                 org?.phone ?? existingForm.orgPhone ?? '',
+      orgCapital:               org?.capital ? String(org.capital) : existingForm.orgCapital ?? '',
+      orgEmployeeCount:         org?.employeeCount ? String(org.employeeCount) : existingForm.orgEmployeeCount ?? '',
+      // 取次者固定
+      agentName:         '山口忠士',
+      agentOrganization: '兵庫県行政書士会',
+      agentAddress:      '〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B',
+      agentPhone:        '090-2596-0128',
     };
 
-    // Gemini で補完できる場合はAI追記
-    if (process.env.GEMINI_API_KEY) {
+    // ── 7. 全書類データを使った包括的Gemini解析 ──────────────────────────────
+    if (process.env.GEMINI_API_KEY && allDocs.length > 0) {
       try {
         const { GoogleGenAI } = await import("@google/genai");
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const prompt = `以下の情報を元に、入管申請書の空欄フィールドを日本語で補完してください。
-情報: ${JSON.stringify({ applicant: { nationality: applicant?.nationality, dateOfBirth: applicant?.dateOfBirth }, org: org?.nameJa, visaType: app.visaType, ocr: ocrMap }, null, 2)}
 
-以下の項目だけJSONで返してください（推測が難しいものは空文字列）:
+        // 書類サマリーを文字列化
+        const docSummary = allDocs.map((d, i) =>
+          `【書類${i + 1}】${d.name}\n${JSON.stringify(d.data, null, 2)}`
+        ).join("\n\n");
+
+        const comprehensivePrompt = `あなたは在留資格申請の専門行政書士AIです。
+以下の提出書類データをすべて精査し、法務省入管庁の申請書（在留期間更新・資格変更・認定証明書交付）の
+全フィールドを正確に埋めてください。
+
+━━ 提出書類一覧（${allDocs.length}件） ━━
+${docSummary}
+
+━━ 申請人マスター情報 ━━
+氏名: ${applicant?.familyNameEn ?? ''} ${applicant?.givenNameEn ?? ''} / ${applicant?.familyNameJa ?? ''} ${applicant?.givenNameJa ?? ''}
+国籍: ${applicant?.nationality ?? ''} / 性別: ${applicant?.gender ?? ''}
+在留資格: ${applicant?.currentVisaType ?? ''} / 在留期限: ${applicant?.currentVisaExpiry ?? ''}
+
+━━ 所属機関情報 ━━
+${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ?? ''} / 所在地: ${[org.prefecture, org.city, org.addressLine].filter(Boolean).join('')}` : '（なし）'}
+
+━━ 申請種別: ${app.applicationType} / 在留資格: ${app.visaType} ━━
+
+上記の書類データから読み取れる全情報を精査し、以下のJSONフィールドを埋めてください。
+書類に明記されている情報を最優先し、推測・補完は最小限にしてください。
+不明・書類に記載なしの場合は ""（空文字列）にしてください。
+日付はすべてYYYY-MM-DD形式で返してください。
+
 {
-  "placeOfBirth": "出生地（国名）",
-  "homeTownCity": "本国での居住地",
-  "occupation": "職業（例：会社員）",
-  "reasonForApplication": "申請理由（1〜2文）",
-  "reasonForHiring": "採用理由（1〜2文）"
+  "placeOfBirth": "出生地（都市・国名）",
+  "homeTownCity": "本国における居住地（都市・国）",
+  "occupation": "職業（例：主婦、会社員）",
+  "maritalStatus": "配偶者の有無（有（Married）または無（Single））",
+  "reasonForApplication": "更新・変更の理由（書類から読み取れる事実を具体的に記述）",
+
+  "employerName": "勤務先名称（書類記載の正式名称）",
+  "employerBranchName": "支店・事業所名",
+  "employerAddress": "勤務先所在地（フル住所）",
+  "employerPhone": "勤務先電話番号",
+  "salary": "給与・報酬（数値のみ）",
+  "salaryType": "給与種別（月額 または 年額）",
+  "position": "職務上の地位・役職名",
+  "activityDetails": "業務活動内容（具体的に）",
+
+  "educationCountry": "学校所在国（本邦（日本） または 外国）",
+  "educationDegree": "学位・区分（大学院（博士）/大学院（修士）/大学/短期大学/専門学校/高等学校等）",
+  "educationSchoolName": "学校名（正式名称）",
+  "educationGraduationDate": "卒業年月日（YYYY-MM-DD）",
+  "majorCategory": "専攻・専門分野",
+
+  "itQualificationExists": "情報処理技術者資格の有無（有（Yes）または無（No））",
+  "itQualificationName": "資格名（有の場合）",
+
+  "marriageDate": "婚姻年月日（T型・YYYY-MM-DD）",
+  "marriageRegistrationDate": "婚姻届出年月日（YYYY-MM-DD）",
+  "marriageRegistrationPlace": "婚姻届出市区町村",
+  "cohabitation": "同居の有無（有（Yes）または無（No））",
+
+  "marriageNotificationPlaceJapan": "婚姻届出先（日本）",
+  "marriageNotificationDateJapan": "日本での届出年月日（YYYY-MM-DD）",
+  "marriageNotificationPlaceForeign": "婚姻届出先（本国等）",
+  "marriageNotificationDateForeign": "本国等での届出年月日（YYYY-MM-DD）",
+  "fundingMethod": "滞在費支弁方法（親族負担/外国からの送金/身元保証人負担/その他）",
+
+  "supporterFamilyNameEn": "扶養者 姓（ローマ字）",
+  "supporterGivenNameEn": "扶養者 名（ローマ字）",
+  "supporterFamilyNameJa": "扶養者 姓（漢字）",
+  "supporterGivenNameJa": "扶養者 名（漢字）",
+  "supporterDob": "扶養者 生年月日（YYYY-MM-DD）",
+  "supporterNationality": "扶養者 国籍・地域",
+  "supporterResidenceCard": "扶養者 在留カード番号",
+  "supporterStatusOfResidence": "扶養者 在留資格（日本語）",
+  "supporterPeriodOfStay": "扶養者 在留期間（例：3年）",
+  "supporterPeriodExpiry": "扶養者 在留期間満了日（YYYY-MM-DD）",
+  "supporterRelationship": "申請人との続柄（夫/妻/父/母/養父/養母/その他）",
+  "supporterEmployer": "扶養者 勤務先名称",
+  "supporterCorporateNumber": "扶養者 法人番号（13桁）",
+  "supporterBranchName": "扶養者 支店・事業所名",
+  "supporterAddress": "扶養者 勤務先所在地",
+  "supporterAnnualIncome": "扶養者 年収（数値・円）",
+
+  "spouseFamilyNameEn": "配偶者 姓（ローマ字）",
+  "spouseGivenNameEn": "配偶者 名（ローマ字）",
+  "spouseFamilyNameJa": "配偶者 姓（漢字）",
+  "spouseGivenNameJa": "配偶者 名（漢字）",
+  "spouseDob": "配偶者 生年月日（YYYY-MM-DD）",
+  "spouseNationality": "配偶者 国籍",
+  "spouseResidenceCard": "配偶者 在留カード番号",
+  "spouseOccupation": "配偶者 職業",
+  "spouseEmployer": "配偶者 勤務先",
+  "spouseAddress": "配偶者 住所",
+  "spouseResidenceStatus": "配偶者 身分（日本国籍/永住者/特別永住者）",
+
+  "schoolName": "在籍学校名",
+  "schoolType": "学校種別（大学院/大学/短期大学/専門学校/高等学校/日本語学校/その他）",
+  "schoolAddress": "学校所在地",
+  "schoolPhone": "学校電話番号",
+  "enrollmentDate": "入学年月日（YYYY-MM-DD）",
+  "expectedGraduationDate": "卒業予定年月日（YYYY-MM-DD）",
+  "courseOfStudy": "在籍コース・専攻",
+  "annualTuition": "年間学費（数値・円）",
+  "fundingSource": "費用支弁方法",
+  "fundingAmount": "月額生活費（数値・円）",
+
+  "familyInJapanExists": "在日親族の有無（有 または 無）",
+  "criminalRecord": "犯罪記録の有無（有（Yes）または無（No））",
+
+  "orgBranchName": "所属機関 支店・事業所名",
+  "orgEmploymentInsuranceNo": "雇用保険適用事業所番号",
+  "orgAnnualSales": "年間売上高（数値・円）",
+  "orgForeignEmployeeCount": "外国人職員数",
+  "workPeriodFixed": "就労予定期間（定めなし または 定めあり）",
+  "workPeriodDuration": "就労期間（定めありの場合）",
+  "employmentStartDate": "雇用開始年月日（YYYY-MM-DD）",
+  "businessExperienceYears": "実務経験年数（数値）",
+  "occupationCode": "職種コード番号"
 }`;
-        const resp = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: [{ parts: [{ text: prompt }] }] });
+
+        const resp = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{ parts: [{ text: comprehensivePrompt }] }],
+        });
         const text = resp.text ?? "{}";
         const m = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
         if (m) {
-          const ai_data = JSON.parse(m[1] ?? m[0]);
-          Object.entries(ai_data).forEach(([k, v]) => {
-            if (v && !prefilled[k]) prefilled[k] = v;
-          });
+          const aiData: Record<string, any> = JSON.parse(m[1] ?? m[0]);
+          // AIの値は「現在空欄のフィールドのみ」に適用（マスターデータ優先）
+          for (const [k, v] of Object.entries(aiData)) {
+            if (v !== null && v !== undefined && v !== '' && !prefilled[k]) {
+              prefilled[k] = v;
+            }
+          }
         }
-      } catch { /* AI失敗は無視 */ }
+      } catch (aiErr: any) {
+        console.error("[prefill] comprehensive AI error:", aiErr?.message);
+        /* AI失敗は無視して続行 */
+      }
     }
 
+    // ── 8. 在日親族リストをOCRデータから自動構築（familyInJapan が空の場合）────
+    if (!prefilled.familyInJapan || (prefilled.familyInJapan as any[]).length === 0) {
+      const familyFromOcr: any[] = [];
+      // OCR から家族情報らしきデータを拾う
+      const ocr = ocrMap;
+      if (ocr.family_members && Array.isArray(ocr.family_members)) {
+        for (const m of ocr.family_members) {
+          familyFromOcr.push({
+            relationship: m.relationship ?? '',
+            name: m.name ?? '',
+            dateOfBirth: m.dateOfBirth ?? m.date_of_birth ?? '',
+            nationality: m.nationality ?? '',
+            placeOfEmployment: m.employer ?? m.school ?? '',
+            residingTogether: true,
+            residenceCardNumber: m.residenceCard ?? m.residence_card ?? '',
+          });
+        }
+      }
+      if (familyFromOcr.length > 0) {
+        prefilled.familyInJapan = familyFromOcr;
+        prefilled.familyInJapanExists = '有';
+      }
+    }
+
+    // ── 9. 保存・返却 ────────────────────────────────────────────────────────
     await db.update(applications)
       .set({ formData: prefilled, updatedAt: new Date() })
       .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));

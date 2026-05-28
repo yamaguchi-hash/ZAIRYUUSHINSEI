@@ -605,8 +605,14 @@ export async function saveChecklistDocumentAndOcr(
 以下の項目が含まれる場合は必ず抽出してください：
 - full_name_ja: 氏名（日本語）
 - full_name_en: 氏名（英語・ローマ字）
+- family_name_en: 姓（ローマ字）
+- given_name_en: 名（ローマ字）
+- nationality: 国籍・地域
+- date_of_birth: 生年月日（YYYY-MM-DD形式）
+- gender: 性別（M または F）
 - company_name: 会社名・機関名・組織名
 - company_name_en: 会社名（英語）
+- corporate_number: 法人番号（13桁）
 - position: 役職・職種・業務内容
 - employment_start: 雇用開始日・在籍開始日（YYYY-MM-DD形式）
 - employment_end: 雇用終了日（YYYY-MM-DD形式、現職はnull）
@@ -618,9 +624,20 @@ export async function saveChecklistDocumentAndOcr(
 - graduation_date: 卒業日（YYYY-MM-DD形式）
 - qualification: 資格・免許・称号
 - address: 住所
+- passport_number: パスポート番号
+- residence_card_number: 在留カード番号
+- current_visa_type: 在留資格（日本語で。例：家族滞在、技術・人文知識・国際業務）
+- current_period_of_stay: 在留期間の長さ（例：3年、1年、3年6月。数字＋単位で記載）
+- current_visa_expiry: 在留期間満了日（YYYY-MM-DD形式）
 - issue_date: 発行日（YYYY-MM-DD形式）
 - expiry_date: 有効期限（YYYY-MM-DD形式）
+- marriage_date: 婚姻年月日（YYYY-MM-DD形式）
+- marriage_place: 婚姻届出先・婚姻登録地
 - notes: その他の重要事項
+
+【在留カードの場合】
+在留カード表面に記載の「在留期間」（例：3年、1年）を必ず current_period_of_stay に抽出すること。
+在留期間の満了日（例：2026年10月15日）は current_visa_expiry に YYYY-MM-DD形式で抽出すること。
 
 読み取れない項目はnullにしてください（省略不要）。
 JSONのみを返し、説明文は不要です。`;
@@ -1419,10 +1436,21 @@ export async function prefillApplicationFormData(
           if (!supported.includes(useMime)) return null;
 
           const ocrPrompt = `あなたは在留資格申請書類の読み取り専門家です。書類「${docName}」から全情報をJSON抽出してください。
-読み取り対象: 氏名(ja/en)・国籍・生年月日・出生地・住所(日本/本国)・電話番号・
-パスポート番号・有効期限・在留資格・在留期間・在留期間満了日・在留カード番号・
-婚姻年月日・婚姻届出先・就労先名称・法人番号・役職・年収・月収・学校名・学位・卒業年月日・
-家族氏名・家族続柄・家族国籍・その他重要事項
+以下のフィールド名で抽出してください:
+full_name_ja(氏名日本語), full_name_en(氏名英語), family_name_en(姓英字), given_name_en(名英字),
+nationality(国籍), date_of_birth(生年月日YYYY-MM-DD), gender(性別M/F),
+passport_number(パスポート番号), expiry_date(パスポート有効期限YYYY-MM-DD),
+residence_card_number(在留カード番号),
+current_visa_type(在留資格・日本語で。例：家族滞在),
+current_period_of_stay(在留期間の長さ。在留カードに記載の期間。例：3年、1年、3年6月),
+current_visa_expiry(在留期間満了日YYYY-MM-DD),
+address(日本の住所), phone(電話番号),
+company_name(勤務先名称), corporate_number(法人番号13桁), position(役職),
+annual_salary(年収・数値円), monthly_salary(月収・数値円),
+school_name(学校名), degree(学位), graduation_date(卒業日YYYY-MM-DD), major(専攻),
+marriage_date(婚姻年月日YYYY-MM-DD), marriage_place(婚姻届出先),
+family_members(在日家族の配列: [{name, relationship, nationality, dateOfBirth, employer}]),
+notes(その他重要事項)
 読み取れない項目はnull。JSONのみ返答。`;
           const resp = await ai.models.generateContent({
             model: "gemini-2.5-flash",
@@ -1505,6 +1533,9 @@ export async function prefillApplicationFormData(
       passportNumber:           applicant?.passportNumber ?? existingForm.passportNumber ?? '',
       passportExpiry:           applicant?.passportExpiry ?? existingForm.passportExpiry ?? '',
       currentStatusOfResidence: toJaVisa(applicant?.currentVisaType) || existingForm.currentStatusOfResidence || '',
+      // currentPeriodOfStay（在留期間）: マスターに専用フィールドがないため
+      // OCRデータ→既存フォームの順で取得する（AIで補完）
+      currentPeriodOfStay:      ocrMap.current_period_of_stay ?? existingForm.currentPeriodOfStay ?? '',
       currentPeriodExpiry:      applicant?.currentVisaExpiry ?? existingForm.currentPeriodExpiry ?? '',
       residenceCardNumber:      applicant?.residenceCardNumber ?? existingForm.residenceCardNumber ?? '',
       // 申請情報
@@ -1583,6 +1614,8 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
 
   "itQualificationExists": "情報処理技術者資格の有無（有（Yes）または無（No））",
   "itQualificationName": "資格名（有の場合）",
+
+  "currentPeriodOfStay": "申請人の現在の在留期間の長さ（在留カード表面に記載。例：3年、1年、3年6月。数字と単位を含めて正確に）",
 
   "marriageDate": "婚姻年月日（T型・YYYY-MM-DD）",
   "marriageRegistrationDate": "婚姻届出年月日（YYYY-MM-DD）",

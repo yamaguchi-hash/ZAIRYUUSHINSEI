@@ -27,9 +27,9 @@ const ALL_QUESTIONS: Question[] = [
   { key: "givenNameEn",    section: "基本情報", label: "3. 氏名（ローマ字・名 / Given Name）", note: "例：TARO" },
   { key: "familyNameJa",   section: "基本情報", label: "3. 氏名（漢字・姓）", note: "漢字氏名がある場合" },
   { key: "givenNameJa",    section: "基本情報", label: "3. 氏名（漢字・名）", note: "漢字氏名がある場合" },
-  { key: "sex",            section: "基本情報", label: "4. 性別", options: ["男（Male）", "女（Female）"] },
+  { key: "sex",            section: "基本情報", label: "4. 性別", options: ["男", "女"] },
   { key: "placeOfBirth",   section: "基本情報", label: "5. 出生地", note: "例：北京市", formTypes: ["coe", "change"] },
-  { key: "maritalStatus",  section: "基本情報", label: "5（更新）/ 6. 配偶者の有無", options: ["有（Married）", "無（Single）"] },
+  { key: "maritalStatus",  section: "基本情報", label: "5（更新）/ 6. 配偶者の有無", options: ["有", "無"] },
   { key: "occupation",     section: "基本情報", label: "6（更新）/ 7. 職業", note: "例：会社員、主婦" },
   { key: "homeTownCity",   section: "基本情報", label: "7（更新）/ 8. 本国における居住地", note: "例：上海市徐匯区〇〇路1-2-3" },
 
@@ -57,7 +57,7 @@ const ALL_QUESTIONS: Question[] = [
   { key: "reasonForApplication",     section: "申請内容", label: "更新・変更の理由", note: "なぜ更新・変更が必要か、具体的にご記入ください" },
 
   // ── 犯罪記録 ─────────────────────────────────────────────────────────────
-  { key: "criminalRecord", section: "犯罪・退去強制歴", label: "犯罪を理由とする処分を受けたことの有無", note: "日本国外・交通違反等を含む", options: ["有（Yes）", "無（No）"] },
+  { key: "criminalRecord", section: "犯罪・退去強制歴", label: "犯罪を理由とする処分を受けたことの有無", note: "日本国外・交通違反等を含む", options: ["有", "無"] },
 
   // ── R型: 婚姻・届出 ──────────────────────────────────────────────────────
   { key: "marriageNotificationPlaceJapan",   section: "婚姻・出生届出（R型）", label: "日本国届出先", note: "例：東京都新宿区役所", categories: ["R"] },

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, FileDown, ClipboardList } from "lucide-react";
 import { ExcelDownloadButton } from "@/components/applications/excel-download-button";
+import { QuestionnaireDocxButton } from "@/components/applications/questionnaire-docx-button";
 import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
 import { ShinseiFormEditor } from "./shinsei-form-editor";
 import type { ApplicationFormData } from "@/lib/form-types";
@@ -135,8 +136,9 @@ export default async function ShinseiFormPage({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 bg-amber-50 border border-amber-300 hover:bg-amber-100 rounded-lg transition-colors"
           >
             <ClipboardList className="w-4 h-4" />
-            顧客向け質問書
+            顧客向け質問書（印刷用）
           </Link>
+          <QuestionnaireDocxButton applicationId={id} />
           <ExcelDownloadButton applicationId={id} />
           <Link
             href={`/print/${id}/shinsei`}

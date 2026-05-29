@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { saveApplicationFormData, extractMarriageNotificationFromDocs } from "@/actions/applications";
+import { fillAllFieldsFromDocs } from "@/actions/fill-all-fields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Loader2, Save, User, Building2, GraduationCap, Briefcase,
-  Plus, Trash2, FileText, Settings, Heart, GraduationCap as School, ScanText,
+  Plus, Trash2, FileText, Settings, Heart, GraduationCap as School, ScanText, BookOpen,
 } from "lucide-react";
 import { SectionExtractButton } from "@/components/applications/section-extract-button";
 import { cn } from "@/lib/utils";
@@ -78,6 +79,8 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
   const [form, setForm] = useState<ApplicationFormData>(initialForm);
   const [tab, setTab] = useState<TabKey>("meta");
   const [isSaving, setIsSaving] = useState(false);
+  const [isFilling, setIsFilling] = useState(false);
+  const [fillProgress, setFillProgress] = useState("");
   const [isExtractingMarriage, setIsExtractingMarriage] = useState(false);
   const [marriageMsg, setMarriageMsg] = useState("");
   const [msg, setMsg] = useState("");
@@ -137,6 +140,23 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
     setIsSaving(false);
   }
 
+  // 全書類一括読み取り・全フィールド入力
+  async function handleFillAll() {
+    setIsFilling(true);
+    setFillProgress("書類を読み取り中...");
+    setMsg("");
+    const result = await fillAllFieldsFromDocs(applicationId);
+    if (result.success && result.formData) {
+      setForm(result.formData as typeof form);
+      setMsg(`✓ ${result.docsRead}件の書類を読み取り、全フィールドを入力しました`);
+      setFillProgress("");
+    } else {
+      setMsg(`エラー: ${result.error}`);
+      setFillProgress("");
+    }
+    setIsFilling(false);
+  }
+
   // 書類抽出結果をフォームにマージ
   function applyExtracted(data: Record<string, any>) {
     setForm(prev => {
@@ -187,12 +207,31 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
   return (
     <div>
       {/* ツールバー */}
-      <div className="flex items-center justify-end mb-4 gap-3">
-        {msg && <span className={cn("text-xs", msg.startsWith("エラー") ? "text-red-600" : "text-green-600")}>{msg}</span>}
-        <button onClick={handleSave} disabled={isSaving}
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50">
-          {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}保存
-        </button>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        {/* 全書類一括読み取りボタン */}
+        <div className="flex flex-col gap-1">
+          <button
+            onClick={handleFillAll}
+            disabled={isFilling}
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50 transition-colors"
+            title="アップロード済み全書類を読み取り、申請書の全フィールドを一括入力します"
+          >
+            {isFilling
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <BookOpen className="w-4 h-4" />}
+            {isFilling ? "読み取り中..." : "書類から全項目を読み取る"}
+          </button>
+          {fillProgress && (
+            <p className="text-xs text-emerald-600">{fillProgress}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {msg && <span className={cn("text-xs", msg.startsWith("エラー") ? "text-red-600" : "text-green-600")}>{msg}</span>}
+          <button onClick={handleSave} disabled={isSaving}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50">
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}保存
+          </button>
+        </div>
       </div>
 
       {/* タブ */}

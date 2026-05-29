@@ -299,7 +299,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 <input className={inputCls} value={form.givenNameJa} onChange={e => set("givenNameJa", e.target.value)} placeholder="太郎" />
               </Field>
               <Field label="4. 性別" required>
-                <RadioGroup value={form.sex} onChange={v => set("sex", v)} options={["男（Male）", "女（Female）"]} />
+                <RadioGroup value={form.sex} onChange={v => set("sex", v)} options={["男", "女"]} />
               </Field>
 
               {/* 出生地は COE/Change のみ（項目5）。Extension は項目5=配偶者の有無のため不要 */}
@@ -310,7 +310,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
               )}
 
               <Field label={`${isCoe || isChange ? '6' : '5'}. 配偶者の有無`}>
-                <RadioGroup value={form.maritalStatus} onChange={v => set("maritalStatus", v)} options={["有（Married）", "無（Single）"]} />
+                <RadioGroup value={form.maritalStatus} onChange={v => set("maritalStatus", v)} options={["有", "無"]} />
               </Field>
               <Field label={`${isCoe || isChange ? '7' : '6'}. 職業`}>
                 <input className={inputCls} value={form.occupation} onChange={e => set("occupation", e.target.value)} placeholder="例: 会社員 / Company Employee" />
@@ -420,7 +420,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     <input className={inputCls} value={form.intendedLengthOfStay} onChange={e => set("intendedLengthOfStay", e.target.value)} placeholder="例: 3年" />
                   </Field>
                   <Field label="15. 同伴者の有無">
-                    <RadioGroup value={form.accompanyingPersons} onChange={v => set("accompanyingPersons", v)} options={["有（Yes）", "無（No）"]} />
+                    <RadioGroup value={form.accompanyingPersons} onChange={v => set("accompanyingPersons", v)} options={["有", "無"]} />
                   </Field>
                   <div className="sm:col-span-2">
                     <Field label="16. 査証申請予定地">
@@ -433,9 +433,9 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 <CardHeader><CardTitle className="text-base">過去の出入国歴・申請歴（項目 17〜18）</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="17. 過去の出入国歴">
-                    <RadioGroup value={form.pastEntryHistory} onChange={v => set("pastEntryHistory", v)} options={["有（Yes）", "無（No）"]} />
+                    <RadioGroup value={form.pastEntryHistory} onChange={v => set("pastEntryHistory", v)} options={["有", "無"]} />
                   </Field>
-                  {form.pastEntryHistory === "有（Yes）" && (
+                  {form.pastEntryHistory === "有" && (
                     <>
                       <Field label="回数">
                         <input className={inputCls} value={form.pastEntryCount} onChange={e => set("pastEntryCount", e.target.value)} placeholder="例: 2回" />
@@ -449,9 +449,9 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     </>
                   )}
                   <Field label="18. 過去の在留資格認定証明書交付申請歴">
-                    <RadioGroup value={form.pastCoeHistory} onChange={v => set("pastCoeHistory", v)} options={["有（Yes）", "無（No）"]} />
+                    <RadioGroup value={form.pastCoeHistory} onChange={v => set("pastCoeHistory", v)} options={["有", "無"]} />
                   </Field>
-                  {form.pastCoeHistory === "有（Yes）" && (
+                  {form.pastCoeHistory === "有" && (
                     <>
                       <Field label="回数">
                         <input className={inputCls} value={form.pastCoeCount} onChange={e => set("pastCoeCount", e.target.value)} placeholder="例: 1回" />
@@ -550,9 +550,9 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label={`${isCoe ? "19" : "15"}. 犯罪を理由とする処分を受けたことの有無`} note="日本国外を含む。交通違反等を含む">
-                <RadioGroup value={form.criminalRecord} onChange={v => set("criminalRecord", v)} options={["有（Yes）", "無（No）"]} />
+                <RadioGroup value={form.criminalRecord} onChange={v => set("criminalRecord", v)} options={["有", "無"]} />
               </Field>
-              {form.criminalRecord === "有（Yes）" && (
+              {form.criminalRecord === "有" && (
                 <Field label="具体的内容">
                   <input className={inputCls} value={form.criminalRecordDetail} onChange={e => set("criminalRecordDetail", e.target.value)} />
                 </Field>
@@ -560,9 +560,9 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
               {isCoe && (
                 <>
                   <Field label="20. 退去強制又は出国命令による出国の有無">
-                    <RadioGroup value={form.deportationHistory} onChange={v => set("deportationHistory", v)} options={["有（Yes）", "無（No）"]} />
+                    <RadioGroup value={form.deportationHistory} onChange={v => set("deportationHistory", v)} options={["有", "無"]} />
                   </Field>
-                  {form.deportationHistory === "有（Yes）" && (
+                  {form.deportationHistory === "有" && (
                     <>
                       <Field label="回数">
                         <input className={inputCls} value={form.deportationCount} onChange={e => set("deportationCount", e.target.value)} />
@@ -614,8 +614,8 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                           <Field label="在留カード番号"><input className={inputCls} value={m.residenceCardNumber} onChange={e => updateFamilyMember(idx, "residenceCardNumber", e.target.value)} /></Field>
                           <Field label="同居（予定）の有無">
                             <select className={selectCls} value={m.residingTogether ? "yes" : "no"} onChange={e => updateFamilyMember(idx, "residingTogether", e.target.value === "yes")}>
-                              <option value="yes">有（Yes）</option>
-                              <option value="no">無（No）</option>
+                              <option value="yes">有</option>
+                              <option value="no">無</option>
                             </select>
                           </Field>
                         </div>
@@ -665,14 +665,14 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   <Field label="(2) 学位・区分" required>
                     <select className={selectCls} value={form.educationDegree} onChange={e => set("educationDegree", e.target.value)}>
                       <option value="">選択してください</option>
-                      <option value="大学院（博士）">大学院（博士）Doctor</option>
-                      <option value="大学院（修士）">大学院（修士）Master</option>
-                      <option value="大学">大学 Bachelor</option>
-                      <option value="短期大学">短期大学 Junior college</option>
+                      <option value="大学院（博士）">大学院（博士）</option>
+                      <option value="大学院（修士）">大学院（修士）</option>
+                      <option value="大学">大学</option>
+                      <option value="短期大学">短期大学</option>
                       <option value="高等専門学校">高等専門学校 College of technology</option>
-                      <option value="専門学校">専門学校 Vocational school</option>
-                      <option value="高等学校">高等学校 Senior high school</option>
-                      <option value="中学校">中学校 Junior high school</option>
+                      <option value="専門学校">専門学校</option>
+                      <option value="高等学校">高等学校</option>
+                      <option value="中学校">中学校</option>
                       <option value="その他">その他 Others</option>
                     </select>
                   </Field>
@@ -719,9 +719,9 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 <CardHeader><CardTitle className="text-base">{isCoe ? "25." : "20."} 情報処理技術者資格等（情報処理業務従事者のみ）</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="資格の有無">
-                    <RadioGroup value={form.itQualificationExists} onChange={v => set("itQualificationExists", v)} options={["有（Yes）", "無（No）"]} />
+                    <RadioGroup value={form.itQualificationExists} onChange={v => set("itQualificationExists", v)} options={["有", "無"]} />
                   </Field>
-                  {form.itQualificationExists === "有（Yes）" && (
+                  {form.itQualificationExists === "有" && (
                     <Field label="資格名又は試験名">
                       <input className={inputCls} value={form.itQualificationName} onChange={e => set("itQualificationName", e.target.value)} placeholder="例: 基本情報技術者試験" />
                     </Field>
@@ -819,9 +819,9 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     <input className={inputCls} value={form.marriageRegistrationPlace} onChange={e => set("marriageRegistrationPlace", e.target.value)} placeholder="例: 東京都渋谷区" />
                   </Field>
                   <Field label="同居の有無">
-                    <RadioGroup value={form.cohabitation} onChange={v => set("cohabitation", v)} options={["有（Yes）", "無（No）"]} />
+                    <RadioGroup value={form.cohabitation} onChange={v => set("cohabitation", v)} options={["有", "無"]} />
                   </Field>
-                  {form.cohabitation === "無（No）" && (
+                  {form.cohabitation === "無" && (
                     <div className="sm:col-span-2">
                       <Field label="別居理由">
                         <input className={inputCls} value={form.separationReason} onChange={e => set("separationReason", e.target.value)} />
@@ -916,8 +916,8 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
               <Card>
                 <CardHeader><CardTitle className="text-base">19. 資格外活動の有無</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
-                  <RadioGroup value={form.partTimeWorkExistsR} onChange={v => set("partTimeWorkExistsR", v)} options={["有（Yes）", "無（No）"]} />
-                  {form.partTimeWorkExistsR === "有（Yes）" && (
+                  <RadioGroup value={form.partTimeWorkExistsR} onChange={v => set("partTimeWorkExistsR", v)} options={["有", "無"]} />
+                  {form.partTimeWorkExistsR === "有" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
                       <div className="sm:col-span-2">
                         <Field label="(1) 内容">
@@ -1118,7 +1118,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     <input className={inputCls} value={form.scholarshipAmount} onChange={e => set("scholarshipAmount", e.target.value)} />
                   </Field>
                   <Field label="資格外活動許可の有無">
-                    <RadioGroup value={form.partTimeWorkPermit} onChange={v => set("partTimeWorkPermit", v)} options={["有（Yes）", "無（No）"]} />
+                    <RadioGroup value={form.partTimeWorkPermit} onChange={v => set("partTimeWorkPermit", v)} options={["有", "無"]} />
                   </Field>
                 </CardContent>
               </Card>
@@ -1199,7 +1199,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="sm:col-span-2">
                         <Field label="2. 契約の形態">
-                          <RadioGroup value={form.contractType} onChange={v => set("contractType", v)} options={["雇用（Employment）", "委任（Entrustment）", "請負（Service contract）", "その他"]} />
+                          <RadioGroup value={form.contractType} onChange={v => set("contractType", v)} options={["雇用", "委任", "請負", "その他"]} />
                         </Field>
                         {form.contractType === "その他" && (
                           <div className="mt-2"><Field label="その他の詳細"><input className={inputCls} value={form.contractTypeOther} onChange={e => set("contractTypeOther", e.target.value)} /></Field></div>
@@ -1241,7 +1241,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     <CardHeader><CardTitle className="text-base">就労条件・給与・職種</CardTitle></CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Field label={`${isCoe ? "5." : "4."} 就労予定期間`}>
-                        <RadioGroup value={form.workPeriodFixed} onChange={v => set("workPeriodFixed", v)} options={["定めなし（Non-fixed）", "定めあり（Fixed）"]} />
+                        <RadioGroup value={form.workPeriodFixed} onChange={v => set("workPeriodFixed", v)} options={["定めなし", "定めあり"]} />
                       </Field>
                       {form.workPeriodFixed === "定めあり（Fixed）" && (
                         <Field label="期間（年・月）"><input className={inputCls} value={form.workPeriodDuration} onChange={e => set("workPeriodDuration", e.target.value)} placeholder="例: 1年6ヶ月" /></Field>
@@ -1270,9 +1270,9 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                         <input className={inputCls} value={form.businessExperienceYears} onChange={e => set("businessExperienceYears", e.target.value)} placeholder="例: 3" />
                       </Field>
                       <Field label={`${isCoe ? "9." : "8."} 職務上の地位（役職名）`}>
-                        <RadioGroup value={form.positionExists} onChange={v => set("positionExists", v)} options={["あり（Yes）", "なし（No）"]} />
+                        <RadioGroup value={form.positionExists} onChange={v => set("positionExists", v)} options={["あり", "なし"]} />
                       </Field>
-                      {form.positionExists === "あり（Yes）" && (
+                      {form.positionExists === "あり" && (
                         <Field label="   役職名（Title）"><input className={inputCls} value={form.position} onChange={e => set("position", e.target.value)} placeholder="例: システムエンジニア" /></Field>
                       )}
                       <Field label={`${isCoe ? "10." : "9."} 職種`} note="別紙職種一覧番号">

@@ -34,9 +34,9 @@ const SECTION_CONFIG: Record<
   "givenNameEn": "名（ローマ字・パスポート記載の大文字）",
   "familyNameJa": "姓（漢字・ない場合は空文字）",
   "givenNameJa": "名（漢字・ない場合は空文字）",
-  "sex": "性別（男（Male） または 女（Female））",
+  "sex": "性別（男 または 女）",
   "placeOfBirth": "出生地（都市・国名）",
-  "maritalStatus": "配偶者の有無（有（Married） または 無（Single））",
+  "maritalStatus": "配偶者の有無（有 または 無）",
   "occupation": "職業（例：会社員、主婦、留学生）",
   "homeTownCity": "本国における居住地（都市・国名）"
 }`,
@@ -168,7 +168,7 @@ const SECTION_CONFIG: Record<
   "spouseAddress": "配偶者 住所（日本）",
   "marriageDate": "婚姻年月日（YYYY-MM-DD）",
   "marriageRegistrationPlace": "婚姻届出市区町村名",
-  "cohabitation": "同居の有無（有（Yes） または 無（No））"
+  "cohabitation": "同居の有無（有 または 無）"
 }`,
   },
 

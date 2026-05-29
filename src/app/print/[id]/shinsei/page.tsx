@@ -20,6 +20,31 @@ function fmtMoney(v: string | null | undefined) {
 }
 function businessTypeLabel(code: string) { return code ? `${code}番` : "　"; }
 
+// ─── 後方互換ヘルパー（旧英語混在値 "有（Yes）" と新日本語値 "有" の両方に対応） ─
+function yes(v: string | null | undefined): boolean {
+  if (!v) return false;
+  return v === "有" || v.startsWith("有（") || v === "あり" || v.startsWith("あり（");
+}
+function no(v: string | null | undefined): boolean { return !yes(v); }
+function fmtYesNo(v: string | null | undefined): string { return yes(v) ? "有" : "無"; }
+function fmtSex(v: string | null | undefined): string {
+  if (!v) return "　";
+  if (v.startsWith("男")) return "男";
+  if (v.startsWith("女")) return "女";
+  return v;
+}
+function fmtWorkPeriod(v: string | null | undefined): string {
+  if (!v) return "定めなし";
+  if (v === "定めなし" || v.startsWith("定めなし")) return "定めなし";
+  if (v === "定めあり" || v.startsWith("定めあり")) return "定めあり";
+  return v;
+}
+function fmtContractType(v: string | null | undefined): string {
+  if (!v) return "　";
+  // "雇用（Employment）" → "雇用" など
+  return v.replace(/（[^）]*）$/, "");
+}
+
 export default async function ShinseiPrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth();
@@ -131,7 +156,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 <td colSpan={3}>{(form.familyNameJa || form.givenNameJa) ? `${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}` : "　"}</td>
               </tr>
               <tr>
-                <td className="lbl">4. 性別</td><td>{fmt(form.sex)}</td>
+                <td className="lbl">4. 性別</td><td>{fmtSex(form.sex)}</td>
                 {hasBirthplace
                   ? <><td className="lbl">5. 出生地</td><td>{fmt(form.placeOfBirth)}</td></>
                   : <><td className="lbl">5. 配偶者の有無</td><td>{fmt(form.maritalStatus)}</td></>
@@ -204,29 +229,29 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   <tr>
                     <td className="lbl">17. 過去の出入国歴</td>
                     <td colSpan={3}>
-                      {form.pastEntryHistory === "有（Yes）"
+                      {yes(form.pastEntryHistory)
                         ? `有 — 回数：${fmt(form.pastEntryCount)}回　最新：${fmtDate(form.pastEntryLatestFrom)} 〜 ${fmtDate(form.pastEntryLatestTo)}`
-                        : "無（No）"}
+                        : "無"}
                     </td>
                   </tr>
                   <tr>
                     <td className="lbl">18. 過去の認定証明書申請歴</td>
                     <td colSpan={3}>
-                      {form.pastCoeHistory === "有（Yes）"
+                      {yes(form.pastCoeHistory)
                         ? `有 — 申請回数：${fmt(form.pastCoeCount)}回　うち不交付：${fmt(form.pastCoeNonIssuanceCount)}回`
-                        : "無（No）"}
+                        : "無"}
                     </td>
                   </tr>
                   <tr>
                     <td className="lbl">19. 犯罪記録の有無</td>
-                    <td colSpan={3}>{form.criminalRecord === "有（Yes）" ? `有 — ${fmt(form.criminalRecordDetail)}` : "無（No）"}</td>
+                    <td colSpan={3}>{yes(form.criminalRecord) ? `有 — ${fmt(form.criminalRecordDetail)}` : "無"}</td>
                   </tr>
                   <tr>
                     <td className="lbl">20. 退去強制歴の有無</td>
                     <td colSpan={3}>
-                      {form.deportationHistory === "有（Yes）"
+                      {yes(form.deportationHistory)
                         ? `有 — 回数：${fmt(form.deportationCount)}回　最新：${fmtDate(form.deportationLatestDate)}`
-                        : "無（No）"}
+                        : "無"}
                     </td>
                   </tr>
                 </tbody>
@@ -258,7 +283,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   </tr>
                   <tr>
                     <td className="lbl">15. 犯罪記録の有無</td>
-                    <td colSpan={3}>{form.criminalRecord === "有（Yes）" ? `有 — ${fmt(form.criminalRecordDetail)}` : "無（No）"}</td>
+                    <td colSpan={3}>{yes(form.criminalRecord) ? `有 — ${fmt(form.criminalRecordDetail)}` : "無"}</td>
                   </tr>
                 </tbody>
               </table>
@@ -289,7 +314,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   </tr>
                   <tr>
                     <td className="lbl">15. 犯罪記録の有無</td>
-                    <td colSpan={3}>{form.criminalRecord === "有（Yes）" ? `有 — ${fmt(form.criminalRecordDetail)}` : "無（No）"}</td>
+                    <td colSpan={3}>{yes(form.criminalRecord) ? `有 — ${fmt(form.criminalRecordDetail)}` : "無"}</td>
                   </tr>
                 </tbody>
               </table>
@@ -435,7 +460,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   <tr>
                     <td className="lbl">同居の有無</td>
                     <td colSpan={3}>
-                      {form.cohabitation === "無（No）"
+                      {no(form.cohabitation)
                         ? `無 — ${fmt(form.separationReason)}`
                         : "有（同居）"}
                     </td>
@@ -501,12 +526,12 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   <tr>
                     <td className="lbl" style={{width:'30%'}}>資格外活動</td>
                     <td colSpan={3}>
-                      {form.partTimeWorkExistsR === '有（Yes）'
-                        ? '有（Yes）'
-                        : '無（No）'}
+                      {yes(form.partTimeWorkExistsR)
+                        ? '有'
+                        : '無'}
                     </td>
                   </tr>
-                  {form.partTimeWorkExistsR === '有（Yes）' && (
+                  {yes(form.partTimeWorkExistsR) && (
                     <>
                       <tr>
                         <td className="lbl">(1) 内容</td>
@@ -850,7 +875,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 <tbody>
                   <tr>
                     <td className="lbl">{isCoe ? "5." : "4."} 就労予定期間</td>
-                    <td>{form.workPeriodFixed === "定めあり（Fixed）" ? `定めあり：${fmt(form.workPeriodDuration)}` : "定めなし"}</td>
+                    <td>{(form.workPeriodFixed === "定めあり" || form.workPeriodFixed?.startsWith("定めあり")) ? `定めあり：${fmt(form.workPeriodDuration)}` : "定めなし"}</td>
                     <td className="lbl">{isCoe ? "6." : "5."} 雇用開始予定日</td>
                     <td>
                       {fmtDate(form.employmentStartDate)}

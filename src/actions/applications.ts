@@ -1557,7 +1557,7 @@ notes(その他重要事項)
       givenNameEn:              applicant?.givenNameEn ?? existingForm.givenNameEn ?? '',
       familyNameJa:             applicant?.familyNameJa ?? existingForm.familyNameJa ?? '',
       givenNameJa:              applicant?.givenNameJa ?? existingForm.givenNameJa ?? '',
-      sex:                      (applicant?.gender === 'M' ? '男（Male）' : applicant?.gender === 'F' ? '女（Female）' : null) ?? existingForm.sex ?? '',
+      sex:                      (applicant?.gender === 'M' ? '男' : applicant?.gender === 'F' ? '女' : null) ?? existingForm.sex ?? '',
       postalCodeInJapan:        (applicant as any)?.postalCode ?? existingForm.postalCodeInJapan ?? '',
       prefectureInJapan:        (applicant as any)?.japanPrefecture ?? existingForm.prefectureInJapan ?? '',
       cityInJapan:              (applicant as any)?.japanCity ?? existingForm.cityInJapan ?? '',
@@ -1633,7 +1633,7 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
   "placeOfBirth": "出生地（都市・国名）",
   "homeTownCity": "本国における居住地（都市・国）",
   "occupation": "職業（例：主婦、会社員）",
-  "maritalStatus": "配偶者の有無（有（Married）または無（Single））",
+  "maritalStatus": "配偶者の有無（有 または 無）",
   "reasonForApplication": "更新・変更の理由（書類から読み取れる事実を具体的に記述）",
 
   "employerName": "勤務先名称（書類記載の正式名称）",
@@ -1651,7 +1651,7 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
   "educationGraduationDate": "卒業年月日（YYYY-MM-DD）",
   "majorCategory": "専攻・専門分野",
 
-  "itQualificationExists": "情報処理技術者資格の有無（有（Yes）または無（No））",
+  "itQualificationExists": "情報処理技術者資格の有無（有 または 無）",
   "itQualificationName": "資格名（有の場合）",
 
   "currentPeriodOfStay": "申請人の現在の在留期間の長さ（在留カード表面に記載。例：3年、1年、3年6月。数字と単位を含めて正確に）",
@@ -1659,7 +1659,7 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
   "marriageDate": "婚姻年月日（T型・YYYY-MM-DD）",
   "marriageRegistrationDate": "婚姻届出年月日（YYYY-MM-DD）",
   "marriageRegistrationPlace": "婚姻届出市区町村",
-  "cohabitation": "同居の有無（有（Yes）または無（No））",
+  "cohabitation": "同居の有無（有 または 無）",
 
   "marriageNotificationPlaceJapan": "日本国への婚姻・出生・縁組の届出先（市区町村役場名。婚姻届受理証明書・戸籍謄本から抽出。例：大阪市北区役所）",
   "marriageNotificationDateJapan": "日本国への届出年月日（YYYY-MM-DD。婚姻届受理証明書・戸籍謄本に記載の届出受理日）",
@@ -1708,7 +1708,7 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
   "fundingAmount": "月額生活費（数値・円）",
 
   "familyInJapanExists": "在日親族の有無（有 または 無）",
-  "criminalRecord": "犯罪記録の有無（有（Yes）または無（No））",
+  "criminalRecord": "犯罪記録の有無（有 または 無）",
 
   "orgBranchName": "所属機関 支店・事業所名",
   "orgEmploymentInsuranceNo": "雇用保険適用事業所番号",

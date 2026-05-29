@@ -34,6 +34,7 @@ import { getDocumentRequirements } from "@/actions/applications";
 import { DeleteApplicationButton } from "./delete-application-button";
 import { FileDown, FolderArchive } from "lucide-react";
 import { MergePdfButton } from "@/components/applications/merge-pdf-button";
+import { ExcelDownloadButton } from "@/components/applications/excel-download-button";
 
 // 7ステップのワークフロー
 const WORKFLOW_STEPS = [
@@ -136,6 +137,8 @@ export default async function ApplicationDetailPage({
           </Link>
           {/* 添付書類一括PDF */}
           <MergePdfButton applicationId={application.id} />
+          {/* オンライン申請用Excel */}
+          <ExcelDownloadButton applicationId={application.id} />
           {(userRole === "expert" || userRole === "admin") && !application.isApproved && (
             <ApproveButton applicationId={application.id} />
           )}

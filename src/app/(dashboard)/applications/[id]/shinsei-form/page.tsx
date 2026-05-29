@@ -3,6 +3,7 @@ import { getApplicationById } from "@/actions/applications";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, FileDown, ClipboardList } from "lucide-react";
+import { ExcelDownloadButton } from "@/components/applications/excel-download-button";
 import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
 import { ShinseiFormEditor } from "./shinsei-form-editor";
 import type { ApplicationFormData } from "@/lib/form-types";
@@ -127,7 +128,7 @@ export default async function ShinseiFormPage({
           <span className="text-gray-300">/</span>
           <span className="text-sm text-gray-700 font-medium">申請書作成</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <Link
             href={`/print/${id}/questionnaire`}
             target="_blank"
@@ -136,6 +137,7 @@ export default async function ShinseiFormPage({
             <ClipboardList className="w-4 h-4" />
             顧客向け質問書
           </Link>
+          <ExcelDownloadButton applicationId={id} />
           <Link
             href={`/print/${id}/shinsei`}
             target="_blank"

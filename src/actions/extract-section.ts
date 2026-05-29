@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { db, applications, applicationDocumentChecklist } from "@/lib/db";
+import { db, applications, applicationDocumentChecklist, applicantMaster } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 
 // ─── セクションキー定義 ───────────────────────────────────────────────────────
@@ -130,24 +130,24 @@ const SECTION_CONFIG: Record<
 
   supporter: {
     label: "扶養者情報（R型）",
-    sources: "扶養者のパスポート・在留カード・在職証明書・源泉徴収票・登記簿",
+    sources: "扶養者のパスポート・在留カード・在職証明書・源泉徴収票・雇用契約書・登記簿謄本",
     jsonTemplate: `{
-  "supporterFamilyNameEn": "扶養者 姓（ローマ字）",
-  "supporterGivenNameEn": "扶養者 名（ローマ字）",
-  "supporterFamilyNameJa": "扶養者 姓（漢字）",
-  "supporterGivenNameJa": "扶養者 名（漢字）",
-  "supporterDob": "扶養者 生年月日（YYYY-MM-DD）",
-  "supporterNationality": "扶養者 国籍・地域",
-  "supporterResidenceCard": "扶養者 在留カード番号",
-  "supporterStatusOfResidence": "扶養者 在留資格（日本語）",
-  "supporterPeriodOfStay": "扶養者 在留期間（例：3年）",
-  "supporterPeriodExpiry": "扶養者 在留期間満了日（YYYY-MM-DD）",
+  "supporterFamilyNameEn": "扶養者（申請人の配偶者や親）の姓（ローマ字）",
+  "supporterGivenNameEn": "扶養者の名（ローマ字）",
+  "supporterFamilyNameJa": "扶養者の姓（漢字）",
+  "supporterGivenNameJa": "扶養者の名（漢字）",
+  "supporterDob": "扶養者の生年月日（YYYY-MM-DD）",
+  "supporterNationality": "扶養者の国籍・地域",
+  "supporterResidenceCard": "扶養者の在留カード番号（英数字12桁）",
+  "supporterStatusOfResidence": "扶養者の在留資格（日本語。例：技術・人文知識・国際業務、永住者）",
+  "supporterPeriodOfStay": "扶養者の在留期間の長さ（在留カード記載。例：3年、1年）",
+  "supporterPeriodExpiry": "扶養者の在留期間満了日（在留カードの満了日欄。YYYY-MM-DD形式）",
   "supporterRelationship": "申請人との続柄（夫/妻/父/母/養父/養母/その他）",
-  "supporterEmployer": "扶養者 勤務先名称",
-  "supporterCorporateNumber": "扶養者 法人番号（13桁）",
-  "supporterBranchName": "扶養者 支店・事業所名",
-  "supporterAddress": "扶養者 勤務先所在地",
-  "supporterAnnualIncome": "扶養者 年収（数値のみ・円）"
+  "supporterEmployer": "扶養者の勤務先名称",
+  "supporterCorporateNumber": "扶養者の勤務先法人番号（13桁）",
+  "supporterBranchName": "扶養者の支店・事業所名",
+  "supporterAddress": "扶養者の勤務先所在地",
+  "supporterAnnualIncome": "扶養者の年収（数値のみ・円）"
 }`,
   },
 
@@ -292,9 +292,30 @@ export async function extractSectionFromDocs(
     const result: Record<string, any> = {};
     let docsChecked = 0;
 
+    // supporter セクション専用: 申請人氏名を取得して区別コンテキストに使用
+    let applicantNameContext = "";
+    if (sectionKey === "supporter") {
+      const [applicant] = await db
+        .select()
+        .from(applicantMaster)
+        .where(eq(applicantMaster.id, app.applicantId))
+        .limit(1);
+      if (applicant) {
+        const nameEn = [applicant.familyNameEn, applicant.givenNameEn].filter(Boolean).join(" ");
+        const nameJa = [applicant.familyNameJa, applicant.givenNameJa].filter(Boolean).join(" ");
+        applicantNameContext = `
+【重要】この申請は家族滞在ビザの更新申請です。
+・申請人（家族滞在ビザ所持者）の氏名：${nameEn}${nameJa ? `（${nameJa}）` : ""}
+・扶養者とは申請人の配偶者や親など、メインのビザ（就労・永住等）を持つ人物です。
+・この書類に申請人と扶養者の両方の情報がある場合は、申請人以外の人物（扶養者）の情報を抽出してください。
+・在留カードが複数ある場合は、申請人のもの以外が扶養者の在留カードです。
+・在留期間満了日（supporterPeriodExpiry）は扶養者の在留カードに記載されている満了日です。必ず日付を読み取ってください。`;
+      }
+    }
+
     const prompt = `あなたは在留資格申請の専門行政書士AIです。
 この書類「{DOC_NAME}」から、以下のフィールドを読み取ってください。
-
+${applicantNameContext}
 【参考書類の種類】${config.sources}
 
 【抽出対象フィールド】
@@ -303,7 +324,7 @@ ${config.jsonTemplate}
 【重要ルール】
 ・書類に記載されている情報のみを抽出し、推測しないこと
 ・この書類に該当情報がない場合は ""（空文字列）を返すこと
-・日付はすべて YYYY-MM-DD 形式で返すこと
+・日付はすべて YYYY-MM-DD 形式で返すこと（例：2028-03-15）
 ・数値フィールド（金額・人数等）は数値のみ返し、単位や記号は含めないこと
 ・JSONのみを返し、説明文・コメントは不要
 

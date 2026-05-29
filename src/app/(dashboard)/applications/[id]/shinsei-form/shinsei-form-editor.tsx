@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { saveApplicationFormData, prefillApplicationFormData, extractMarriageNotificationFromDocs } from "@/actions/applications";
+import { saveApplicationFormData, extractMarriageNotificationFromDocs } from "@/actions/applications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Loader2, Save, Sparkles, User, Building2, GraduationCap, Briefcase,
+  Loader2, Save, User, Building2, GraduationCap, Briefcase,
   Plus, Trash2, FileText, Settings, Heart, GraduationCap as School, ScanText,
 } from "lucide-react";
 import { SectionExtractButton } from "@/components/applications/section-extract-button";
@@ -78,7 +78,6 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
   const [form, setForm] = useState<ApplicationFormData>(initialForm);
   const [tab, setTab] = useState<TabKey>("meta");
   const [isSaving, setIsSaving] = useState(false);
-  const [isPrefilling, setIsPrefilling] = useState(false);
   const [isExtractingMarriage, setIsExtractingMarriage] = useState(false);
   const [marriageMsg, setMarriageMsg] = useState("");
   const [msg, setMsg] = useState("");
@@ -173,17 +172,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
     setIsExtractingMarriage(false);
   }
 
-  async function handlePrefill() {
-    setIsPrefilling(true);
-    const result = await prefillApplicationFormData(applicationId);
-    if (result.success && result.formData) {
-      setForm(result.formData as ApplicationFormData);
-      setMsg("✓ AIで自動入力しました");
-    } else {
-      setMsg(`エラー: ${result.error}`);
-    }
-    setIsPrefilling(false);
-  }
+
 
   const tabs: { key: TabKey; label: string; sub: string; show?: boolean }[] = [
     { key: "meta",      label: "申請書設定",       sub: "様式・在留資格種別" },
@@ -198,19 +187,12 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
   return (
     <div>
       {/* ツールバー */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <button onClick={handlePrefill} disabled={isPrefilling}
-          className="inline-flex items-center gap-1.5 border border-purple-200 bg-purple-50 text-purple-700 rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-purple-100 disabled:opacity-50">
-          {isPrefilling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          AIで自動入力
+      <div className="flex items-center justify-end mb-4 gap-3">
+        {msg && <span className={cn("text-xs", msg.startsWith("エラー") ? "text-red-600" : "text-green-600")}>{msg}</span>}
+        <button onClick={handleSave} disabled={isSaving}
+          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50">
+          {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}保存
         </button>
-        <div className="flex items-center gap-3">
-          {msg && <span className={cn("text-xs", msg.startsWith("エラー") ? "text-red-600" : "text-green-600")}>{msg}</span>}
-          <button onClick={handleSave} disabled={isSaving}
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50">
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}保存
-          </button>
-        </div>
       </div>
 
       {/* タブ */}

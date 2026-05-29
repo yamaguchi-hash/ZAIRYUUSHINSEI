@@ -1860,6 +1860,144 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
 }
 
 // ── 申請書類下書きの保存（手動編集） ─────────────────────────────────────────
+// ─── 項目17 婚姻・出生・縁組届出情報を書類画像から直接抽出 ──────────────────────
+// 全提出済み書類をGeminiに直接送り、届出先・届出年月日だけを集中抽出する
+export async function extractMarriageNotificationFromDocs(
+  applicationId: string
+): Promise<{
+  success: boolean;
+  error?: string;
+  data?: {
+    marriageNotificationPlaceJapan: string;
+    marriageNotificationDateJapan: string;
+    marriageNotificationPlaceForeign: string;
+    marriageNotificationDateForeign: string;
+  };
+  docsChecked?: number;
+}> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    if (!process.env.GEMINI_API_KEY) {
+      return { success: false, error: "AI機能が設定されていません" };
+    }
+
+    // 提出済み書類を取得
+    const checklist = await db
+      .select()
+      .from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.applicationId, applicationId));
+
+    const submitted = checklist.filter(
+      (item) => item.fileUrl && item.status === "submitted"
+    );
+
+    if (submitted.length === 0) {
+      return { success: false, error: "提出済みの書類がありません" };
+    }
+
+    const { GoogleGenAI } = await import("@google/genai");
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+    const result = {
+      marriageNotificationPlaceJapan: "",
+      marriageNotificationDateJapan: "",
+      marriageNotificationPlaceForeign: "",
+      marriageNotificationDateForeign: "",
+    };
+
+    let docsChecked = 0;
+
+    // 全提出済み書類を順に処理（届出先が見つかれば残りも確認）
+    for (const doc of submitted.slice(0, 15)) {
+      try {
+        let base64: string;
+        let useMime: string;
+
+        if (doc.fileUrl!.startsWith("data:")) {
+          const ci = doc.fileUrl!.indexOf(",");
+          base64 = doc.fileUrl!.slice(ci + 1);
+          useMime = doc.fileUrl!.slice(5, ci).split(";")[0];
+        } else {
+          const res = await fetch(doc.fileUrl!, { cache: "no-store" });
+          if (!res.ok) continue;
+          const buf = await res.arrayBuffer();
+          base64 = Buffer.from(buf).toString("base64");
+          useMime = doc.mimeType ?? "image/jpeg";
+        }
+
+        const supported = [
+          "image/jpeg", "image/png", "image/webp",
+          "image/heic", "image/heif", "application/pdf",
+        ];
+        if (!supported.includes(useMime)) continue;
+
+        docsChecked++;
+
+        const prompt = `この書類「${doc.documentName}」を見て、婚姻・出生・縁組に関する届出情報を探してください。
+
+以下のJSONのみを返してください（該当情報がない書類の場合はすべて""）：
+{
+  "marriage_notification_place_japan": "日本の役所（市区町村役場）へ婚姻・出生・縁組を届け出た場合の届出先役場名。例：東京都新宿区役所、大阪市北区役所",
+  "marriage_notification_date_japan": "日本の役所への届出年月日（YYYY-MM-DD形式）",
+  "marriage_notification_place_foreign": "本国（外国）の機関へ婚姻・出生・縁組を届け出た場合の届出先機関名。例：中国民政局上海市徐匯区民政局、韓国首爾家族関係登録事務所",
+  "marriage_notification_date_foreign": "本国（外国）機関への届出年月日（YYYY-MM-DD形式）"
+}
+
+【重要】
+- 婚姻届受理証明書・戸籍謄本・戸籍抄本 → 日本の届出先とその日付を記入
+- 外国の婚姻証明書・結婚証明書・Marriage Certificate・公証書 → 本国の届出先とその日付を記入
+- 「届出年月日」は婚姻した日ではなく、役所や機関に届け出た日付
+- この書類に該当情報がない場合は ""（空文字）を返す
+- JSONのみ返し、説明文は不要`;
+
+        const resp = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{
+            parts: [
+              { inlineData: { mimeType: useMime, data: base64 } },
+              { text: prompt },
+            ],
+          }],
+        });
+
+        const txt = resp.text ?? "{}";
+        const m = txt.match(/```json\s*([\s\S]*?)```/) ?? txt.match(/(\{[\s\S]*\})/);
+        if (!m) continue;
+
+        const extracted = JSON.parse(m[1] ?? m[0]) as Record<string, string>;
+
+        if (extracted.marriage_notification_place_japan && !result.marriageNotificationPlaceJapan)
+          result.marriageNotificationPlaceJapan = extracted.marriage_notification_place_japan;
+        if (extracted.marriage_notification_date_japan && !result.marriageNotificationDateJapan)
+          result.marriageNotificationDateJapan = extracted.marriage_notification_date_japan;
+        if (extracted.marriage_notification_place_foreign && !result.marriageNotificationPlaceForeign)
+          result.marriageNotificationPlaceForeign = extracted.marriage_notification_place_foreign;
+        if (extracted.marriage_notification_date_foreign && !result.marriageNotificationDateForeign)
+          result.marriageNotificationDateForeign = extracted.marriage_notification_date_foreign;
+
+      } catch {
+        // 1書類のエラーは無視して次へ
+      }
+    }
+
+    const found = Object.values(result).some((v) => v !== "");
+    if (!found) {
+      return {
+        success: false,
+        docsChecked,
+        error: `${docsChecked}件の書類を確認しましたが、婚姻・出生・縁組の届出情報が見つかりませんでした。婚姻届受理証明書・戸籍謄本・外国の婚姻証明書をアップロードしてください。`,
+      };
+    }
+
+    return { success: true, data: result, docsChecked };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "読み取りに失敗しました" };
+  }
+}
+
 export async function saveApplicationDraft(
   applicationId: string,
   draftData: Record<string, any>

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { saveApplicationFormData, prefillApplicationFormData } from "@/actions/applications";
+import { saveApplicationFormData, prefillApplicationFormData, extractMarriageNotificationFromDocs } from "@/actions/applications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Loader2, Save, Sparkles, User, Building2, GraduationCap, Briefcase,
-  Plus, Trash2, FileText, Settings, Heart, GraduationCap as School,
+  Plus, Trash2, FileText, Settings, Heart, GraduationCap as School, ScanText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddressSplitInput } from "@/components/ui/postal-code-input";
@@ -78,6 +78,8 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
   const [tab, setTab] = useState<TabKey>("meta");
   const [isSaving, setIsSaving] = useState(false);
   const [isPrefilling, setIsPrefilling] = useState(false);
+  const [isExtractingMarriage, setIsExtractingMarriage] = useState(false);
+  const [marriageMsg, setMarriageMsg] = useState("");
   const [msg, setMsg] = useState("");
 
   // 申請書種別
@@ -133,6 +135,27 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
     const result = await saveApplicationFormData(applicationId, form as Record<string, any>);
     setMsg(result.success ? "✓ 保存しました" : `エラー: ${result.error}`);
     setIsSaving(false);
+  }
+
+  async function handleExtractMarriage() {
+    setIsExtractingMarriage(true);
+    setMarriageMsg("");
+    const result = await extractMarriageNotificationFromDocs(applicationId);
+    if (result.success && result.data) {
+      const d = result.data;
+      setForm(prev => ({
+        ...prev,
+        ...(d.marriageNotificationPlaceJapan   ? { marriageNotificationPlaceJapan:   d.marriageNotificationPlaceJapan   } : {}),
+        ...(d.marriageNotificationDateJapan    ? { marriageNotificationDateJapan:    d.marriageNotificationDateJapan    } : {}),
+        ...(d.marriageNotificationPlaceForeign ? { marriageNotificationPlaceForeign: d.marriageNotificationPlaceForeign } : {}),
+        ...(d.marriageNotificationDateForeign  ? { marriageNotificationDateForeign:  d.marriageNotificationDateForeign  } : {}),
+      }));
+      const found = [d.marriageNotificationPlaceJapan, d.marriageNotificationDateJapan, d.marriageNotificationPlaceForeign, d.marriageNotificationDateForeign].filter(Boolean);
+      setMarriageMsg(`✓ ${result.docsChecked}件確認・${found.length}項目を入力しました`);
+    } else {
+      setMarriageMsg(`⚠ ${result.error ?? "読み取りに失敗しました"}`);
+    }
+    setIsExtractingMarriage(false);
   }
 
   async function handlePrefill() {
@@ -768,11 +791,34 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
               {/* 17. 婚姻・出生届出 */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Heart className="w-4 h-4 text-red-500" />
-                    17. 婚姻・出生又は縁組の届出先及び届出年月日
-                  </CardTitle>
-                  <p className="text-xs text-gray-500 mt-1">配偶者→婚姻届、子→出生届又は縁組届</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Heart className="w-4 h-4 text-red-500" />
+                        17. 婚姻・出生又は縁組の届出先及び届出年月日
+                      </CardTitle>
+                      <p className="text-xs text-gray-500 mt-1">配偶者→婚姻届、子→出生届又は縁組届</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleExtractMarriage}
+                        disabled={isExtractingMarriage}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap"
+                        title="アップロード済み書類（婚姻証明書・戸籍謄本等）から届出情報を読み取ります"
+                      >
+                        {isExtractingMarriage
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <ScanText className="w-3.5 h-3.5" />}
+                        {isExtractingMarriage ? "読み取り中..." : "書類から読み取る"}
+                      </button>
+                      {marriageMsg && (
+                        <p className={cn("text-xs", marriageMsg.startsWith("✓") ? "text-green-600" : "text-amber-600")}>
+                          {marriageMsg}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="(1) 日本国届出先">

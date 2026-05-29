@@ -32,7 +32,8 @@ import { ApproveButton } from "@/components/applications/approve-button";
 import { QuestionnairePanel } from "@/components/applications/questionnaire-panel";
 import { getDocumentRequirements } from "@/actions/applications";
 import { DeleteApplicationButton } from "./delete-application-button";
-import { FileDown } from "lucide-react";
+import { FileDown, FolderArchive } from "lucide-react";
+import { MergePdfButton } from "@/components/applications/merge-pdf-button";
 
 // 7ステップのワークフロー
 const WORKFLOW_STEPS = [
@@ -133,6 +134,8 @@ export default async function ApplicationDetailPage({
             <FileDown className="w-4 h-4" />
             書類一覧PDF
           </Link>
+          {/* 添付書類一括PDF */}
+          <MergePdfButton applicationId={application.id} />
           {(userRole === "expert" || userRole === "admin") && !application.isApproved && (
             <ApproveButton applicationId={application.id} />
           )}

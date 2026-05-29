@@ -1421,6 +1421,18 @@ export async function prefillApplicationFormData(
           .where(eq(applicantDocuments.applicantId, applicant.id))
       : [];
 
+    // ── 婚姻・届出関連書類の判定ヘルパー（ステップ4・8共通） ──────────────────
+    const MARRIAGE_KEYWORDS_PREFILL = ['婚姻', '結婚', 'marriage', '出生', '縁組', '戸籍', '家族', 'birth', 'family'];
+    const isMarriageDoc = (name: string) =>
+      MARRIAGE_KEYWORDS_PREFILL.some(kw => name.toLowerCase().includes(kw.toLowerCase()));
+    const needsMarriageReOcr = (data: any) => {
+      if (!data) return true;
+      return !(data.marriage_notification_place_japan ||
+               data.marriage_notification_place_foreign ||
+               data.marriage_notification_date_japan ||
+               data.marriage_notification_date_foreign);
+    };
+
     // ── 4. OCR未処理の書類ファイルをここで処理 ─────────────────────────────────
     if (process.env.GEMINI_API_KEY) {
       const { GoogleGenAI } = await import("@google/genai");
@@ -1477,10 +1489,17 @@ notes(その他重要事項)
         } catch { return null; }
       };
 
-      // チェックリスト書類でOCR未済のものを処理（最大10件）
+      // チェックリスト書類を処理
+      // ・OCR未処理 → 必ず実行
+      // ・婚姻関連書類でnotificationフィールドが未取得 → 強制再OCR
       let processed = 0;
       for (const item of checklist) {
-        if (!item.fileUrl || item.ocrExtractedData || processed >= 10) continue;
+        if (!item.fileUrl || processed >= 10) continue;
+        const alreadyHasOcr = !!item.ocrExtractedData;
+        const isMarriage = isMarriageDoc(item.documentName);
+        const needsReOcr = !alreadyHasOcr || (isMarriage && needsMarriageReOcr(item.ocrExtractedData));
+        if (!needsReOcr) continue;
+
         const extracted = await ocrFile(item.fileUrl, item.mimeType, item.documentName);
         if (extracted) {
           await db.update(applicationDocumentChecklist)
@@ -1723,7 +1742,88 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
       }
     }
 
-    // ── 8. 在日親族リストをOCRデータから自動構築（familyInJapan が空の場合）────
+    // ── 8. 婚姻関連書類の画像を直接Geminiに渡して項目17を高精度抽出 ─────────────
+    // 包括的テキスト解析でも未取得の場合、書類画像を直接読んで補完する
+    const stillNeedsMarriage = !prefilled.marriageNotificationPlaceJapan &&
+                               !prefilled.marriageNotificationPlaceForeign &&
+                               !prefilled.marriageNotificationDateJapan &&
+                               !prefilled.marriageNotificationDateForeign;
+
+    if (stillNeedsMarriage && process.env.GEMINI_API_KEY) {
+      const marriageDocs = checklist.filter(
+        (item) => item.fileUrl && isMarriageDoc(item.documentName)
+      );
+
+      if (marriageDocs.length > 0) {
+        try {
+          const { GoogleGenAI } = await import("@google/genai");
+          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+          for (const doc of marriageDocs.slice(0, 5)) {
+            const bytes = await (async () => {
+              try {
+                if (doc.fileUrl!.startsWith("data:")) {
+                  const ci = doc.fileUrl!.indexOf(",");
+                  return Buffer.from(doc.fileUrl!.slice(ci + 1), "base64");
+                }
+                const r = await fetch(doc.fileUrl!, { cache: "no-store" });
+                if (!r.ok) return null;
+                return Buffer.from(await r.arrayBuffer());
+              } catch { return null; }
+            })();
+            if (!bytes) continue;
+
+            let useMime = doc.mimeType ?? "image/jpeg";
+            if (doc.fileUrl!.startsWith("data:")) {
+              useMime = doc.fileUrl!.slice(5, doc.fileUrl!.indexOf(";"));
+            }
+            const supported = ["image/jpeg","image/png","image/webp","image/heic","image/heif","application/pdf"];
+            if (!supported.includes(useMime)) continue;
+
+            const marriagePrompt = `この書類「${doc.documentName}」を精査して、以下のJSONを日本語で返してください。
+書類に記載されている事実のみを抽出し、不明な場合は""にしてください。
+日付はYYYY-MM-DD形式で返してください。
+
+{
+  "marriage_notification_place_japan": "日本の市区町村役場への婚姻・出生・縁組の届出先（役場名。例：大阪市北区役所、東京都新宿区役所）",
+  "marriage_notification_date_japan": "日本の役場への届出年月日（YYYY-MM-DD）",
+  "marriage_notification_place_foreign": "本国・外国の登録機関への届出先（機関名。例：中国民政局、韓国家族関係登録事務所）",
+  "marriage_notification_date_foreign": "本国・外国への届出年月日（YYYY-MM-DD）"
+}
+
+【ヒント】
+- 婚姻届受理証明書・戸籍謄本・戸籍抄本 → marriage_notification_place_japan と marriage_notification_date_japan に記入
+- 外国の婚姻証明書（Marriage Certificate）・公証書 → marriage_notification_place_foreign と marriage_notification_date_foreign に記入
+- 届出年月日（Notification Date）＝役場に届け出た日（婚姻成立日と異なる場合あり）`;
+
+            const resp = await ai.models.generateContent({
+              model: "gemini-2.5-flash",
+              contents: [{ parts: [
+                { inlineData: { mimeType: useMime, data: bytes.toString("base64") } },
+                { text: marriagePrompt },
+              ]}],
+            });
+            const txt = resp.text ?? "{}";
+            const mm = txt.match(/```json\s*([\s\S]*?)```/) ?? txt.match(/(\{[\s\S]*\})/);
+            if (mm) {
+              const mData: Record<string, any> = JSON.parse(mm[1] ?? mm[0]);
+              if (mData.marriage_notification_place_japan && !prefilled.marriageNotificationPlaceJapan)
+                prefilled.marriageNotificationPlaceJapan = mData.marriage_notification_place_japan;
+              if (mData.marriage_notification_date_japan && !prefilled.marriageNotificationDateJapan)
+                prefilled.marriageNotificationDateJapan = mData.marriage_notification_date_japan;
+              if (mData.marriage_notification_place_foreign && !prefilled.marriageNotificationPlaceForeign)
+                prefilled.marriageNotificationPlaceForeign = mData.marriage_notification_place_foreign;
+              if (mData.marriage_notification_date_foreign && !prefilled.marriageNotificationDateForeign)
+                prefilled.marriageNotificationDateForeign = mData.marriage_notification_date_foreign;
+            }
+          }
+        } catch (mErr: any) {
+          console.error("[prefill] marriage doc analysis error:", mErr?.message);
+        }
+      }
+    }
+
+    // ── 9. 在日親族リストをOCRデータから自動構築（familyInJapan が空の場合）────
     if (!prefilled.familyInJapan || (prefilled.familyInJapan as any[]).length === 0) {
       const familyFromOcr: any[] = [];
       // OCR から家族情報らしきデータを拾う

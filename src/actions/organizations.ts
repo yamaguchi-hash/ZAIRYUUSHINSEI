@@ -126,3 +126,25 @@ export async function updateOrganization(
 
   revalidatePath("/organizations");
 }
+
+export async function deleteOrganization(id: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+  const tenantId = requireTenantId((session.user as any).tenantId);
+
+  // ソフトデリート（isActive = false）
+  await db
+    .update(organizationMaster)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(and(eq(organizationMaster.id, id), eq(organizationMaster.tenantId, tenantId)));
+
+  await db.insert(auditLog).values({
+    tenantId,
+    userId: session.user.id,
+    action: "delete",
+    entityType: "organization",
+    entityId: id,
+  });
+
+  revalidatePath("/organizations");
+}

@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { getApplicationById } from "@/actions/applications";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, FileDown, ClipboardList } from "lucide-react";
+import { ArrowLeft, FileDown } from "lucide-react";
 import { ExcelDownloadButton } from "@/components/applications/excel-download-button";
 import { QuestionnaireDocxButton } from "@/components/applications/questionnaire-docx-button";
 import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
@@ -130,14 +130,6 @@ export default async function ShinseiFormPage({
           <span className="text-sm text-gray-700 font-medium">申請書作成</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <Link
-            href={`/print/${id}/questionnaire`}
-            target="_blank"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 bg-amber-50 border border-amber-300 hover:bg-amber-100 rounded-lg transition-colors"
-          >
-            <ClipboardList className="w-4 h-4" />
-            顧客向け質問書（印刷用）
-          </Link>
           <QuestionnaireDocxButton applicationId={id} />
           <ExcelDownloadButton applicationId={id} />
           <Link

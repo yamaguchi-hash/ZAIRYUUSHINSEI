@@ -3,8 +3,6 @@ import { db, applications, applicantMaster } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { ApplicationFormData } from "@/lib/form-types";
-import { VISA_CATEGORY_PART2 } from "@/lib/form-types";
-import { PrintTrigger } from "../print-trigger";
 
 // ─── 質問定義 ────────────────────────────────────────────────────────────────
 interface Question {
@@ -204,7 +202,6 @@ export default async function QuestionnairePrintPage({
         `}</style>
       </head>
       <body>
-        <PrintTrigger applicationId={id} />
         <div className="page">
           <h1>在留申請　ご確認・ご記入のお願い</h1>
           <p className="meta">

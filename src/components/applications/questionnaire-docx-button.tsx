@@ -282,7 +282,7 @@ export function QuestionnaireDocxButton({ applicationId }: { applicationId: stri
           ) : (
             <FileText className="w-4 h-4" />
           )}
-          {loading ? "作成中..." : "質問書（Googleドキュメント）"}
+          {loading ? "作成中..." : "顧客向け質問書"}
         </button>
         {error && <p className="text-xs text-red-500 max-w-xs">{error}</p>}
       </div>

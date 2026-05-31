@@ -135,10 +135,10 @@ export default async function ShinseiFormPage({
           <Link
             href={`/print/${id}/shinsei`}
             target="_blank"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-300"
           >
             <FileDown className="w-4 h-4" />
-            申請書を印刷・PDF出力
+            申請書PDF出力
           </Link>
         </div>
       </div>

@@ -127,21 +127,21 @@ export default async function ApplicationDetailPage({
             <FileText className="w-4 h-4" />
             申請書を作成
           </Link>
+          {/* 顧客向け質問書（Googleドキュメント） */}
+          <QuestionnaireDocxButton applicationId={application.id} />
+          {/* オンライン申請用Excel */}
+          <ExcelDownloadButton applicationId={application.id} />
+          {/* 添付書類一括PDF */}
+          <MergePdfButton applicationId={application.id} />
           {/* PDF出力ボタン */}
           <Link
             href={`/print/${application.id}`}
             target="_blank"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <FileDown className="w-4 h-4" />
             書類一覧PDF
           </Link>
-          {/* 添付書類一括PDF */}
-          <MergePdfButton applicationId={application.id} />
-          {/* オンライン申請用Excel */}
-          <ExcelDownloadButton applicationId={application.id} />
-          {/* 質問書（Googleドキュメント用） */}
-          <QuestionnaireDocxButton applicationId={application.id} />
           {(userRole === "expert" || userRole === "admin") && !application.isApproved && (
             <ApproveButton applicationId={application.id} />
           )}

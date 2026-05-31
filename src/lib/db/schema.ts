@@ -69,8 +69,9 @@ export const organizationMaster = pgTable("organization_master", {
   city: text("city"),
   addressLine: text("address_line"),
   phone: text("phone"),
-  capital: real("capital"),
-  employeeCount: integer("employee_count"),
+  capital: real("capital"),              // 資本金（円）
+  annualSales: real("annual_sales"),     // 年間売上金額（円）
+  employeeCount: integer("employee_count"), // 常勤職員数
   fiscalYearEnd: text("fiscal_year_end"),
   category: text("category"),
   industry: text("industry"),

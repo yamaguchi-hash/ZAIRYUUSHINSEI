@@ -15,23 +15,24 @@ type OrgForm = {
   city: string;
   addressLine: string;
   phone: string;
+  email: string;
   category: string;
   capital: string;
+  annualSales: string;
   employeeCount: string;
   industry: string;
   workersAccidentInsuranceNo: string;
   employmentInsuranceNo: string;
   representativeTitle: string;
   representativeName: string;
-  email: string;
 };
 
 const EMPTY_FORM: OrgForm = {
   nameJa: "", nameEn: "", corporateNumber: "", postalCode: "",
-  prefecture: "", city: "", addressLine: "", phone: "", category: "",
-  capital: "", employeeCount: "", industry: "",
+  prefecture: "", city: "", addressLine: "", phone: "", email: "",
+  category: "", capital: "", annualSales: "", employeeCount: "", industry: "",
   workersAccidentInsuranceNo: "", employmentInsuranceNo: "",
-  representativeTitle: "", representativeName: "", email: "",
+  representativeTitle: "", representativeName: "",
 };
 
 type EditingOrg = {
@@ -47,6 +48,7 @@ type EditingOrg = {
   email?: string;
   category?: string;
   capital?: number | null;
+  annualSales?: number | null;
   employeeCount?: number | null;
   industry?: string;
   workersAccidentInsuranceNo?: string;
@@ -77,15 +79,16 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
       city: editingOrg.city ?? "",
       addressLine: editingOrg.addressLine ?? "",
       phone: editingOrg.phone ?? "",
+      email: editingOrg.email ?? "",
       category: editingOrg.category ?? "",
       capital: editingOrg.capital != null ? String(editingOrg.capital) : "",
+      annualSales: editingOrg.annualSales != null ? String(editingOrg.annualSales) : "",
       employeeCount: editingOrg.employeeCount != null ? String(editingOrg.employeeCount) : "",
       industry: editingOrg.industry ?? "",
       workersAccidentInsuranceNo: editingOrg.workersAccidentInsuranceNo ?? "",
       employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? "",
       representativeTitle: editingOrg.representativeTitle ?? "",
       representativeName: editingOrg.representativeName ?? "",
-      email: editingOrg.email ?? "",
     };
   });
 
@@ -101,8 +104,9 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
       try {
         const payload = {
           ...form,
-          capital: form.capital ? parseFloat(form.capital) : undefined,
-          employeeCount: form.employeeCount ? parseInt(form.employeeCount) : undefined,
+          capital:       form.capital       ? parseFloat(form.capital)       : undefined,
+          annualSales:   form.annualSales   ? parseFloat(form.annualSales)   : undefined,
+          employeeCount: form.employeeCount ? parseInt(form.employeeCount)   : undefined,
         };
         if (isEdit && editingOrg) {
           await updateOrganization(editingOrg.id, payload);
@@ -201,9 +205,56 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
             </div>
           </div>
 
-          {/* ── 事業情報 ──────────────────────────────────────────── */}
+          {/* ── 財務・規模情報（申請書への自動転記項目） ─────────────── */}
           <div className="border-t pt-3">
-            <p className="text-xs font-semibold text-gray-500 mb-2">事業情報</p>
+            <p className="text-xs font-semibold text-gray-700 mb-1">財務・規模情報</p>
+            <p className="text-xs text-gray-400 mb-2">申請書に自動転記されます。変更の都度更新してください。</p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">資本金（円）</label>
+                <input
+                  name="capital"
+                  type="number"
+                  value={form.capital}
+                  onChange={handleChange}
+                  placeholder="例：10000000"
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  年間売上金額（円）
+                  <span className="ml-1 text-amber-600 font-normal">※ 要更新</span>
+                </label>
+                <input
+                  name="annualSales"
+                  type="number"
+                  value={form.annualSales}
+                  onChange={handleChange}
+                  placeholder="例：500000000"
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  常勤職員数（名）
+                  <span className="ml-1 text-amber-600 font-normal">※ 要更新</span>
+                </label>
+                <input
+                  name="employeeCount"
+                  type="number"
+                  value={form.employeeCount}
+                  onChange={handleChange}
+                  placeholder="例：50"
+                  className="input-field"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── その他事業情報 ────────────────────────────────────── */}
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 mb-2">その他</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">カテゴリー</label>
@@ -218,16 +269,6 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">業種</label>
                 <input name="industry" value={form.industry} onChange={handleChange} placeholder="IT・情報通信" className="input-field" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">従業員数</label>
-                <input name="employeeCount" type="number" value={form.employeeCount} onChange={handleChange} placeholder="100" className="input-field" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">資本金（円）</label>
-                <input name="capital" type="number" value={form.capital} onChange={handleChange} placeholder="10000000" className="input-field" />
               </div>
             </div>
           </div>

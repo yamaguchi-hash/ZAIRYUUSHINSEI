@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Pencil, X, Mail, Phone, Shield, Briefcase, User } from "lucide-react";
+import { Building2, Pencil, X, Mail, Phone, Shield, User, TrendingUp } from "lucide-react";
 import { AddOrganizationForm } from "./add-organization-form";
 
 type Org = {
@@ -18,6 +18,7 @@ type Org = {
   email: string | null;
   category: string | null;
   capital: number | null;
+  annualSales: number | null;
   employeeCount: number | null;
   industry: string | null;
   workersAccidentInsuranceNo: string | null;
@@ -55,6 +56,7 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
             email: editingOrg.email ?? undefined,
             category: editingOrg.category ?? undefined,
             capital: editingOrg.capital,
+            annualSales: editingOrg.annualSales,
             employeeCount: editingOrg.employeeCount,
             industry: editingOrg.industry ?? undefined,
             workersAccidentInsuranceNo: editingOrg.workersAccidentInsuranceNo ?? undefined,
@@ -110,9 +112,24 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                     <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
                       {org.corporateNumber && <span className="font-mono">法人番号: {org.corporateNumber}</span>}
                       {org.category && <span>カテゴリー{org.category}</span>}
-                      {org.employeeCount && <span>{org.employeeCount}名</span>}
                       {org.industry && <span>{org.industry}</span>}
                     </div>
+
+                    {/* 財務・規模情報 */}
+                    {(org.capital != null || org.annualSales != null || org.employeeCount != null) && (
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                        <TrendingUp className="w-2.5 h-2.5 mt-0.5 flex-shrink-0 text-amber-500" />
+                        {org.capital != null && (
+                          <span>資本金: <span className="font-medium">{org.capital.toLocaleString()}円</span></span>
+                        )}
+                        {org.annualSales != null && (
+                          <span>年間売上: <span className="font-medium">{org.annualSales.toLocaleString()}円</span></span>
+                        )}
+                        {org.employeeCount != null && (
+                          <span>常勤: <span className="font-medium">{org.employeeCount}名</span></span>
+                        )}
+                      </div>
+                    )}
 
                     {/* 住所・電話 */}
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400">

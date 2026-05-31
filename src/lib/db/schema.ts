@@ -74,6 +74,12 @@ export const organizationMaster = pgTable("organization_master", {
   fiscalYearEnd: text("fiscal_year_end"),
   category: text("category"),
   industry: text("industry"),
+  // ── 追加フィールド ────────────────────────────────────────────────────────
+  workersAccidentInsuranceNo: text("workers_accident_insurance_no"),  // 労働災害保険番号
+  employmentInsuranceNo: text("employment_insurance_no"),              // 雇用保険事業者番号
+  representativeTitle: text("representative_title"),                   // 代表者役職
+  representativeName: text("representative_name"),                     // 代表者氏名
+  email: text("email"),                                                // メールアドレス
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

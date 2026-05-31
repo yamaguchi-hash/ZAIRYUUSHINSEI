@@ -6,6 +6,19 @@ import { organizationMaster, auditLog } from "@/lib/db/schema";
 import { eq, and, ilike } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+export async function getOrganizationById(id: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+  const tenantId = requireTenantId((session.user as any).tenantId);
+
+  const [org] = await db
+    .select()
+    .from(organizationMaster)
+    .where(and(eq(organizationMaster.id, id), eq(organizationMaster.tenantId, tenantId)))
+    .limit(1);
+  return org ?? null;
+}
+
 function requireTenantId(tenantId: string | undefined | null): string {
   if (!tenantId) throw new Error("テナントIDが不正です");
   return tenantId;
@@ -42,6 +55,11 @@ export async function createOrganization(data: {
   fiscalYearEnd?: string;
   category?: string;
   industry?: string;
+  workersAccidentInsuranceNo?: string;
+  employmentInsuranceNo?: string;
+  representativeTitle?: string;
+  representativeName?: string;
+  email?: string;
 }) {
   const session = await auth();
   if (!session?.user) throw new Error("認証が必要です");
@@ -79,6 +97,11 @@ export async function updateOrganization(
     fiscalYearEnd: string;
     category: string;
     industry: string;
+    workersAccidentInsuranceNo: string;
+    employmentInsuranceNo: string;
+    representativeTitle: string;
+    representativeName: string;
+    email: string;
   }>
 ) {
   const session = await auth();

@@ -92,10 +92,11 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
 
   // 在留資格カテゴリ
   const cat = form.visaFormCategory;
-  const isNtype = ['N', 'L', 'I', 'V'].includes(cat);  // 就労系N型フォーム使用
+  const isNtype = ['N', 'L', 'I'].includes(cat);        // 就労系N型フォーム使用
   const isTtype = cat === 'T';                           // 日本人配偶者等
   const isRtype = cat === 'R';                           // 家族滞在
   const isPtype = cat === 'P';                           // 留学
+  const isVtype = cat === 'V';                           // 特定技能（１号・２号）
   const needsOrg = VISA_CATEGORY_NEEDS_ORG[cat];
   const part2Type = VISA_CATEGORY_PART2[cat];
 
@@ -1146,8 +1147,365 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
             </>
           )}
 
+          {/* ── V型 Part 2（特定技能１号・２号） ───────────────────────────── */}
+          {isVtype && (
+            <>
+              {/* ── 17. 特定技能所属機関 ─────────────────────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">17. 特定技能所属機関</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Field label="(1) 名称">
+                    <input className={inputCls} value={form.employerName} onChange={e => set("employerName", e.target.value)} placeholder="株式会社〇〇" />
+                  </Field>
+                  <Field label="(2) 所在地">
+                    <input className={inputCls} value={form.employerAddress} onChange={e => set("employerAddress", e.target.value)} />
+                  </Field>
+                  <Field label="電話番号">
+                    <input className={inputCls} value={form.employerPhone} onChange={e => set("employerPhone", e.target.value)} />
+                  </Field>
+                </CardContent>
+              </Card>
+
+              {/* ── 18. 技能水準 ────────────────────────────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">18. 技能水準</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Field label="証明方法">
+                    <select className={selectCls} value={form.skillLevelProofMethod} onChange={e => set("skillLevelProofMethod", e.target.value)}>
+                      <option value="">選択してください</option>
+                      <option value="分野別運用方針に定める評価方法">分野別運用方針に定める評価方法</option>
+                      <option value="試験">試験（技能測定試験等）</option>
+                      <option value="その他の評価方法">その他の評価方法</option>
+                      <option value="技能実習2号を良好に修了">技能実習2号を良好に修了</option>
+                    </select>
+                  </Field>
+                  {(form.skillLevelProofMethod === "試験" || form.skillLevelProofMethod === "分野別運用方針に定める評価方法") && (
+                    <>
+                      <div className="grid grid-cols-1 gap-2 pl-3 border-l-2 border-blue-200">
+                        <p className="text-xs font-medium text-gray-600">試験①</p>
+                        <Field label="試験名">
+                          <input className={inputCls} value={form.skillLevelExamName1} onChange={e => set("skillLevelExamName1", e.target.value)} placeholder="特定技能1号技能測定試験（○○分野）" />
+                        </Field>
+                        <Field label="試験地">
+                          <select className={selectCls} value={form.skillLevelExamCountry1} onChange={e => set("skillLevelExamCountry1", e.target.value)}>
+                            <option value="">選択</option>
+                            <option value="国内">国内</option>
+                            <option value="国外">国外</option>
+                          </select>
+                          {form.skillLevelExamCountry1 === "国外" && (
+                            <input className={`${inputCls} mt-1`} value={form.skillLevelExamCountryName1} onChange={e => set("skillLevelExamCountryName1", e.target.value)} placeholder="国名" />
+                          )}
+                        </Field>
+                        <p className="text-xs font-medium text-gray-600 mt-1">試験②（ある場合）</p>
+                        <Field label="試験名">
+                          <input className={inputCls} value={form.skillLevelExamName2} onChange={e => set("skillLevelExamName2", e.target.value)} />
+                        </Field>
+                        <Field label="試験地">
+                          <select className={selectCls} value={form.skillLevelExamCountry2} onChange={e => set("skillLevelExamCountry2", e.target.value)}>
+                            <option value="">選択</option>
+                            <option value="国内">国内</option>
+                            <option value="国外">国外</option>
+                          </select>
+                          {form.skillLevelExamCountry2 === "国外" && (
+                            <input className={`${inputCls} mt-1`} value={form.skillLevelExamCountryName2} onChange={e => set("skillLevelExamCountryName2", e.target.value)} placeholder="国名" />
+                          )}
+                        </Field>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* ── 19. 日本語能力（特定技能１号の場合のみ） ──────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">19. 日本語能力（特定技能１号を希望する場合のみ）</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Field label="証明方法">
+                    <select className={selectCls} value={form.japaneseAbilityProofMethod} onChange={e => set("japaneseAbilityProofMethod", e.target.value)}>
+                      <option value="">選択してください</option>
+                      <option value="分野別運用方針に定める評価方法">分野別運用方針に定める評価方法</option>
+                      <option value="日本語試験">日本語試験（日本語能力試験等）</option>
+                      <option value="その他の評価方法">その他の評価方法</option>
+                      <option value="技能実習2号を良好に修了">技能実習2号を良好に修了</option>
+                    </select>
+                  </Field>
+                  {form.japaneseAbilityProofMethod === "日本語試験" && (
+                    <div className="pl-3 border-l-2 border-blue-200 space-y-2">
+                      <p className="text-xs font-medium text-gray-600">試験①</p>
+                      <Field label="試験名"><input className={inputCls} value={form.japaneseAbilityExamName1} onChange={e => set("japaneseAbilityExamName1", e.target.value)} placeholder="日本語能力試験（N4）等" /></Field>
+                      <Field label="試験地">
+                        <select className={selectCls} value={form.japaneseAbilityExamCountry1} onChange={e => set("japaneseAbilityExamCountry1", e.target.value)}>
+                          <option value="">選択</option><option value="国内">国内</option><option value="国外">国外</option>
+                        </select>
+                        {form.japaneseAbilityExamCountry1 === "国外" && <input className={`${inputCls} mt-1`} value={form.japaneseAbilityExamCountryName1} onChange={e => set("japaneseAbilityExamCountryName1", e.target.value)} placeholder="国名" />}
+                      </Field>
+                      <p className="text-xs font-medium text-gray-600">試験②（ある場合）</p>
+                      <Field label="試験名"><input className={inputCls} value={form.japaneseAbilityExamName2} onChange={e => set("japaneseAbilityExamName2", e.target.value)} /></Field>
+                      <Field label="試験地">
+                        <select className={selectCls} value={form.japaneseAbilityExamCountry2} onChange={e => set("japaneseAbilityExamCountry2", e.target.value)}>
+                          <option value="">選択</option><option value="国内">国内</option><option value="国外">国外</option>
+                        </select>
+                        {form.japaneseAbilityExamCountry2 === "国外" && <input className={`${inputCls} mt-1`} value={form.japaneseAbilityExamCountryName2} onChange={e => set("japaneseAbilityExamCountryName2", e.target.value)} placeholder="国名" />}
+                      </Field>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* ── 20. 修了した技能実習2号 ─────────────────────────── */}
+              {(form.skillLevelProofMethod === "技能実習2号を良好に修了" || form.japaneseAbilityProofMethod === "技能実習2号を良好に修了") && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">20. 修了した技能実習2号</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-xs text-gray-500">（技能実習法施行規則別表第二の職種・作業として記載）</p>
+                    <div className="pl-3 border-l-2 border-blue-200 space-y-2">
+                      <p className="text-xs font-medium text-gray-600">(1) 職種・作業①</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Field label="職種"><input className={inputCls} value={form.completedTit2Occupation1} onChange={e => set("completedTit2Occupation1", e.target.value)} placeholder="機械加工" /></Field>
+                        <Field label="作業"><input className={inputCls} value={form.completedTit2Operations1} onChange={e => set("completedTit2Operations1", e.target.value)} placeholder="旋盤作業" /></Field>
+                      </div>
+                      <Field label="修了証明方法">
+                        <select className={selectCls} value={form.completedTit2ProofType1} onChange={e => set("completedTit2ProofType1", e.target.value)}>
+                          <option value="">選択</option>
+                          <option value="3級の技能検定合格等">3級の技能検定合格等（実技試験）</option>
+                          <option value="訓練状況書類">訓練状況に関する書類</option>
+                        </select>
+                      </Field>
+                      <p className="text-xs font-medium text-gray-600 mt-2">(2) 職種・作業②（ある場合）</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Field label="職種"><input className={inputCls} value={form.completedTit2Occupation2} onChange={e => set("completedTit2Occupation2", e.target.value)} /></Field>
+                        <Field label="作業"><input className={inputCls} value={form.completedTit2Operations2} onChange={e => set("completedTit2Operations2", e.target.value)} /></Field>
+                      </div>
+                      <Field label="修了証明方法">
+                        <select className={selectCls} value={form.completedTit2ProofType2} onChange={e => set("completedTit2ProofType2", e.target.value)}>
+                          <option value="">選択</option>
+                          <option value="3級の技能検定合格等">3級の技能検定合格等（実技試験）</option>
+                          <option value="訓練状況書類">訓練状況に関する書類</option>
+                        </select>
+                      </Field>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* ── 21. 通算在留期間（特定技能１号） ────────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">21. 通算在留期間（特定技能１号の場合のみ）</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="年"><input className={inputCls} type="number" value={form.cumulativeStayYears} onChange={e => set("cumulativeStayYears", e.target.value)} placeholder="0〜5" /></Field>
+                    <Field label="月"><input className={inputCls} type="number" value={form.cumulativeStayMonths} onChange={e => set("cumulativeStayMonths", e.target.value)} placeholder="0〜11" /></Field>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ── 22〜27. 申請人 Part 3 V ────────────────────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">申請人等作成用 Part 3 V（項目22〜27）</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {[
+                    { key: "depositContractExists" as const, label: "22. 保証金の徴収その他名目で財産の管理または違約金等の支払契約の有無", note: "有の場合：機関名・金額等を記載" },
+                    { key: "overseasExpensesExists" as const, label: "23. 外国の機関への費用（仲介手数料等）の有無・了解の有無", note: "" },
+                    { key: "homeCountryProcedureComplied" as const, label: "24. 本国・居住国で定められた本邦での活動に関する手続きの実施", note: "" },
+                    { key: "regularExpensesUnderstood" as const, label: "25. 本邦で定期的に費用を払う義務への了解", note: "" },
+                    { key: "technologyTransferEffortV" as const, label: "26. 技能実習を通じた技能等の本国への移転への努力（技能実習歴あり＋特定技能２号希望の場合）", note: "" },
+                    { key: "ssfSpecificFieldCriteriaMet" as const, label: "27. 特定産業分野の公示で定める基準への適合", note: "" },
+                  ].map(({ key, label, note }) => (
+                    <div key={key} className="border rounded-lg p-3 bg-gray-50">
+                      <p className="text-xs font-medium text-gray-700 mb-2">{label}</p>
+                      {note && <p className="text-xs text-gray-400 mb-2">{note}</p>}
+                      <div className="flex gap-4">
+                        {["有", "無"].map(opt => (
+                          <label key={opt} className="flex items-center gap-1.5 cursor-pointer text-sm">
+                            <input type="radio" name={key} value={opt} checked={form[key] === opt} onChange={() => set(key, opt)} />
+                            {opt}
+                          </label>
+                        ))}
+                      </div>
+                      {key === "overseasExpensesExists" && form.overseasExpensesExists === "有" && (
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <Field label="外国機関名"><input className={inputCls} value={form.overseasExpensesOrgName} onChange={e => set("overseasExpensesOrgName", e.target.value)} /></Field>
+                          <Field label="費用額（円換算）"><input className={inputCls} value={form.overseasExpensesAmount} onChange={e => set("overseasExpensesAmount", e.target.value)} placeholder="例：500000" /></Field>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* ── 所属機関 Part 1 V — 特定技能雇用契約 ─────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">所属機関等作成用 Part 1 V — 特定技能雇用契約（項目2）</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="(1) 雇用契約期間 開始"><input className={inputCls} type="date" value={form.orgContractStartDate} onChange={e => set("orgContractStartDate", e.target.value)} /></Field>
+                    <Field label="雇用契約期間 終了"><input className={inputCls} type="date" value={form.orgContractEndDate} onChange={e => set("orgContractEndDate", e.target.value)} /></Field>
+                  </div>
+                  <Field label="(2) 特定産業分野">
+                    <input className={inputCls} value={form.orgSpecifiedIndustrialField} onChange={e => set("orgSpecifiedIndustrialField", e.target.value)} placeholder="例：製造業、建設業、農業、介護、宿泊" />
+                  </Field>
+                  <Field label="業務区分">
+                    <input className={inputCls} value={form.orgWorkCategory} onChange={e => set("orgWorkCategory", e.target.value)} placeholder="例：素形材・産業機械・電気電子情報関連製造業" />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="主職種番号（1つのみ）"><input className={inputCls} value={form.orgOccupationNumber} onChange={e => set("orgOccupationNumber", e.target.value)} placeholder="例：100" /></Field>
+                    <Field label="その他職種番号（複数可）"><input className={inputCls} value={form.orgOccupationNumberAdditional} onChange={e => set("orgOccupationNumberAdditional", e.target.value)} placeholder="例：102,103" /></Field>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="(3) 所定労働時間（週平均・時間）"><input className={inputCls} type="number" value={form.orgWorkHoursWeekly} onChange={e => set("orgWorkHoursWeekly", e.target.value)} placeholder="例：40" /></Field>
+                    <Field label="所定労働時間（月平均・時間）"><input className={inputCls} type="number" value={form.orgWorkHoursMonthly} onChange={e => set("orgWorkHoursMonthly", e.target.value)} placeholder="例：160" /></Field>
+                  </div>
+                  <Field label="一般労働者の所定労働時間と同等か">
+                    <div className="flex gap-4 mt-1">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" checked={form.orgWorkHoursEquivalent === o} onChange={() => set("orgWorkHoursEquivalent", o)} />{o}</label>)}
+                    </div>
+                  </Field>
+                  <Field label="(4) 月額報酬（円・各種手当を除く）">
+                    <input className={inputCls} type="number" value={form.salary} onChange={e => set("salary", e.target.value)} placeholder="例：200000" />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="基本給の時間換算額（円）"><input className={inputCls} type="number" value={form.orgTimeConvertedBasicSalary} onChange={e => set("orgTimeConvertedBasicSalary", e.target.value)} /></Field>
+                    <Field label="同種業務日本人の月額報酬（円）"><input className={inputCls} type="number" value={form.orgJapaneseEquivalentSalary} onChange={e => set("orgJapaneseEquivalentSalary", e.target.value)} /></Field>
+                  </div>
+                  <Field label="日本人と同等以上の報酬か">
+                    <div className="flex gap-4 mt-1">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" checked={form.orgSalaryEqualToJapanese === o} onChange={() => set("orgSalaryEqualToJapanese", o)} />{o}</label>)}
+                    </div>
+                  </Field>
+                  <Field label="(5) 報酬の支払方法">
+                    <div className="flex gap-4 mt-1">
+                      <label className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="checkbox" checked={form.orgSalaryPaymentCash === "有"} onChange={e => set("orgSalaryPaymentCash", e.target.checked ? "有" : "無")} />現金払い</label>
+                      <label className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="checkbox" checked={form.orgSalaryPaymentBank === "有"} onChange={e => set("orgSalaryPaymentBank", e.target.checked ? "有" : "無")} />銀行口座振込</label>
+                    </div>
+                  </Field>
+                  {/* (6)〜(11) Yes/No 系 */}
+                  {[
+                    { key: "orgForeignTreatmentDifference" as const, label: "(6) 外国人であることを理由とした異なる雇用条件の有無" },
+                    { key: "orgPaidHolidayForReturn" as const, label: "(7) 一時帰国のための有給休暇取得の可否" },
+                    { key: "orgFieldSpecificEmploymentCriteria" as const, label: "(8) 分野別雇用関係基準への適合" },
+                    { key: "orgReturnTravelExpenses" as const, label: "(9) 帰国旅費を負担できない場合の費用負担・出国確保措置" },
+                    { key: "orgHealthCheck" as const, label: "(10) 外国人の健康状況等を確認するための措置" },
+                    { key: "orgProperResidenceCriteria" as const, label: "(11) 適正な在留のための基準（分野別公示）への適合" },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="border rounded-lg p-2 bg-gray-50">
+                      <p className="text-xs font-medium text-gray-700 mb-1">{label}</p>
+                      <div className="flex gap-4">
+                        {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" checked={form[key] === o} onChange={() => set(key, o)} />{o}</label>)}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* ── 所属機関 Part 2-3 V — 機関情報 ──────────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">所属機関等作成用 Part 2-3 V — 機関情報（項目3）</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Field label="(1) 名称"><input className={inputCls} value={form.orgName} onChange={e => set("orgName", e.target.value)} /></Field>
+                  <Field label="(2) 法人番号（13桁）"><input className={inputCls} value={form.orgCorporateNumber} onChange={e => set("orgCorporateNumber", e.target.value)} /></Field>
+                  <Field label="(3) 雇用保険適用事業所番号（11桁）"><input className={inputCls} value={form.orgEmploymentInsuranceNo} onChange={e => set("orgEmploymentInsuranceNo", e.target.value)} /></Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="(4) 業種コード（主）"><input className={inputCls} value={form.orgBusinessTypeCode} onChange={e => set("orgBusinessTypeCode", e.target.value)} /></Field>
+                    <Field label="業種コード（その他）"><input className={inputCls} value={form.orgBusinessTypeOtherCode} onChange={e => set("orgBusinessTypeOtherCode", e.target.value)} /></Field>
+                  </div>
+                  <Field label="(5) 所在地"><input className={inputCls} value={form.orgAddress} onChange={e => set("orgAddress", e.target.value)} /></Field>
+                  <Field label="電話番号"><input className={inputCls} value={form.orgPhone} onChange={e => set("orgPhone", e.target.value)} /></Field>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Field label="(6) 資本金（円）"><input className={inputCls} type="number" value={form.orgCapital} onChange={e => set("orgCapital", e.target.value)} /></Field>
+                    <Field label="(7) 年間売上高（円）"><input className={inputCls} type="number" value={form.orgAnnualSales} onChange={e => set("orgAnnualSales", e.target.value)} /></Field>
+                    <Field label="(8) 常勤職員数（名）"><input className={inputCls} type="number" value={form.orgEmployeeCount} onChange={e => set("orgEmployeeCount", e.target.value)} /></Field>
+                  </div>
+                  <Field label="(9) 代表者氏名"><input className={inputCls} value={form.position} onChange={e => set("position", e.target.value)} placeholder="代表取締役 〇〇 〇〇" /></Field>
+                  <Field label="(10) 勤務先事業所名（本社以外の場合）"><input className={inputCls} value={form.orgBranchName} onChange={e => set("orgBranchName", e.target.value)} /></Field>
+                  <Field label="勤務先事業所所在地"><input className={inputCls} value={form.activityDetails} onChange={e => set("activityDetails", e.target.value)} placeholder="本社と異なる場合" /></Field>
+                  <Field label="労働保険番号（14桁）"><input className={inputCls} value={form.orgLaborInsuranceNo} onChange={e => set("orgLaborInsuranceNo", e.target.value)} placeholder="例：01-234567-890123-000" /></Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="健康保険・厚生年金保険の適用事業所か">
+                      <div className="flex gap-4 mt-1">
+                        {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" checked={form.orgHealthInsuranceMet === o} onChange={() => set("orgHealthInsuranceMet", o)} />{o}</label>)}
+                      </div>
+                    </Field>
+                    <Field label="労災・雇用保険の適用事業所か">
+                      <div className="flex gap-4 mt-1">
+                        {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" checked={form.orgLaborInsuranceMet === o} onChange={() => set("orgLaborInsuranceMet", o)} />{o}</label>)}
+                      </div>
+                    </Field>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ── 支援責任者・担当者（特定技能１号） ──────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">支援責任者・支援担当者（特定技能１号・支援計画）</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="支援責任者 氏名"><input className={inputCls} value={form.supportManagerName} onChange={e => set("supportManagerName", e.target.value)} /></Field>
+                    <Field label="役職・部署"><input className={inputCls} value={form.supportManagerTitle} onChange={e => set("supportManagerTitle", e.target.value)} /></Field>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="支援担当者 氏名"><input className={inputCls} value={form.supportStaffName} onChange={e => set("supportStaffName", e.target.value)} /></Field>
+                    <Field label="役職・部署"><input className={inputCls} value={form.supportStaffTitle} onChange={e => set("supportStaffTitle", e.target.value)} /></Field>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ── 登録支援機関（全支援委託の場合） ────────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">登録支援機関（支援計画の全部を委託する場合）</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="(1) 名称"><input className={inputCls} value={form.rsoName} onChange={e => set("rsoName", e.target.value)} /></Field>
+                    <Field label="(2) 法人番号（13桁）"><input className={inputCls} value={form.rsoCorporateNo} onChange={e => set("rsoCorporateNo", e.target.value)} /></Field>
+                  </div>
+                  <Field label="(3) 雇用保険適用事業所番号"><input className={inputCls} value={form.rsoInsuranceNo} onChange={e => set("rsoInsuranceNo", e.target.value)} /></Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="(4) 所在地"><input className={inputCls} value={form.rsoAddress} onChange={e => set("rsoAddress", e.target.value)} /></Field>
+                    <Field label="電話番号"><input className={inputCls} value={form.rsoPhone} onChange={e => set("rsoPhone", e.target.value)} /></Field>
+                  </div>
+                  <Field label="(5) 代表者氏名"><input className={inputCls} value={form.rsoRepresentative} onChange={e => set("rsoRepresentative", e.target.value)} /></Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="(6) 登録番号"><input className={inputCls} value={form.rsoRegNo} onChange={e => set("rsoRegNo", e.target.value)} /></Field>
+                    <Field label="(7) 登録年月日"><input className={inputCls} type="date" value={form.rsoRegDate} onChange={e => set("rsoRegDate", e.target.value)} /></Field>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="(8) 支援実施事業所名"><input className={inputCls} value={form.rsoSupportBusinessName} onChange={e => set("rsoSupportBusinessName", e.target.value)} /></Field>
+                    <Field label="所在地"><input className={inputCls} value={form.rsoSupportBusinessAddress} onChange={e => set("rsoSupportBusinessAddress", e.target.value)} /></Field>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="(10) 支援責任者"><input className={inputCls} value={form.rsoSupportManager} onChange={e => set("rsoSupportManager", e.target.value)} /></Field>
+                    <Field label="(11) 支援担当者"><input className={inputCls} value={form.rsoSupportStaff} onChange={e => set("rsoSupportStaff", e.target.value)} /></Field>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="(12) 対応可能言語"><input className={inputCls} value={form.rsoAvailableLanguages} onChange={e => set("rsoAvailableLanguages", e.target.value)} placeholder="日本語、英語、中国語" /></Field>
+                    <Field label="(13) 支援委託費用（月額・円）"><input className={inputCls} type="number" value={form.rsoFeePerMonth} onChange={e => set("rsoFeePerMonth", e.target.value)} /></Field>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
           {/* ── その他（J/K/O/M/Q/Y/H/U型）── フリーフィールド ─────────────── */}
-          {!isNtype && !isTtype && !isRtype && !isPtype && (
+          {!isNtype && !isTtype && !isRtype && !isPtype && !isVtype && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">申請人等作成用 Part 2 — 補足情報</CardTitle>

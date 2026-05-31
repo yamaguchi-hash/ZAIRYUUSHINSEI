@@ -50,9 +50,10 @@ export const VISA_CATEGORY_NEEDS_ORG: Record<VisaFormCategory, boolean> = {
 };
 
 // Part 2 の種類
-export type Part2Type = 'N' | 'T' | 'R' | 'P' | 'none';
+export type Part2Type = 'N' | 'T' | 'R' | 'P' | 'V' | 'none';
 export const VISA_CATEGORY_PART2: Record<VisaFormCategory, Part2Type> = {
-  N: 'N', L: 'N', I: 'N', V: 'N',
+  N: 'N', L: 'N', I: 'N',
+  V: 'V',   // 特定技能 — 専用 Part 2 V
   T: 'T',
   R: 'R',
   P: 'P',
@@ -282,6 +283,119 @@ export interface ApplicationFormData {
   freeformOrgNotes: string;         // 所属機関等の補足・自由記載
 
   // ══════════════════════════════════════════════════════════════════════════
+  // 申請人等作成用 Part 2 — V型（特定技能１号・２号）
+  // 別記第三十号様式（変更）・第三十号の二様式（更新）申請人用２V・３V
+  // ══════════════════════════════════════════════════════════════════════════
+  // 17. 特定技能所属機関（employerName / employerAddress / employerPhone と共用）
+
+  // 18. 技能水準
+  skillLevelProofMethod: string;      // 証明方法: 分野別方針/試験/その他/技能実習2号修了
+  skillLevelExamName1: string;        // 試験名1
+  skillLevelExamCountry1: string;     // 試験地1: 国内/国外
+  skillLevelExamCountryName1: string; // 試験地1の国名（国外の場合）
+  skillLevelExamName2: string;        // 試験名2
+  skillLevelExamCountry2: string;     // 試験地2
+  skillLevelExamCountryName2: string; // 試験地2の国名
+
+  // 19. 日本語能力（特定技能１号の場合のみ）
+  japaneseAbilityProofMethod: string;
+  japaneseAbilityExamName1: string;
+  japaneseAbilityExamCountry1: string;
+  japaneseAbilityExamCountryName1: string;
+  japaneseAbilityExamName2: string;
+  japaneseAbilityExamCountry2: string;
+  japaneseAbilityExamCountryName2: string;
+
+  // 20. 修了した技能実習2号（18・19で技能実習2号修了を選択した場合）
+  completedTit2Occupation1: string;   // 職種1
+  completedTit2Operations1: string;   // 作業1
+  completedTit2ProofType1: string;    // 修了証明方法1: 実技試験合格/訓練状況書類
+  completedTit2Occupation2: string;   // 職種2（複数ある場合）
+  completedTit2Operations2: string;   // 作業2
+  completedTit2ProofType2: string;    // 修了証明方法2
+
+  // 21. 通算在留期間（特定技能１号を希望する場合のみ）
+  cumulativeStayYears: string;        // 年
+  cumulativeStayMonths: string;       // 月
+
+  // ── 申請人 Part 3 V（項目22〜27）────────────────────────────────────────
+  // 22. 保証金徴収等の有無
+  depositContractExists: string;       // 有/無
+  // 23. 外国の機関への費用
+  overseasExpensesExists: string;      // 有/無
+  overseasExpensesOrgName: string;     // 機関名
+  overseasExpensesAmount: string;      // 費用額（円換算）
+  // 24. 本国の手続きの実施
+  homeCountryProcedureComplied: string; // 有/無
+  // 25. 定期的な費用の了解
+  regularExpensesUnderstood: string;   // 有/無
+  // 26. 技能移転への努力（技能実習歴あり＋2号希望の場合）
+  technologyTransferEffortV: string;   // 有/無
+  // 27. 特定産業分野の基準への適合
+  ssfSpecificFieldCriteriaMet: string; // 有/無
+
+  // ── 所属機関等作成用 Part 1 V — 特定技能雇用契約 ───────────────────────
+  // V型 Item 2: 雇用契約
+  orgContractStartDate: string;       // 雇用契約期間（始）
+  orgContractEndDate: string;         // 雇用契約期間（終）
+  orgSpecifiedIndustrialField: string; // (2) 特定産業分野
+  orgWorkCategory: string;            // (2) 業務区分
+  orgOccupationNumber: string;        // (2) 主職種番号
+  orgOccupationNumberAdditional: string; // (2) 追加職種番号
+  orgWorkHoursWeekly: string;         // (3) 所定労働時間（週平均）
+  orgWorkHoursMonthly: string;        // (3) 所定労働時間（月平均）
+  orgWorkHoursEquivalent: string;     // (3) 正規労働者と同等か 有/無
+  orgTimeConvertedBasicSalary: string; // (4) 基本給の時間換算額
+  orgJapaneseEquivalentSalary: string; // (4) 同種業務日本人の月額報酬
+  orgSalaryEqualToJapanese: string;   // (4) 日本人同等以上か 有/無
+  orgSalaryPaymentCash: string;       // (5) 現金払い 有/無
+  orgSalaryPaymentBank: string;       // (5) 銀行振込 有/無
+  orgForeignTreatmentDifference: string; // (6) 外国人差別的扱い 有/無
+  orgForeignTreatmentDetail: string;   // (6) 差別的扱いの詳細
+  orgPaidHolidayForReturn: string;    // (7) 一時帰国有給休暇 有/無
+  orgFieldSpecificEmploymentCriteria: string; // (8) 分野別雇用基準 有/無
+  orgReturnTravelExpenses: string;    // (9) 帰国旅費負担 有/無
+  orgHealthCheck: string;             // (10) 健康状況確認 有/無
+  orgProperResidenceCriteria: string; // (11) 適正在留基準 有/無
+
+  // V型 Item 3: 所属機関情報（既存のorg系フィールドを共用）
+  orgLaborInsuranceNo: string;        // 労働保険番号（14桁）
+  orgHealthInsuranceMet: string;      // 健康保険・厚生年金 有/無
+  orgLaborInsuranceMet: string;       // 労災・雇用保険 有/無
+
+  // 職業紹介事業者（Item 2 (13)）
+  orgPlacementProviderName: string;
+  orgPlacementProviderCorporateNo: string;
+  orgPlacementProviderInsuranceNo: string;
+  orgPlacementProviderAddress: string;
+  orgPlacementProviderPhone: string;
+  orgPlacementProviderLicenseNo: string;
+  orgPlacementProviderLicenseDate: string;
+
+  // 特定技能１号支援計画（特定技能１号の場合のみ）
+  // 支援責任者・支援担当者
+  supportManagerName: string;         // 支援責任者氏名
+  supportManagerTitle: string;        // 支援責任者役職・部署
+  supportStaffName: string;           // 支援担当者氏名
+  supportStaffTitle: string;          // 支援担当者役職・部署
+
+  // 登録支援機関（特定技能１号・全支援委託の場合）
+  rsoName: string;                    // (5-1) 登録支援機関名称
+  rsoCorporateNo: string;             // (5-2) 法人番号
+  rsoInsuranceNo: string;             // (5-3) 雇用保険適用事業所番号
+  rsoAddress: string;                 // (5-4) 所在地
+  rsoPhone: string;                   // 電話番号
+  rsoRepresentative: string;          // (5-5) 代表者氏名
+  rsoRegNo: string;                   // (5-6) 登録番号
+  rsoRegDate: string;                 // (5-7) 登録年月日
+  rsoSupportBusinessName: string;     // (5-8) 支援実施事業所名
+  rsoSupportBusinessAddress: string;  // 支援実施事業所所在地
+  rsoSupportManager: string;          // (5-10) 支援責任者
+  rsoSupportStaff: string;            // (5-11) 支援担当者
+  rsoAvailableLanguages: string;      // (5-12) 対応可能言語
+  rsoFeePerMonth: string;             // (5-13) 支援委託費用（月額・円）
+
+  // ══════════════════════════════════════════════════════════════════════════
   // 所属機関等作成用 Part 1 — N型
   // ══════════════════════════════════════════════════════════════════════════
   contractType: string;
@@ -410,6 +524,36 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   // フリーフィールド
   freeformPart2Notes: '',
   freeformOrgNotes: '',
+  // Part 2 V — 特定技能
+  skillLevelProofMethod: '', skillLevelExamName1: '', skillLevelExamCountry1: '', skillLevelExamCountryName1: '',
+  skillLevelExamName2: '', skillLevelExamCountry2: '', skillLevelExamCountryName2: '',
+  japaneseAbilityProofMethod: '', japaneseAbilityExamName1: '', japaneseAbilityExamCountry1: '', japaneseAbilityExamCountryName1: '',
+  japaneseAbilityExamName2: '', japaneseAbilityExamCountry2: '', japaneseAbilityExamCountryName2: '',
+  completedTit2Occupation1: '', completedTit2Operations1: '', completedTit2ProofType1: '',
+  completedTit2Occupation2: '', completedTit2Operations2: '', completedTit2ProofType2: '',
+  cumulativeStayYears: '', cumulativeStayMonths: '',
+  depositContractExists: '無', overseasExpensesExists: '無', overseasExpensesOrgName: '', overseasExpensesAmount: '',
+  homeCountryProcedureComplied: '有', regularExpensesUnderstood: '有',
+  technologyTransferEffortV: '有', ssfSpecificFieldCriteriaMet: '有',
+  // 所属機関 V型固有
+  orgContractStartDate: '', orgContractEndDate: '',
+  orgSpecifiedIndustrialField: '', orgWorkCategory: '',
+  orgOccupationNumber: '', orgOccupationNumberAdditional: '',
+  orgWorkHoursWeekly: '', orgWorkHoursMonthly: '', orgWorkHoursEquivalent: '有',
+  orgTimeConvertedBasicSalary: '', orgJapaneseEquivalentSalary: '', orgSalaryEqualToJapanese: '有',
+  orgSalaryPaymentCash: '無', orgSalaryPaymentBank: '有',
+  orgForeignTreatmentDifference: '無', orgForeignTreatmentDetail: '',
+  orgPaidHolidayForReturn: '有', orgFieldSpecificEmploymentCriteria: '有',
+  orgReturnTravelExpenses: '有', orgHealthCheck: '有', orgProperResidenceCriteria: '有',
+  orgLaborInsuranceNo: '', orgHealthInsuranceMet: '有', orgLaborInsuranceMet: '有',
+  orgPlacementProviderName: '', orgPlacementProviderCorporateNo: '', orgPlacementProviderInsuranceNo: '',
+  orgPlacementProviderAddress: '', orgPlacementProviderPhone: '',
+  orgPlacementProviderLicenseNo: '', orgPlacementProviderLicenseDate: '',
+  supportManagerName: '', supportManagerTitle: '', supportStaffName: '', supportStaffTitle: '',
+  rsoName: '', rsoCorporateNo: '', rsoInsuranceNo: '', rsoAddress: '', rsoPhone: '',
+  rsoRepresentative: '', rsoRegNo: '', rsoRegDate: '',
+  rsoSupportBusinessName: '', rsoSupportBusinessAddress: '',
+  rsoSupportManager: '', rsoSupportStaff: '', rsoAvailableLanguages: '', rsoFeePerMonth: '',
   // 所属機関 Part 1
   contractType: '雇用', contractTypeOther: '',
   orgName: '', orgCorporateNumber: '', orgBranchName: '',

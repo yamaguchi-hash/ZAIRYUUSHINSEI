@@ -204,40 +204,63 @@ export function QuestionnaireDocxButton({ applicationId }: { applicationId: stri
     setError("");
 
     try {
-      // ── 方法1: Apps Script 経由（URL 設定済みの場合）──────────────────────
-      const scriptUrl = "/api/applications/" + applicationId + "/questionnaire-gdoc";
-      const gdocRes = await fetch(scriptUrl);
-      const gdocJson = await gdocRes.json().catch(() => ({}));
-      if (gdocRes.ok && gdocJson?.url) {
-        window.open(gdocJson.url, "_blank");
-        return;
-      }
-
-      // ── 方法2: GIS + Google Docs API（Client ID 設定済みの場合）──────────
+      // ── 方法1: GIS + Google Docs API（Client ID 設定済みの場合を最優先）──
+      // ブラウザのポップアップブロック回避のため、クリック直後に認証を開始する
       if (clientId) {
         if (!gisReady) {
           setError("Google認証ライブラリを読み込み中です。数秒後にもう一度押してください。");
           return;
         }
 
-        // コンテンツを取得
+        // ① GIS トークンをクリック直後に取得（ユーザーのジェスチャーが有効な間に実行）
+        let accessToken: string;
+        try {
+          accessToken = await getAccessToken(clientId);
+        } catch (authErr: any) {
+          const msg = (authErr?.message ?? "") as string;
+          if (msg.includes("popup_closed") || msg.includes("access_denied")) {
+            setError("Google認証がキャンセルされました。もう一度ボタンを押してください。");
+          } else {
+            setError("Google認証エラー: " + msg);
+          }
+          return;
+        }
+
+        // ② 質問書コンテンツをサーバーから取得
         const contentRes = await fetch(
           `/api/applications/${applicationId}/questionnaire-content`,
         );
-        if (!contentRes.ok) throw new Error("質問書の取得に失敗しました");
+        if (!contentRes.ok) throw new Error("質問書データの取得に失敗しました");
         const { plainText, title } = await contentRes.json();
 
-        // Google OAuth トークン取得 → ドキュメント作成
-        const accessToken = await getAccessToken(clientId);
+        // ③ Google Docs API でドキュメントを作成
         const url = await createGoogleDoc(accessToken, title, plainText);
         window.open(url, "_blank");
         return;
       }
 
-      // ── 方法3: どちらも未設定 → セットアップ案内 ──────────────────────────
+      // ── 方法2: Apps Script 経由（GOOGLE_APPS_SCRIPT_URL 設定済みの場合）──
+      const gdocRes = await fetch(
+        `/api/applications/${applicationId}/questionnaire-gdoc`,
+      );
+      const gdocJson = await gdocRes.json().catch(() => ({}));
+      if (gdocRes.ok && gdocJson?.url) {
+        window.open(gdocJson.url, "_blank");
+        return;
+      }
+
+      // ── 方法3: 未設定 → セットアップ案内 ───────────────────────────────────
       setShowSetup(true);
     } catch (e: any) {
-      setError(e?.message ?? "エラーが発生しました");
+      const msg = (e?.message ?? "エラーが発生しました") as string;
+      // Google Docs API が有効でない場合のエラー
+      if (msg.includes("API has not been used") || msg.includes("disabled")) {
+        setError(
+          "Google Docs API が有効になっていません。Google Cloud Console で「Google Docs API」を有効化してください。",
+        );
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

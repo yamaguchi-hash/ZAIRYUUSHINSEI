@@ -608,6 +608,18 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 </tbody>
               </table>
 
+              {/* ── 申請人署名欄（申請人等作成用の末尾・R型） ─────────────────────── */}
+              <table className="sign-table" style={{ marginTop: "16px" }}>
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{ width: "40%" }}>申請人（法定代理人）の署名／申請書作成年月日</td>
+                    <td style={{ width: "30%" }}></td>
+                    <td className="lbl" style={{ width: "12%" }}>署名日</td>
+                    <td style={{ width: "18%" }}>　　年　　月　　日</td>
+                  </tr>
+                </tbody>
+              </table>
+
               {/* ── 扶養者用Ｒ（別ページ） ─────────────────────────────────────── */}
               <div className="section page-break">
                 扶養者等作成用　１　Ｒ　—「家族滞在」在留期間更新用
@@ -998,17 +1010,20 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
             </>
           )}
 
-          {/* ── 申請人署名欄（1か所のみ） ──────────────────────────────────── */}
-          <table className="sign-table" style={{ marginTop: "16px" }}>
-            <tbody>
-              <tr>
-                <td className="lbl" style={{ width: "40%" }}>申請人（法定代理人）の署名／申請書作成年月日</td>
-                <td style={{ width: "30%" }}></td>
-                <td className="lbl" style={{ width: "12%" }}>署名日</td>
-                <td style={{ width: "18%" }}>　　年　　月　　日</td>
-              </tr>
-            </tbody>
-          </table>
+          {/* ── 申請人署名欄（R型以外：申請人等作成用の末尾） ───────────────────── */}
+          {/* R型は上の取次者の後・扶養者ページの前に署名欄を出力済みのため除外 */}
+          {!isRtype && (
+            <table className="sign-table" style={{ marginTop: "16px" }}>
+              <tbody>
+                <tr>
+                  <td className="lbl" style={{ width: "40%" }}>申請人（法定代理人）の署名／申請書作成年月日</td>
+                  <td style={{ width: "30%" }}></td>
+                  <td className="lbl" style={{ width: "12%" }}>署名日</td>
+                  <td style={{ width: "18%" }}>　　年　　月　　日</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
 
           {/* ── フッター ──────────────────────────────────────────────────── */}
           <div style={{

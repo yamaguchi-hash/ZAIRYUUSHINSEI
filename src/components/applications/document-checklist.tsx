@@ -833,7 +833,7 @@ export function DocumentChecklist({
                           title={`同じ書類の${nextSlotNum}枚目のアップロード先を追加`}
                         >
                           <Plus className="w-3.5 h-3.5" />
-                          同じ書類を{nextSlotNum}枚目として追加
+                          追加
                         </button>
                       );
                     })()}

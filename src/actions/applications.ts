@@ -96,10 +96,8 @@ export async function getApplicationById(id: string) {
       reviewedBy:            applicationDocumentChecklist.reviewedBy,
       createdAt:             applicationDocumentChecklist.createdAt,
       updatedAt:             applicationDocumentChecklist.updatedAt,
-      // マスターから留意事項・条件を取得
+      // マスターから留意事項を取得（LEFT JOINで取得。未登録書類はnull）
       masterDescription:     documentRequirementMaster.description,
-      masterConditions:      documentRequirementMaster.conditions,
-      masterIsAlwaysRequired: documentRequirementMaster.isAlwaysRequired,
     })
     .from(applicationDocumentChecklist)
     .leftJoin(

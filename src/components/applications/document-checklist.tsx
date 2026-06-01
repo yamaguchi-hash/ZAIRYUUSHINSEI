@@ -10,6 +10,7 @@ import {
   shareApplicantDocumentsToChecklist,
   generateApplicationFormDraft,
   duplicateChecklistItem,
+  removeDocumentFromChecklist,
 } from "@/actions/applications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -576,9 +577,7 @@ export function DocumentChecklist({
                             {!subItem.fileUrl && isExpert && (
                               <button
                                 onClick={async () => {
-                                  await import("@/actions/applications").then(m =>
-                                    m.removeDocumentFromChecklist(subItem.id)
-                                  );
+                                  await removeDocumentFromChecklist(subItem.id);
                                   setLocalChecklist(prev => prev.filter(i => i.id !== subItem.id));
                                 }}
                                 className="ml-2 text-xs text-red-400 hover:text-red-600"

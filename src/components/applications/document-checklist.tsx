@@ -696,49 +696,54 @@ export function DocumentChecklist({
                   )}
                 </div>
 
-                {/* 下段: アップロードゾーン + 枠を追加（グループ最後のアイテムのみ） */}
+                {/* 下段: アップロードゾーン + 同書類追加ボタン */}
                 {item.isRequiredByExpert && !isApplicationForm(item.documentName) && (
                   <div>
                     <ChecklistItemUpload item={item} onUploaded={handleUploaded} onCleared={handleCleared} />
-                    {/* 「枠を追加」はグループの最後のアイテムにだけ表示 */}
-                    {isLastInGroup && (
-                      <button
-                        onClick={async () => {
-                          const result = await duplicateChecklistItem(item.id, applicationId);
-                          if (result.success && result.newItem) {
-                            // ページリロードなしで即座にローカル状態に追加
-                            setLocalChecklist(prev => {
-                              const idx = prev.findIndex(i => i.id === item.id);
-                              const newEntry = {
-                                id: result.newItem!.id,
-                                documentName: result.newItem!.documentName,
-                                documentRequirementId: result.newItem!.documentRequirementId,
-                                isRequiredByExpert: result.newItem!.isRequiredByExpert,
-                                status: "not_submitted" as const,
-                                fileUrl: null,
-                                fileName: null,
-                                expertNotes: null,
-                                ocrExtractedData: null,
-                                masterDescription: item.masterDescription,
-                                masterSortOrder: item.masterSortOrder,
-                                createdAt: new Date().toISOString(),
-                              };
-                              if (idx >= 0) {
-                                const next = [...prev];
-                                next.splice(idx + 1, 0, newEntry);
-                                return next;
-                              }
-                              return [...prev, newEntry];
-                            });
-                          }
-                        }}
-                        className="ml-8 mt-1 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded px-2 py-1 transition-colors"
-                        title="このアップロード枠を1つ追加"
-                      >
-                        <Plus className="w-3 h-3" />
-                        枠を追加
-                      </button>
-                    )}
+                    {/* 同書類追加ボタン：グループの最後のアイテムにだけ表示 */}
+                    {isLastInGroup && (() => {
+                      // グループ内の枚数を取得（グループ先頭アイテムのindexから逆算）
+                      const groupKey = item.documentRequirementId ?? `name:${item.documentName}`;
+                      const info = groupInfoMap.get(item.id);
+                      const nextSlotNum = (info?.index ?? 0) + 2; // 「2枚目」「3枚目」...
+                      return (
+                        <button
+                          onClick={async () => {
+                            const result = await duplicateChecklistItem(item.id, applicationId);
+                            if (result.success && result.newItem) {
+                              setLocalChecklist(prev => {
+                                const idx = prev.findIndex(i => i.id === item.id);
+                                const newEntry = {
+                                  id: result.newItem!.id,
+                                  documentName: result.newItem!.documentName,
+                                  documentRequirementId: result.newItem!.documentRequirementId,
+                                  isRequiredByExpert: result.newItem!.isRequiredByExpert,
+                                  status: "not_submitted" as const,
+                                  fileUrl: null,
+                                  fileName: null,
+                                  expertNotes: null,
+                                  ocrExtractedData: null,
+                                  masterDescription: item.masterDescription,
+                                  masterSortOrder: item.masterSortOrder,
+                                  createdAt: new Date().toISOString(),
+                                };
+                                if (idx >= 0) {
+                                  const next = [...prev];
+                                  next.splice(idx + 1, 0, newEntry);
+                                  return next;
+                                }
+                                return [...prev, newEntry];
+                              });
+                            }
+                          }}
+                          className="ml-8 mt-2 inline-flex items-center gap-1.5 text-xs text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg px-3 py-1.5 transition-colors"
+                          title={`同じ書類の${nextSlotNum}枚目のアップロード先を追加`}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          同じ書類を{nextSlotNum}枚目として追加
+                        </button>
+                      );
+                    })()}
                   </div>
                 )}
                 </>

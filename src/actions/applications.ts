@@ -1007,7 +1007,17 @@ export async function addCustomDocumentToChecklist(
 export async function duplicateChecklistItem(
   checklistItemId: string,
   applicationId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+  /** 追加された新アイテムのID・書類名・requirementId（UI即時反映用） */
+  newItem?: {
+    id: string;
+    documentName: string;
+    documentRequirementId: string | null;
+    isRequiredByExpert: boolean;
+  };
+}> {
   try {
     const session = await auth();
     if (!session?.user) return { success: false, error: "認証が必要です" };
@@ -1029,17 +1039,28 @@ export async function duplicateChecklistItem(
       .limit(1);
     if (!app) return { success: false, error: "申請案件が見つかりません" };
 
-    // 同じ書類名・requirementId で新行を追加
-    await db.insert(applicationDocumentChecklist).values({
-      applicationId,
-      documentRequirementId: original.documentRequirementId,
-      documentName: original.documentName,
-      isRequiredByExpert: original.isRequiredByExpert,
-      status: "not_submitted",
-    });
+    // 同じ書類名・requirementId で新行を追加（返り値で ID を取得）
+    const [inserted] = await db
+      .insert(applicationDocumentChecklist)
+      .values({
+        applicationId,
+        documentRequirementId: original.documentRequirementId,
+        documentName: original.documentName,
+        isRequiredByExpert: original.isRequiredByExpert,
+        status: "not_submitted",
+      })
+      .returning({ id: applicationDocumentChecklist.id });
 
     revalidatePath(`/applications/${applicationId}`);
-    return { success: true };
+    return {
+      success: true,
+      newItem: {
+        id: inserted.id,
+        documentName: original.documentName,
+        documentRequirementId: original.documentRequirementId ?? null,
+        isRequiredByExpert: original.isRequiredByExpert,
+      },
+    };
   } catch (err: any) {
     return { success: false, error: err.message ?? "追加に失敗しました" };
   }

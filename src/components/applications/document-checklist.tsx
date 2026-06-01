@@ -666,7 +666,32 @@ export function DocumentChecklist({
                       <button
                         onClick={async () => {
                           const result = await duplicateChecklistItem(item.id, applicationId);
-                          if (result.success) window.location.reload();
+                          if (result.success && result.newItem) {
+                            // ページリロードなしで即座にローカル状態に追加
+                            setLocalChecklist(prev => {
+                              const idx = prev.findIndex(i => i.id === item.id);
+                              const newEntry = {
+                                id: result.newItem!.id,
+                                documentName: result.newItem!.documentName,
+                                documentRequirementId: result.newItem!.documentRequirementId,
+                                isRequiredByExpert: result.newItem!.isRequiredByExpert,
+                                status: "not_submitted" as const,
+                                fileUrl: null,
+                                fileName: null,
+                                expertNotes: null,
+                                ocrExtractedData: null,
+                                masterDescription: item.masterDescription,
+                                masterSortOrder: item.masterSortOrder,
+                                createdAt: new Date().toISOString(),
+                              };
+                              if (idx >= 0) {
+                                const next = [...prev];
+                                next.splice(idx + 1, 0, newEntry);
+                                return next;
+                              }
+                              return [...prev, newEntry];
+                            });
+                          }
                         }}
                         className="ml-8 mt-1 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded px-2 py-1 transition-colors"
                         title="このアップロード枠を1つ追加"

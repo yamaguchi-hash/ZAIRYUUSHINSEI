@@ -138,7 +138,9 @@ function ChecklistItemUpload({
   }
 
   // ファイルあり → ファイル名＋OCR結果表示
-  if (item.fileUrl && item.fileName) {
+  // "(data)" は data: URL のプレースホルダー（RSCペイロード削減のため置換済み）
+  const hasFile = item.fileUrl && item.fileName;
+  if (hasFile) {
     return (
       <div className="mt-2 ml-8">
         <div className="flex items-center gap-2 flex-wrap">

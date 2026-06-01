@@ -77,7 +77,12 @@ export async function getApplicationById(id: string) {
         .then((r) => r[0])
     : null;
 
-  const checklist = await db
+  // ── NOTE: fileUrl が data: URL の場合は巨大な base64 文字列になり
+  //          RSC シリアライズサイズ制限を超えてエラーになるため、
+  //          data: URL はプレースホルダー "(data)" に置換して返す。
+  //          実際のファイル内容は個別アクションで取得する。
+  const { sql: sqlExpr } = await import("drizzle-orm");
+  const rawChecklist = await db
     .select({
       id:                    applicationDocumentChecklist.id,
       applicationId:         applicationDocumentChecklist.applicationId,
@@ -85,7 +90,8 @@ export async function getApplicationById(id: string) {
       documentName:          applicationDocumentChecklist.documentName,
       isRequiredByExpert:    applicationDocumentChecklist.isRequiredByExpert,
       status:                applicationDocumentChecklist.status,
-      fileUrl:               applicationDocumentChecklist.fileUrl,
+      // data: URL は "(data)" プレースホルダーに置換（RSCペイロード肥大化防止）
+      fileUrl:  sqlExpr<string | null>`CASE WHEN ${applicationDocumentChecklist.fileUrl} LIKE 'data:%' THEN '(data)' ELSE ${applicationDocumentChecklist.fileUrl} END`,
       fileName:              applicationDocumentChecklist.fileName,
       fileSize:              applicationDocumentChecklist.fileSize,
       mimeType:              applicationDocumentChecklist.mimeType,
@@ -106,6 +112,9 @@ export async function getApplicationById(id: string) {
     )
     .where(eq(applicationDocumentChecklist.applicationId, id))
     .orderBy(applicationDocumentChecklist.createdAt);
+
+  // "(data)" プレースホルダーはファイルあり扱いにする（表示・差し替えは別途取得）
+  const checklist = rawChecklist;
 
   const questionnaire = await db
     .select()
@@ -643,11 +652,13 @@ JSONのみを返し、説明文は不要です。`;
 
     let extracted: Record<string, any> = {};
     try {
+      // PDF は "application/pdf"、画像は実際の mimeType を使用
+      const inlineMime = isPdf ? "application/pdf" : imageMimeType;
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [{
           parts: [
-            { inlineData: { mimeType: isImage ? imageMimeType : "image/jpeg", data: base64 } },
+            { inlineData: { mimeType: inlineMime, data: base64 } },
             { text: prompt },
           ],
         }],

@@ -34,6 +34,10 @@ interface ChecklistItem {
   masterDescription?: string | null;
   /** 書類マスターID（グループ化に使用） */
   documentRequirementId?: string | null;
+  /** マスターの並び順（入管提出順） */
+  masterSortOrder?: number;
+  /** 作成日時（ISO文字列） */
+  createdAt?: string | null;
 }
 
 interface DocumentChecklistProps {

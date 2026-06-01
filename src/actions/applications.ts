@@ -101,17 +101,25 @@ export async function getApplicationById(id: string) {
     .where(eq(applicationDocumentChecklist.applicationId, id))
     .orderBy(applicationDocumentChecklist.createdAt);
 
-  // マスターの留意事項を別クエリで取得
+  // マスターの留意事項と並び順を別クエリで取得
   const requirementIds = [
     ...new Set(rawChecklist.map((c) => c.documentRequirementId).filter((id): id is string => !!id))
   ];
   const masterDescMap: Record<string, string | null> = {};
+  const masterSortOrderMap: Record<string, number> = {};
   if (requirementIds.length > 0) {
     const masters = await db
-      .select({ id: documentRequirementMaster.id, description: documentRequirementMaster.description })
+      .select({
+        id: documentRequirementMaster.id,
+        description: documentRequirementMaster.description,
+        sortOrder: documentRequirementMaster.sortOrder,
+      })
       .from(documentRequirementMaster)
       .where(inArray(documentRequirementMaster.id, requirementIds));
-    for (const m of masters) { masterDescMap[m.id] = m.description ?? null; }
+    for (const m of masters) {
+      masterDescMap[m.id] = m.description ?? null;
+      masterSortOrderMap[m.id] = m.sortOrder;
+    }
   }
 
   // ── 安全なシリアライズのために加工
@@ -145,6 +153,10 @@ export async function getApplicationById(id: string) {
     masterDescription: item.documentRequirementId
       ? (masterDescMap[item.documentRequirementId] ?? null)
       : null,
+    // 並び順: マスターの sort_order を保持（ソートに使用）
+    masterSortOrder: item.documentRequirementId
+      ? (masterSortOrderMap[item.documentRequirementId] ?? 9999)
+      : 9999,
     // Date オブジェクトは文字列に変換（RSC シリアライズ安全化）
     // Neon HTTP ドライバーが文字列で返す場合も対応
     submittedAt: item.submittedAt
@@ -152,7 +164,23 @@ export async function getApplicationById(id: string) {
           ? item.submittedAt.toISOString()
           : String(item.submittedAt))
       : null,
+    // created_at は Date → string（ソートの二次キー用）
+    createdAt: item.createdAt
+      ? (item.createdAt instanceof Date
+          ? item.createdAt.toISOString()
+          : String(item.createdAt))
+      : null,
   }));
+
+  // ── 入管提出順にソート ────────────────────────────────────────────────────
+  //   1次キー: マスターの sort_order（書類提出順）
+  //   2次キー: created_at（同一書類の複数枠は追加順）
+  checklist.sort((a, b) => {
+    if (a.masterSortOrder !== b.masterSortOrder) {
+      return a.masterSortOrder - b.masterSortOrder;
+    }
+    return (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
+  });
 
   const questionnaire = await db
     .select()

@@ -403,6 +403,8 @@ export default async function ApplicationDetailPage({
             ocrExtractedData: c.ocrExtractedData as Record<string, any> | null,
             masterDescription: c.masterDescription,
             documentRequirementId: c.documentRequirementId,
+            masterSortOrder: c.masterSortOrder,
+            createdAt: c.createdAt,
           }))}
           applicationId={application.id}
           userRole={userRole}

@@ -43,3 +43,4 @@ zairyu-data.db
 /data/
 
 .vercel
+.env*

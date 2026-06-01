@@ -553,163 +553,158 @@ export function DocumentChecklist({
                   !item.isRequiredByExpert && "opacity-60"
                 )}
               >
-                {/* 追加枠はラベル＋削除ボタン＋アップロードゾーンを表示（書類名等の上段は省略） */}
+                {/* ── 上段: 追加枠は「N枚目＋削除」のみ、通常枠は番号・チェック・書類名・ステータス ── */}
                 {isAddedSlot ? (
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-xs text-gray-500 font-medium">
-                        {groupInfo!.index + 1}枚目
-                      </span>
-                      {/* 追加枠の削除ボタン（ファイル未アップロード時のみ） */}
-                      {!item.fileUrl && isExpert && (
-                        <button
-                          onClick={async () => {
-                            await removeDocumentFromChecklist(item.id);
-                            setLocalChecklist(prev => prev.filter(i => i.id !== item.id));
-                          }}
-                          className="text-xs text-red-400 hover:text-red-600 underline"
-                          title="この枠を削除"
-                        >
-                          この枠を削除
-                        </button>
-                      )}
-                    </div>
-                    {/* アップロードゾーン（追加枠にも必要） */}
-                    <ChecklistItemUpload item={item} onUploaded={handleUploaded} onCleared={handleCleared} />
+                  /* 追加枠ヘッダー */
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs text-gray-500 font-medium">
+                      {(groupInfo?.index ?? 1) + 1}枚目
+                    </span>
+                    {/* 削除ボタン（ファイル未アップロード時のみ） */}
+                    {!item.fileUrl && isExpert && (
+                      <button
+                        onClick={async () => {
+                          await removeDocumentFromChecklist(item.id);
+                          setLocalChecklist(prev => prev.filter(i => i.id !== item.id));
+                        }}
+                        className="text-xs text-red-400 hover:text-red-600 underline"
+                        title="この枠を削除"
+                      >
+                        この枠を削除
+                      </button>
+                    )}
                   </div>
                 ) : (
-                <>
-                {/* 上段: 番号 + チェックボックス + 書類名 + ステータス */}
-                <div className="flex items-center gap-3">
-                  {/* 連番バッジ */}
-                  {item.isRequiredByExpert && (
-                    <div className="flex-shrink-0 w-7 text-center">
-                      {numMap[item.id] != null ? (
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
-                          {numMap[item.id]}
-                        </span>
-                      ) : (
-                        <span className="text-gray-300 text-xs">—</span>
-                      )}
-                    </div>
-                  )}
-                  {!item.isRequiredByExpert && <div className="flex-shrink-0 w-7" />}
-
-                  {isExpert ? (
-                    <button
-                      onClick={() => handleToggleExpert(item)}
-                      disabled={isPending}
-                      className="flex-shrink-0 text-blue-600 hover:text-blue-700 disabled:opacity-50"
-                      title="必要書類として確定"
-                    >
-                      {item.isRequiredByExpert
-                        ? <CheckSquare className="w-5 h-5" />
-                        : <Square className="w-5 h-5 text-gray-300" />}
-                    </button>
-                  ) : (
-                    <div className="flex-shrink-0 w-5">
-                      {item.isRequiredByExpert && <CheckSquare className="w-5 h-5 text-blue-600" />}
-                    </div>
-                  )}
-
-                  <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      "text-sm font-medium leading-tight",
-                      item.isRequiredByExpert ? "text-gray-900" : "text-gray-400"
-                    )}>
-                      {item.documentName}
-                      {item.isRequiredByExpert && (
-                        <span className="ml-2 text-xs text-red-500 font-normal">必須</span>
-                      )}
-                    </p>
-                    {/* 留意事項（マスターから自動表示） */}
-                    {item.masterDescription && (
-                      <p className="text-xs text-blue-600 mt-0.5 leading-relaxed">
-                        ℹ {item.masterDescription}
-                      </p>
-                    )}
-
-                    {/* 備考（専門家によるインライン編集） */}
-                    {editingNotesId === item.id ? (
-                      <div className="flex items-center gap-1 mt-1">
-                        <input
-                          type="text"
-                          value={editingNotesValue}
-                          onChange={(e) => setEditingNotesValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") saveNotes(item.id);
-                            if (e.key === "Escape") cancelEditNotes();
-                          }}
-                          placeholder="例：結婚証明書、出生証明書 など"
-                          autoFocus
-                          className="flex-1 text-xs border border-orange-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50"
-                        />
-                        <button onClick={() => saveNotes(item.id)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="保存">
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={cancelEditNotes} className="p-1 text-gray-400 hover:bg-gray-50 rounded" title="キャンセル">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                  /* 通常枠ヘッダー: 番号 + チェックボックス + 書類名 + ステータス */
+                  <div className="flex items-center gap-3">
+                    {/* 連番バッジ */}
+                    {item.isRequiredByExpert ? (
+                      <div className="flex-shrink-0 w-7 text-center">
+                        {numMap[item.id] != null ? (
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
+                            {numMap[item.id]}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1 mt-0.5 group/notes">
-                        {item.expertNotes ? (
-                          <p className="text-xs text-orange-600">📝 {item.expertNotes}</p>
-                        ) : (
-                          <p className="text-xs text-gray-300 hidden group-hover/notes:block">備考を追加...</p>
+                      <div className="flex-shrink-0 w-7" />
+                    )}
+
+                    {isExpert ? (
+                      <button
+                        onClick={() => handleToggleExpert(item)}
+                        disabled={isPending}
+                        className="flex-shrink-0 text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                        title="必要書類として確定"
+                      >
+                        {item.isRequiredByExpert
+                          ? <CheckSquare className="w-5 h-5" />
+                          : <Square className="w-5 h-5 text-gray-300" />}
+                      </button>
+                    ) : (
+                      <div className="flex-shrink-0 w-5">
+                        {item.isRequiredByExpert && <CheckSquare className="w-5 h-5 text-blue-600" />}
+                      </div>
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      <p className={cn(
+                        "text-sm font-medium leading-tight",
+                        item.isRequiredByExpert ? "text-gray-900" : "text-gray-400"
+                      )}>
+                        {item.documentName}
+                        {item.isRequiredByExpert && (
+                          <span className="ml-2 text-xs text-red-500 font-normal">必須</span>
                         )}
-                        {isExpert && (
-                          <button
-                            onClick={() => startEditNotes(item)}
-                            className="p-0.5 text-gray-300 hover:text-orange-400 rounded opacity-0 group-hover/notes:opacity-100 transition-opacity"
-                            title="備考を編集"
-                          >
-                            <Pencil className="w-3 h-3" />
+                      </p>
+                      {/* 留意事項 */}
+                      {item.masterDescription && (
+                        <p className="text-xs text-blue-600 mt-0.5 leading-relaxed">
+                          ℹ {item.masterDescription}
+                        </p>
+                      )}
+                      {/* 備考（専門家インライン編集） */}
+                      {editingNotesId === item.id ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <input
+                            type="text"
+                            value={editingNotesValue}
+                            onChange={(e) => setEditingNotesValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveNotes(item.id);
+                              if (e.key === "Escape") cancelEditNotes();
+                            }}
+                            placeholder="例：結婚証明書、出生証明書 など"
+                            autoFocus
+                            className="flex-1 text-xs border border-orange-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50"
+                          />
+                          <button onClick={() => saveNotes(item.id)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="保存">
+                            <Check className="w-3.5 h-3.5" />
                           </button>
-                        )}
+                          <button onClick={cancelEditNotes} className="p-1 text-gray-400 hover:bg-gray-50 rounded" title="キャンセル">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 mt-0.5 group/notes">
+                          {item.expertNotes ? (
+                            <p className="text-xs text-orange-600">📝 {item.expertNotes}</p>
+                          ) : (
+                            <p className="text-xs text-gray-300 hidden group-hover/notes:block">備考を追加...</p>
+                          )}
+                          {isExpert && (
+                            <button
+                              onClick={() => startEditNotes(item)}
+                              className="p-0.5 text-gray-300 hover:text-orange-400 rounded opacity-0 group-hover/notes:opacity-100 transition-opacity"
+                              title="備考を編集"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ステータス */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {getStatusIcon(item.status)}
+                      <span className="text-xs text-gray-500 hidden sm:block">{STATUS_LABELS[item.status]}</span>
+                    </div>
+
+                    {/* 承認・却下ボタン */}
+                    {isExpert && item.status === "submitted" && (
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => handleStatusChange(item.id, "approved")}
+                          disabled={isPending}
+                          className="p-1 rounded text-green-600 hover:bg-green-50 disabled:opacity-50"
+                          title="承認"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleStatusChange(item.id, "resubmit_required")}
+                          disabled={isPending}
+                          className="p-1 rounded text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          title="再提出要求"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
                       </div>
                     )}
                   </div>
+                )}
 
-                  {/* ステータス */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {getStatusIcon(item.status)}
-                    <span className="text-xs text-gray-500 hidden sm:block">{STATUS_LABELS[item.status]}</span>
-                  </div>
-
-                  {/* 承認・却下ボタン */}
-                  {isExpert && item.status === "submitted" && (
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button
-                        onClick={() => handleStatusChange(item.id, "approved")}
-                        disabled={isPending}
-                        className="p-1 rounded text-green-600 hover:bg-green-50 disabled:opacity-50"
-                        title="承認"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleStatusChange(item.id, "resubmit_required")}
-                        disabled={isPending}
-                        className="p-1 rounded text-red-600 hover:bg-red-50 disabled:opacity-50"
-                        title="再提出要求"
-                      >
-                        <XCircle className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* 下段: アップロードゾーン + 同書類追加ボタン */}
+                {/* ── 下段: アップロードゾーン＋追加ボタン（追加枠・通常枠とも表示）── */}
                 {item.isRequiredByExpert && !isApplicationForm(item.documentName) && (
                   <div>
                     <ChecklistItemUpload item={item} onUploaded={handleUploaded} onCleared={handleCleared} />
-                    {/* 同書類追加ボタン：グループの最後のアイテムにだけ表示 */}
+                    {/* 追加ボタン: グループの最後アイテムにだけ表示 */}
                     {isLastInGroup && (() => {
-                      // グループ内の枚数を取得（グループ先頭アイテムのindexから逆算）
-                      const groupKey = item.documentRequirementId ?? `name:${item.documentName}`;
                       const info = groupInfoMap.get(item.id);
-                      const nextSlotNum = (info?.index ?? 0) + 2; // 「2枚目」「3枚目」...
+                      const nextSlotNum = (info?.index ?? 0) + 2;
                       return (
                         <button
                           onClick={async () => {
@@ -749,8 +744,6 @@ export function DocumentChecklist({
                       );
                     })()}
                   </div>
-                )}
-                </>
                 )}
               </div>
               );

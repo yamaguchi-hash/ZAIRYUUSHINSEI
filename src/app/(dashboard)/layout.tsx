@@ -8,7 +8,13 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  // auth() は JWT 検証失敗等で throw することがあるため try-catch でラップ
+  let session;
+  try {
+    session = await auth();
+  } catch {
+    redirect("/login");
+  }
 
   if (!session?.user) {
     redirect("/login");

@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { getApplicationById } from "@/actions/applications";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from "@/components/ui/card";
@@ -53,7 +53,15 @@ export default async function ApplicationDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
+  // auth() は JWT 検証失敗・期限切れ等で throw することがある
+  // try-catch でラップして 500 ではなく適切なレスポンスにする
+  let session;
+  try {
+    session = await auth();
+  } catch (authErr) {
+    console.error("[ApplicationDetailPage] auth() failed:", authErr);
+    redirect("/login");
+  }
   const userRole = (session?.user as any)?.role;
   const { id } = await params;
 

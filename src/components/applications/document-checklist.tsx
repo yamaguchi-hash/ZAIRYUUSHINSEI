@@ -11,6 +11,7 @@ import {
   generateApplicationFormDraft,
   duplicateChecklistItem,
   removeDocumentFromChecklist,
+  clearChecklistFile,
 } from "@/actions/applications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -89,13 +90,16 @@ const OCR_DISPLAY_FIELDS: { key: string; label: string }[] = [
 function ChecklistItemUpload({
   item,
   onUploaded,
+  onCleared,
 }: {
   item: ChecklistItem;
   onUploaded: (id: string, updates: Partial<ChecklistItem>) => void;
+  onCleared: (id: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [error, setError] = useState("");
   const [ocrStatus, setOcrStatus] = useState<"idle" | "processing" | "done">("idle");
   const [showOcr, setShowOcr] = useState(false);
@@ -146,8 +150,27 @@ function ChecklistItemUpload({
     }
   }
 
+  // アップロード取り消し処理
+  async function handleClear() {
+    if (!confirm(`「${item.fileName}」のアップロードを取り消しますか？`)) return;
+    setIsClearing(true);
+    setError("");
+    try {
+      const result = await clearChecklistFile(item.id);
+      if (!result.success) {
+        setError(result.error ?? "取り消しに失敗しました");
+      } else {
+        onCleared(item.id);
+      }
+    } catch (err: any) {
+      setError(err.message ?? "エラーが発生しました");
+    } finally {
+      setIsClearing(false);
+    }
+  }
+
   // ファイルあり → ファイル名＋OCR結果表示
-  // "(data)" は data: URL のプレースホルダー（RSCペイロード削減のため置換済み）
+  // "(uploaded)" は Vercel Blob / "(data)" は data: URL のプレースホルダー
   const hasFile = item.fileUrl && item.fileName;
   if (hasFile) {
     return (
@@ -171,9 +194,19 @@ function ChecklistItemUpload({
           {/* 差し替えボタン */}
           <button
             onClick={() => inputRef.current?.click()}
-            className="text-xs text-gray-400 hover:text-gray-600 underline"
+            disabled={isClearing}
+            className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50"
           >
             差し替え
+          </button>
+          {/* 取り消しボタン */}
+          <button
+            onClick={handleClear}
+            disabled={isClearing}
+            className="text-xs text-red-400 hover:text-red-600 underline disabled:opacity-50"
+            title="アップロードを取り消す"
+          >
+            {isClearing ? "取り消し中..." : "取り消し"}
           </button>
           <input
             ref={inputRef}
@@ -289,6 +322,17 @@ export function DocumentChecklist({
   function handleUploaded(id: string, updates: Partial<ChecklistItem>) {
     setLocalChecklist((prev) =>
       prev.map((i) => (i.id === id ? { ...i, ...updates } : i))
+    );
+  }
+
+  function handleCleared(id: string) {
+    // アップロード取り消し後：fileUrl・fileName・status をリセット
+    setLocalChecklist((prev) =>
+      prev.map((i) =>
+        i.id === id
+          ? { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, ocrExtractedData: null, status: "not_submitted" }
+          : i
+      )
     );
   }
 
@@ -561,7 +605,7 @@ export function DocumentChecklist({
                 {/* 下段: アップロードゾーン + 枠を追加 */}
                 {item.isRequiredByExpert && !isApplicationForm(item.documentName) && (
                   <div>
-                    <ChecklistItemUpload item={item} onUploaded={handleUploaded} />
+                    <ChecklistItemUpload item={item} onUploaded={handleUploaded} onCleared={handleCleared} />
                     <button
                       onClick={async () => {
                         const result = await duplicateChecklistItem(item.id, applicationId);

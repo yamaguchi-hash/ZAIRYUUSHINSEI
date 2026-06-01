@@ -388,6 +388,42 @@ export async function updateDocumentStatus(
   revalidatePath("/applications");
 }
 
+/** アップロード済みファイルを取り消してアップロード前の状態に戻す */
+export async function clearChecklistFile(
+  checklistItemId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+
+    const [item] = await db
+      .select({ applicationId: applicationDocumentChecklist.applicationId })
+      .from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.id, checklistItemId))
+      .limit(1);
+    if (!item) return { success: false, error: "アイテムが見つかりません" };
+
+    await db
+      .update(applicationDocumentChecklist)
+      .set({
+        fileUrl:          null,
+        fileName:         null,
+        fileSize:         null,
+        mimeType:         null,
+        ocrExtractedData: null,
+        status:           "not_submitted" as const,
+        submittedAt:      null,
+        updatedAt:        new Date(),
+      })
+      .where(eq(applicationDocumentChecklist.id, checklistItemId));
+
+    revalidatePath(`/applications/${item.applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "取り消しに失敗しました" };
+  }
+}
+
 export async function updateChecklistNotes(
   checklistItemId: string,
   notes: string

@@ -115,8 +115,15 @@ export async function getApplicationById(id: string) {
     fileSize:   item.fileSize ?? null,
     mimeType:   item.mimeType ?? null,
     expertNotes: item.expertNotes ?? null,
-    // OCR データは null または plain object（シリアライズ可）
-    ocrExtractedData: (item.ocrExtractedData ?? null) as Record<string, unknown> | null,
+    // OCR データ: null または plain object（シリアライズ可）
+    // 空オブジェクト {} は null に変換（React hydration の安全化）
+    ocrExtractedData: (() => {
+      const ocr = item.ocrExtractedData;
+      if (ocr === null || ocr === undefined) return null;
+      if (typeof ocr !== 'object') return null;
+      if (Object.keys(ocr as object).length === 0) return null;
+      return ocr as Record<string, unknown>;
+    })(),
     // マスターの留意事項
     masterDescription: item.documentRequirementId
       ? (masterDescMap[item.documentRequirementId] ?? null)
@@ -468,19 +475,7 @@ export async function getDocumentRequirements(visaType: string, applicationType:
     )
     .orderBy(documentRequirementMaster.sortOrder);
 
-  // Date オブジェクトを文字列に変換して RSC シリアライズを安全にする
-  return rows.map((r) => ({
-    id:               r.id,
-    visaType:         r.visaType,
-    applicationType:  r.applicationType,
-    documentName:     r.documentName,
-    documentNameEn:   r.documentNameEn ?? null,
-    description:      r.description ?? null,
-    isAlwaysRequired: r.isAlwaysRequired,
-    conditions:       (r.conditions ?? null) as Record<string, unknown> | null,
-    sortOrder:        r.sortOrder,
-    // createdAt/updatedAt は RSC ペイロードに含めない（使用されないため）
-  }));
+  return rows;
 }
 
 // ── チェックリストに書類を追加（選択した書類IDから一括登録）────────────────

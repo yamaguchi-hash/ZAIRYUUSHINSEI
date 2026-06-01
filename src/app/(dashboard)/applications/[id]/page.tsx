@@ -72,12 +72,36 @@ export default async function ApplicationDetailPage({
   const checkResult = application.consistencyCheckResult as any;
 
   // 書類マスター取得（ビザ種別・申請種別でフィルタ）
-  let masterDocuments: Awaited<ReturnType<typeof getDocumentRequirements>> = [];
+  // masterDocuments: Date オブジェクトを持つフィールドを除外して RSC シリアライズを安全にする
+  type SafeMasterDoc = {
+    id: string;
+    documentName: string;
+    documentNameEn: string | null;
+    description: string | null;
+    isAlwaysRequired: boolean;
+    conditions: Record<string, unknown> | null;
+    sortOrder: number;
+    visaType: string;
+    applicationType: string;
+  };
+  let masterDocuments: SafeMasterDoc[] = [];
   try {
-    masterDocuments = await getDocumentRequirements(
+    const rawMasterDocuments = await getDocumentRequirements(
       application.visaType,
       application.applicationType
     );
+    // Date オブジェクト（createdAt・updatedAt 等）を除外
+    masterDocuments = rawMasterDocuments.map((r) => ({
+      id:               r.id,
+      visaType:         r.visaType,
+      applicationType:  r.applicationType,
+      documentName:     r.documentName,
+      documentNameEn:   r.documentNameEn ?? null,
+      description:      r.description ?? null,
+      isAlwaysRequired: r.isAlwaysRequired,
+      conditions:       (r.conditions ?? null) as Record<string, unknown> | null,
+      sortOrder:        r.sortOrder,
+    }));
   } catch (e) {
     console.error("[ApplicationDetailPage] getDocumentRequirements failed:", e);
   }

@@ -12,13 +12,14 @@ import {
   duplicateChecklistItem,
   removeDocumentFromChecklist,
   clearChecklistFile,
+  addCustomDocumentToChecklist,
 } from "@/actions/applications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   CheckSquare, Square, CheckCircle, XCircle, AlertCircle,
   Clock, RefreshCw, Loader2, FileText, Upload, Sparkles,
   ChevronDown, ChevronRight, Share2, Pencil, Check, X,
-  FileEdit, ArrowRight, Plus,
+  FileEdit, ArrowRight, Plus, FilePlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -299,6 +300,11 @@ export function DocumentChecklist({
   // 下書き生成
   const [isDraftGenerating, setIsDraftGenerating] = useState(false);
   const [draftMessage, setDraftMessage] = useState("");
+  // 追加書類入力
+  const [customDocName, setCustomDocName] = useState("");
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [customDocError, setCustomDocError] = useState("");
+  const customDocInputRef = useRef<HTMLInputElement>(null);
 
   const isExpert = userRole === "expert" || userRole === "admin";
   const requiredItems = localChecklist.filter((i) => i.isRequiredByExpert);
@@ -385,6 +391,39 @@ export function DocumentChecklist({
   const allRequiredSubmitted =
     requiredItems.length > 0 &&
     requiredItems.every((i) => i.status !== "not_submitted");
+
+  async function handleAddCustomDoc() {
+    const name = customDocName.trim();
+    if (!name) { setCustomDocError("書類名を入力してください"); return; }
+    setCustomDocError("");
+    setIsAddingCustom(true);
+    try {
+      const result = await addCustomDocumentToChecklist(applicationId, name);
+      if (result.success && result.newItemId) {
+        const newEntry: ChecklistItem = {
+          id: result.newItemId,
+          documentName: name,
+          documentRequirementId: null,
+          isRequiredByExpert: true,
+          status: "not_submitted",
+          fileUrl: null,
+          fileName: null,
+          expertNotes: null,
+          ocrExtractedData: null,
+          masterDescription: null,
+          masterSortOrder: 9999,
+          createdAt: new Date().toISOString(),
+        };
+        setLocalChecklist(prev => [...prev, newEntry]);
+        setCustomDocName("");
+        customDocInputRef.current?.focus();
+      } else {
+        setCustomDocError(result.error ?? "追加に失敗しました");
+      }
+    } finally {
+      setIsAddingCustom(false);
+    }
+  }
 
   async function handleGenerateDraft() {
     setIsDraftGenerating(true);
@@ -711,6 +750,38 @@ export function DocumentChecklist({
         );
           })()
         }
+
+        {/* ── 追加書類入力欄（常に表示）── */}
+        <div className="border-t border-gray-100 bg-gray-50 px-6 py-3">
+          <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1">
+            <FilePlus className="w-3.5 h-3.5" />
+            追加書類をアップロードする欄を作成
+          </p>
+          <div className="flex gap-2">
+            <input
+              ref={customDocInputRef}
+              type="text"
+              value={customDocName}
+              onChange={(e) => { setCustomDocName(e.target.value); setCustomDocError(""); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCustomDoc(); } }}
+              placeholder="書類名を入力（例：雇用証明書、在職証明書 など）"
+              className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
+            />
+            <button
+              onClick={handleAddCustomDoc}
+              disabled={isAddingCustom || !customDocName.trim()}
+              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
+            >
+              {isAddingCustom
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Plus className="w-4 h-4" />}
+              枠を作成
+            </button>
+          </div>
+          {customDocError && (
+            <p className="text-xs text-red-500 mt-1">{customDocError}</p>
+          )}
+        </div>
 
         {/* ── 全書類提出済み → 下書き作成バナー ── */}
         {allRequiredSubmitted && (

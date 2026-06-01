@@ -973,7 +973,7 @@ export async function deleteApplication(
 export async function addCustomDocumentToChecklist(
   applicationId: string,
   documentName: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; newItemId?: string }> {
   try {
     const session = await auth();
     if (!session?.user) return { success: false, error: "認証が必要です" };
@@ -988,16 +988,19 @@ export async function addCustomDocumentToChecklist(
       .limit(1);
     if (!app) return { success: false, error: "申請案件が見つかりません" };
 
-    await db.insert(applicationDocumentChecklist).values({
-      applicationId,
-      documentRequirementId: null,
-      documentName: documentName.trim(),
-      isRequiredByExpert: true,
-      status: "not_submitted",
-    });
+    const [inserted] = await db
+      .insert(applicationDocumentChecklist)
+      .values({
+        applicationId,
+        documentRequirementId: null,
+        documentName: documentName.trim(),
+        isRequiredByExpert: true,
+        status: "not_submitted",
+      })
+      .returning({ id: applicationDocumentChecklist.id });
 
     revalidatePath(`/applications/${applicationId}`);
-    return { success: true };
+    return { success: true, newItemId: inserted.id };
   } catch (err: any) {
     return { success: false, error: err.message ?? "追加に失敗しました" };
   }

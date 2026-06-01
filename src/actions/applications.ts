@@ -77,42 +77,53 @@ export async function getApplicationById(id: string) {
         .then((r) => r[0])
     : null;
 
-  // ── チェックリスト取得（LEFT JOIN でマスターの留意事項も取得）
+  // ── チェックリスト取得（シンプルな SELECT のみ・LEFT JOIN なし）
+  // LEFT JOIN を使わず 2 ステップで取得することで Drizzle ORM の型推論問題を回避
   const rawChecklist = await db
-    .select({
-      id:                    applicationDocumentChecklist.id,
-      applicationId:         applicationDocumentChecklist.applicationId,
-      documentRequirementId: applicationDocumentChecklist.documentRequirementId,
-      documentName:          applicationDocumentChecklist.documentName,
-      isRequiredByExpert:    applicationDocumentChecklist.isRequiredByExpert,
-      status:                applicationDocumentChecklist.status,
-      fileUrl:               applicationDocumentChecklist.fileUrl,
-      fileName:              applicationDocumentChecklist.fileName,
-      fileSize:              applicationDocumentChecklist.fileSize,
-      mimeType:              applicationDocumentChecklist.mimeType,
-      ocrExtractedData:      applicationDocumentChecklist.ocrExtractedData,
-      expertNotes:           applicationDocumentChecklist.expertNotes,
-      submittedAt:           applicationDocumentChecklist.submittedAt,
-      reviewedAt:            applicationDocumentChecklist.reviewedAt,
-      reviewedBy:            applicationDocumentChecklist.reviewedBy,
-      createdAt:             applicationDocumentChecklist.createdAt,
-      updatedAt:             applicationDocumentChecklist.updatedAt,
-      // マスターから留意事項を取得（LEFT JOINで取得。未登録書類はnull）
-      masterDescription:     documentRequirementMaster.description,
-    })
+    .select()
     .from(applicationDocumentChecklist)
-    .leftJoin(
-      documentRequirementMaster,
-      eq(applicationDocumentChecklist.documentRequirementId, documentRequirementMaster.id)
-    )
     .where(eq(applicationDocumentChecklist.applicationId, id))
     .orderBy(applicationDocumentChecklist.createdAt);
 
-  // ── data: URL は RSC シリアライズサイズ制限を超えるため "(data)" に置換
-  //    Vercel Blob 未設定時にファイルが base64 として DB に保存される場合の対策
+  // マスターの留意事項を別クエリで取得
+  const requirementIds = [
+    ...new Set(rawChecklist.map((c) => c.documentRequirementId).filter((id): id is string => !!id))
+  ];
+  const masterDescMap: Record<string, string | null> = {};
+  if (requirementIds.length > 0) {
+    const { inArray } = await import("drizzle-orm");
+    const masters = await db
+      .select({ id: documentRequirementMaster.id, description: documentRequirementMaster.description })
+      .from(documentRequirementMaster)
+      .where(inArray(documentRequirementMaster.id, requirementIds));
+    for (const m of masters) { masterDescMap[m.id] = m.description ?? null; }
+  }
+
+  // ── 安全なシリアライズのために加工
+  //    1. data: URL → "(data)" 置換（RSC ペイロード肥大化防止）
+  //    2. Date オブジェクトを除外（RSC シリアライズ問題の回避）
+  //    3. 不要フィールドを除外
   const checklist = rawChecklist.map((item) => ({
-    ...item,
-    fileUrl: item.fileUrl?.startsWith("data:") ? "(data)" : (item.fileUrl ?? null),
+    id:                    item.id,
+    applicationId:         item.applicationId,
+    documentRequirementId: item.documentRequirementId ?? null,
+    documentName:          item.documentName,
+    isRequiredByExpert:    item.isRequiredByExpert,
+    status:                item.status,
+    // data: URL はプレースホルダーに置換（数 MB → 6 文字）
+    fileUrl:    item.fileUrl?.startsWith("data:") ? "(data)" : (item.fileUrl ?? null),
+    fileName:   item.fileName ?? null,
+    fileSize:   item.fileSize ?? null,
+    mimeType:   item.mimeType ?? null,
+    expertNotes: item.expertNotes ?? null,
+    // OCR データは null または plain object（シリアライズ可）
+    ocrExtractedData: (item.ocrExtractedData ?? null) as Record<string, unknown> | null,
+    // マスターの留意事項
+    masterDescription: item.documentRequirementId
+      ? (masterDescMap[item.documentRequirementId] ?? null)
+      : null,
+    // Date オブジェクトは文字列に変換（RSC シリアライズ安全化）
+    submittedAt: item.submittedAt ? item.submittedAt.toISOString() : null,
   }));
 
   const questionnaire = await db
@@ -453,7 +464,19 @@ export async function getDocumentRequirements(visaType: string, applicationType:
     )
     .orderBy(documentRequirementMaster.sortOrder);
 
-  return rows;
+  // Date オブジェクトを文字列に変換して RSC シリアライズを安全にする
+  return rows.map((r) => ({
+    id:               r.id,
+    visaType:         r.visaType,
+    applicationType:  r.applicationType,
+    documentName:     r.documentName,
+    documentNameEn:   r.documentNameEn ?? null,
+    description:      r.description ?? null,
+    isAlwaysRequired: r.isAlwaysRequired,
+    conditions:       (r.conditions ?? null) as Record<string, unknown> | null,
+    sortOrder:        r.sortOrder,
+    // createdAt/updatedAt は RSC ペイロードに含めない（使用されないため）
+  }));
 }
 
 // ── チェックリストに書類を追加（選択した書類IDから一括登録）────────────────

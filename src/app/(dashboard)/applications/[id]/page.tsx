@@ -359,9 +359,9 @@ export default async function ApplicationDetailPage({
             fileUrl: c.fileUrl,
             fileName: c.fileName,
             expertNotes: c.expertNotes,
-            ocrExtractedData: (c.ocrExtractedData ?? null) as Record<string, any> | null,
-            masterDescription: (c as any).masterDescription ?? null,
-            documentRequirementId: (c as any).documentRequirementId ?? null,
+            ocrExtractedData: c.ocrExtractedData as Record<string, any> | null,
+            masterDescription: c.masterDescription,
+            documentRequirementId: c.documentRequirementId,
           }))}
           applicationId={application.id}
           userRole={userRole}
@@ -373,7 +373,7 @@ export default async function ApplicationDetailPage({
           checklist={checklist.map((c) => ({
             id: c.id,
             documentName: c.documentName,
-            documentRequirementId: (c as any).documentRequirementId ?? null,
+            documentRequirementId: c.documentRequirementId,
             isRequiredByExpert: c.isRequiredByExpert,
             status: c.status,
           }))}

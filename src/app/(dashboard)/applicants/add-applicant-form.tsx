@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserPlus, Loader2, CheckCircle } from "lucide-react";
 import { AddressSplitInput } from "@/components/ui/postal-code-input";
 
-export function AddApplicantForm() {
+export function AddApplicantForm({ onSaved }: { onSaved?: () => void } = {}) {
   const [isPending, startTransition] = useTransition();
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -48,6 +48,7 @@ export function AddApplicantForm() {
           passportExpiry: "", residenceCardNumber: "", phone: "", emailAddress: "",
           postalCode: "", japanPrefecture: "", japanCity: "", japanAddressLine: "",
         });
+        if (onSaved) setTimeout(onSaved, 800);
       } catch (err: any) {
         setError(err.message ?? "登録に失敗しました");
       }

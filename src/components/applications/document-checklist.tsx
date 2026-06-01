@@ -462,25 +462,80 @@ export function DocumentChecklist({
             <p className="text-xs mt-1">下の「入管必要書類から選択」から追加してください</p>
           </div>
         ) : (() => {
-            // シンプルなフラットレンダリング（グループ化なし・安全実装）
+            // ── グループ情報を事前計算（同じ documentRequirementId のアイテムをグループ化）
+            // アイテムは masterSortOrder 順でソート済みなので同グループは隣接している
+            type GroupInfo = { isFirst: boolean; isLast: boolean; index: number; groupKey: string };
+            const groupInfoMap = new Map<string, GroupInfo>();
+            {
+              const keyToIds = new Map<string, string[]>();
+              for (const it of localChecklist) {
+                const key = it.documentRequirementId ?? `name:${it.documentName}`;
+                if (!keyToIds.has(key)) keyToIds.set(key, []);
+                keyToIds.get(key)!.push(it.id);
+              }
+              for (const [key, ids] of keyToIds.entries()) {
+                ids.forEach((id, idx) => {
+                  groupInfoMap.set(id, {
+                    isFirst: idx === 0,
+                    isLast: idx === ids.length - 1,
+                    index: idx,
+                    groupKey: key,
+                  });
+                });
+              }
+            }
+
+            // 連番（グループ単位・写真は番号なし）
             let docNum = 0;
             const numMap: Record<string, number | null> = {};
             for (const it of localChecklist) {
               if (it.isRequiredByExpert) {
-                numMap[it.id] = it.documentName.includes("写真") ? null : ++docNum;
+                const info = groupInfoMap.get(it.id);
+                // グループの先頭アイテムにだけ番号を付ける
+                if (info?.isFirst) {
+                  numMap[it.id] = it.documentName.includes("写真") ? null : ++docNum;
+                }
               }
             }
 
             return (
           <div className="divide-y divide-gray-50">
-            {localChecklist.map((item) => (
+            {localChecklist.map((item) => {
+              const groupInfo = groupInfoMap.get(item.id);
+              const isAddedSlot = groupInfo ? !groupInfo.isFirst : false;  // 追加枠（グループ2番目以降）
+              const isLastInGroup = groupInfo?.isLast ?? true;  // グループの最後のアイテム
+
+              return (
               <div
                 key={item.id}
                 className={cn(
-                  "px-6 py-4 hover:bg-gray-50/50 transition-colors",
+                  "hover:bg-gray-50/50 transition-colors",
+                  isAddedSlot ? "px-6 py-2 pl-12 bg-blue-50/30" : "px-6 py-4",
                   !item.isRequiredByExpert && "opacity-60"
                 )}
               >
+                {/* 追加枠は上段を省略して枠番号のみ表示 */}
+                {isAddedSlot ? (
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs text-gray-400 font-medium">
+                      {groupInfo!.index + 1}枚目
+                    </span>
+                    {/* 追加枠の削除ボタン */}
+                    {isExpert && (
+                      <button
+                        onClick={async () => {
+                          await removeDocumentFromChecklist(item.id);
+                          setLocalChecklist(prev => prev.filter(i => i.id !== item.id));
+                        }}
+                        className="text-xs text-red-400 hover:text-red-600 underline"
+                        title="この枠を削除"
+                      >
+                        この枠を削除
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                <>
                 {/* 上段: 番号 + チェックボックス + 書類名 + ステータス */}
                 <div className="flex items-center gap-3">
                   {/* 連番バッジ */}
@@ -602,25 +657,31 @@ export function DocumentChecklist({
                   )}
                 </div>
 
-                {/* 下段: アップロードゾーン + 枠を追加 */}
+                {/* 下段: アップロードゾーン + 枠を追加（グループ最後のアイテムのみ） */}
                 {item.isRequiredByExpert && !isApplicationForm(item.documentName) && (
                   <div>
                     <ChecklistItemUpload item={item} onUploaded={handleUploaded} onCleared={handleCleared} />
-                    <button
-                      onClick={async () => {
-                        const result = await duplicateChecklistItem(item.id, applicationId);
-                        if (result.success) window.location.reload();
-                      }}
-                      className="ml-8 mt-1 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded px-2 py-1 transition-colors"
-                      title="この書類のアップロード枠を1つ追加"
-                    >
-                      <Plus className="w-3 h-3" />
-                      枠を追加
-                    </button>
+                    {/* 「枠を追加」はグループの最後のアイテムにだけ表示 */}
+                    {isLastInGroup && (
+                      <button
+                        onClick={async () => {
+                          const result = await duplicateChecklistItem(item.id, applicationId);
+                          if (result.success) window.location.reload();
+                        }}
+                        className="ml-8 mt-1 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded px-2 py-1 transition-colors"
+                        title="このアップロード枠を1つ追加"
+                      >
+                        <Plus className="w-3 h-3" />
+                        枠を追加
+                      </button>
+                    )}
                   </div>
                 )}
+                </>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         );
           })()

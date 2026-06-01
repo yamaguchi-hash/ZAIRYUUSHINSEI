@@ -930,6 +930,48 @@ export async function addCustomDocumentToChecklist(
   }
 }
 
+// ── チェックリスト項目の枠を1件追加（同一書類の複数アップロード用）────────────
+export async function duplicateChecklistItem(
+  checklistItemId: string,
+  applicationId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    // 元のアイテムを取得
+    const [original] = await db
+      .select()
+      .from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.id, checklistItemId))
+      .limit(1);
+    if (!original) return { success: false, error: "アイテムが見つかりません" };
+
+    // 権限チェック（同一申請案件か確認）
+    const [app] = await db
+      .select({ id: applications.id })
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    // 同じ書類名・requirementId で新行を追加
+    await db.insert(applicationDocumentChecklist).values({
+      applicationId,
+      documentRequirementId: original.documentRequirementId,
+      documentName: original.documentName,
+      isRequiredByExpert: original.isRequiredByExpert,
+      status: "not_submitted",
+    });
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "追加に失敗しました" };
+  }
+}
+
 // ── 既存申請に必須書類を追加 ───────────────────────────────────────────────────
 export async function addRequiredDocumentsToChecklist(
   applicationId: string

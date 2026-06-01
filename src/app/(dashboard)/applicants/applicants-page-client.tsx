@@ -36,7 +36,7 @@ export function ApplicantsPageClient({ applicants }: { applicants: Applicant[] }
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
         >
           <UserPlus className="w-4 h-4" />
-          申請を新規登録
+          申請人を新規登録
         </button>
       </div>
 
@@ -110,7 +110,7 @@ export function ApplicantsPageClient({ applicants }: { applicants: Applicant[] }
           <div className="w-full max-w-lg">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-white font-semibold text-sm flex items-center gap-1.5">
-                <UserPlus className="w-4 h-4" />申請を新規登録
+                <UserPlus className="w-4 h-4" />申請人を新規登録
               </h2>
               <button
                 onClick={() => setShowModal(false)}

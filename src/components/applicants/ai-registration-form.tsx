@@ -13,13 +13,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-type DocType = "passport_front" | "passport_data_page" | "residence_card_front" | "residence_card_back";
+type DocType = "passport_data_page" | "residence_card";
 
 const DOC_CONFIGS: { type: DocType; label: string; hint: string }[] = [
-  { type: "passport_front",      label: "パスポート（表紙）",        hint: "表紙面" },
-  { type: "passport_data_page",  label: "パスポート（顔写真ページ）", hint: "氏名・番号・有効期限" },
-  { type: "residence_card_front",label: "在留カード（表面）",         hint: "氏名・在留資格" },
-  { type: "residence_card_back", label: "在留カード（裏面）",         hint: "勤務先等" },
+  { type: "passport_data_page", label: "パスポート（顔写真ページ）", hint: "氏名・番号・有効期限" },
+  { type: "residence_card",     label: "在留カード（表面・裏面）",   hint: "両面を含むPDF可" },
 ];
 
 interface UploadedDoc {

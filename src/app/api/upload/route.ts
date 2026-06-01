@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     // documentType が指定されていればDBに一時レコードを保存（applicantId は null）
     let docId: string | null = null;
     if (documentType) {
-      const validTypes = ["passport_front", "passport_data_page", "residence_card_front", "residence_card_back"];
+      const validTypes = ["passport_front", "passport_data_page", "residence_card_front", "residence_card_back", "residence_card"];
       if (validTypes.includes(documentType)) {
         const [doc] = await db.insert(applicantDocuments).values({
           tenantId,

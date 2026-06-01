@@ -11,6 +11,7 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   passport_data_page: "パスポート（顔写真・情報ページ）",
   residence_card_front: "在留カード（表面）",
   residence_card_back: "在留カード（裏面）",
+  residence_card: "在留カード（表面・裏面）",
 };
 
 // Save uploaded document metadata to DB
@@ -75,39 +76,42 @@ export async function deleteApplicantDocument(documentId: string) {
   revalidatePath("/applicants");
 }
 
-// OCR a single document with Gemini
-async function ocrSingleDocument(
-  fileUrl: string,
-  mimeType: string,
-  documentTypeLabel: string
-): Promise<Record<string, any>> {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+// ─── プロンプト生成 ───────────────────────────────────────────────────────────
+function buildPrompt(documentType: string): string {
+  if (documentType === "residence_card" || documentType === "residence_card_front" || documentType === "residence_card_back") {
+    return `あなたは身分証明書のOCR専門家です。
+このファイルは在留カードです。PDFの場合は全ページを確認し、表面・裏面の両方から情報を抽出してください。
 
-  let base64: string;
-  let imageMimeType: string;
+【表面から抽出する項目】
+- surname_ja (姓・漢字)
+- given_name_ja (名・漢字)
+- surname_en (姓・ローマ字)
+- given_name_en (名・ローマ字)
+- nationality (国籍・地域)
+- date_of_birth (生年月日、YYYY-MM-DD形式)
+- gender (性別: M or F)
+- residence_card_number (在留カード番号)
+- status_of_residence (在留資格)
+- period_of_stay (在留期間)
+- date_of_expiry (在留期限、YYYY-MM-DD形式)
+- postal_code (郵便番号、数字7桁のみ。〒マーク不要)
+- address (住居地。郵便番号を除いた住所のみ)
 
-  const supportedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+【裏面から抽出する項目】
+重要: 裏面には住所変更の記録が記載されている場合があります。
+- back_address (変更後の最新住所。「住居地」「新住所」「変更後」などの欄の最新記載。なければnull)
+- back_postal_code (変更後住所の郵便番号、数字7桁のみ。なければnull)
+- workplace (勤務先・所属機関)
+- qualification (資格外活動許可等)
 
-  if (fileUrl.startsWith("data:")) {
-    // データURL: base64部分を直接使用
-    const commaIdx = fileUrl.indexOf(",");
-    base64 = fileUrl.slice(commaIdx + 1);
-    const headerMime = fileUrl.slice(5, commaIdx).split(";")[0];
-    imageMimeType = supportedTypes.includes(headerMime) ? headerMime : "image/jpeg";
-  } else {
-    // HTTP URL: ファイルを取得してBase64に変換
-    const res = await fetch(fileUrl);
-    if (!res.ok) throw new Error(`ファイルの取得に失敗しました: ${fileUrl}`);
-    const arrayBuffer = await res.arrayBuffer();
-    base64 = Buffer.from(arrayBuffer).toString("base64");
-    imageMimeType = supportedTypes.includes(mimeType) ? mimeType : "image/jpeg";
+読み取れなかった項目はnullにしてください。
+JSONのみを返し、説明文は不要です。`;
   }
 
-  const prompt = `あなたは身分証明書のOCR専門家です。
-この画像は「${documentTypeLabel}」です。
+  if (documentType === "passport_data_page" || documentType === "passport_front") {
+    return `あなたは身分証明書のOCR専門家です。
+この画像はパスポートです。以下の項目をすべて抽出してください。
 
-画像から読み取れる全ての情報をJSON形式で抽出してください。
-パスポートの場合は以下の項目を抽出:
 - surname (姓・ファミリーネーム、ローマ字)
 - given_name (名・ファーストネーム、ローマ字)
 - nationality (国籍)
@@ -120,31 +124,48 @@ async function ocrSingleDocument(
 - mrz_line1 (MRZ第1行、読み取れる場合)
 - mrz_line2 (MRZ第2行、読み取れる場合)
 
-在留カード（表面）の場合:
-- surname_ja (姓・漢字)
-- given_name_ja (名・漢字)
-- surname_en (姓・ローマ字)
-- given_name_en (名・ローマ字)
-- nationality (国籍・地域)
-- date_of_birth (生年月日、YYYY-MM-DD形式)
-- gender (性別)
-- residence_card_number (在留カード番号)
-- status_of_residence (在留資格)
-- period_of_stay (在留期間)
-- date_of_expiry (在留期限、YYYY-MM-DD形式)
-- postal_code (郵便番号、数字7桁のみ例:1234567。〒マーク不要。記載があれば抽出)
-- address (住居地。郵便番号を除いた住所のみ)
-
-在留カード（裏面）の場合:
-重要: 在留カード裏面には住所変更の記録が記載されている場合があります。
-- address (変更後の新しい住所。「住居地」「新住所」「変更後」などの欄に記載された最新の住所。記載がない場合はnull)
-- postal_code (変更後住所の郵便番号、数字7桁のみ。記載がない場合はnull)
-- workplace (勤務先・所属機関)
-- qualification (資格外活動許可等)
-- notes (その他備考欄の内容)
-
 読み取れなかった項目はnullにしてください。
 JSONのみを返し、説明文は不要です。`;
+  }
+
+  return `この書類から読み取れる全ての情報をJSON形式で抽出してください。JSONのみを返し、説明文は不要です。`;
+}
+
+// OCR a single document with Gemini
+async function ocrSingleDocument(
+  fileUrl: string,
+  mimeType: string,
+  documentType: string
+): Promise<Record<string, any>> {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+  let base64: string;
+  let fileMimeType: string;
+
+  const supportedImageTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+
+  if (fileUrl.startsWith("data:")) {
+    const commaIdx = fileUrl.indexOf(",");
+    base64 = fileUrl.slice(commaIdx + 1);
+    const headerMime = fileUrl.slice(5, commaIdx).split(";")[0];
+    if (headerMime === "application/pdf") {
+      fileMimeType = "application/pdf";
+    } else {
+      fileMimeType = supportedImageTypes.includes(headerMime) ? headerMime : "image/jpeg";
+    }
+  } else {
+    const res = await fetch(fileUrl);
+    if (!res.ok) throw new Error(`ファイルの取得に失敗しました: ${fileUrl}`);
+    const arrayBuffer = await res.arrayBuffer();
+    base64 = Buffer.from(arrayBuffer).toString("base64");
+    if (mimeType === "application/pdf") {
+      fileMimeType = "application/pdf";
+    } else {
+      fileMimeType = supportedImageTypes.includes(mimeType) ? mimeType : "image/jpeg";
+    }
+  }
+
+  const prompt = buildPrompt(documentType);
 
   let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
   try {
@@ -153,7 +174,7 @@ JSONのみを返し、説明文は不要です。`;
       contents: [
         {
           parts: [
-            { inlineData: { mimeType: imageMimeType, data: base64 } },
+            { inlineData: { mimeType: fileMimeType, data: base64 } },
             { text: prompt },
           ],
         },
@@ -222,11 +243,10 @@ export async function ocrAndFillApplicant(applicantId: string) {
   const docResults: Array<{ id: string; data: Record<string, any> }> = [];
 
   for (const doc of docs) {
-    const label = DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
     const extracted = await ocrSingleDocument(
       doc.fileUrl,
       doc.mimeType ?? "image/jpeg",
-      label
+      doc.documentType
     );
 
     Object.assign(allExtracted, extracted);
@@ -381,8 +401,7 @@ export async function ocrFilesForRegistration(docIds: string[]): Promise<
     const byType: Record<string, Record<string, any>> = {};
 
     for (const doc of docs) {
-      const label = DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
-      const extracted = await ocrSingleDocument(doc.fileUrl, doc.mimeType ?? "image/jpeg", label);
+      const extracted = await ocrSingleDocument(doc.fileUrl, doc.mimeType ?? "image/jpeg", doc.documentType);
       byType[doc.documentType] = extracted;
       Object.assign(allExtracted, extracted);
 
@@ -449,34 +468,55 @@ export async function ocrFilesForRegistration(docIds: string[]): Promise<
     const rcNum = get("residence_card_number", "residenceCardNumber", "card_number");
     if (rcNum) result.residenceCardNumber = rcNum;
 
-    // 在留期限（在留カード表面の date_of_expiry）
-    const rcExpRaw = byType["residence_card_front"]?.date_of_expiry;
+    // 在留期限（在留カード表面 or 統合タイプ の date_of_expiry）
+    const rcExpRaw = byType["residence_card_front"]?.date_of_expiry
+      ?? byType["residence_card"]?.date_of_expiry;
     if (rcExpRaw && rcExpRaw !== "null") result.currentVisaExpiry = String(rcExpRaw);
 
     // ─── 住所・郵便番号の優先処理 ────────────────────────────────────────────
-    // 在留カード裏面に住所変更記録がある場合はそちらが最新
-    const backAddr = byType["residence_card_back"]?.address;
-    const frontAddr = byType["residence_card_front"]?.address;
+    // 統合タイプ（residence_card）: back_address → address の順で最新住所を取得
+    // 分割タイプ（front/back）: 裏面 → 表面の順
+    const cardData = byType["residence_card"];
+    const frontData = byType["residence_card_front"];
+    const backData  = byType["residence_card_back"];
 
     let chosenAddr = "";
     let chosenPostal = "";
 
-    if (backAddr && backAddr !== "null") {
-      // 裏面の住所が最新
-      chosenAddr = String(backAddr);
-      const backPostal = byType["residence_card_back"]?.postal_code;
-      if (backPostal && backPostal !== "null") chosenPostal = String(backPostal);
-      else {
-        const frontPostal = byType["residence_card_front"]?.postal_code;
-        if (frontPostal && frontPostal !== "null") chosenPostal = String(frontPostal);
+    if (cardData) {
+      // 統合PDFの場合: 裏面に住所変更記録があればそちらが最新
+      const backAddr2  = cardData.back_address;
+      const frontAddr2 = cardData.address;
+      if (backAddr2 && backAddr2 !== "null") {
+        chosenAddr = String(backAddr2);
+        const bp = cardData.back_postal_code;
+        if (bp && bp !== "null") chosenPostal = String(bp);
+        else if (cardData.postal_code && cardData.postal_code !== "null") chosenPostal = String(cardData.postal_code);
+        console.log("[OCR] 統合カード・裏面住所を使用:", chosenAddr);
+      } else if (frontAddr2 && frontAddr2 !== "null") {
+        chosenAddr = String(frontAddr2);
+        if (cardData.postal_code && cardData.postal_code !== "null") chosenPostal = String(cardData.postal_code);
+        console.log("[OCR] 統合カード・表面住所を使用:", chosenAddr);
       }
-      console.log("[OCR] 裏面住所を使用:", chosenAddr);
-    } else if (frontAddr && frontAddr !== "null") {
-      // 表面の住所
-      chosenAddr = String(frontAddr);
-      const frontPostal = byType["residence_card_front"]?.postal_code;
-      if (frontPostal && frontPostal !== "null") chosenPostal = String(frontPostal);
-      console.log("[OCR] 表面住所を使用:", chosenAddr);
+    } else {
+      // 分割タイプ: 裏面 → 表面
+      const backAddr  = backData?.address;
+      const frontAddr = frontData?.address;
+      if (backAddr && backAddr !== "null") {
+        chosenAddr = String(backAddr);
+        const backPostal = backData?.postal_code;
+        if (backPostal && backPostal !== "null") chosenPostal = String(backPostal);
+        else {
+          const frontPostal = frontData?.postal_code;
+          if (frontPostal && frontPostal !== "null") chosenPostal = String(frontPostal);
+        }
+        console.log("[OCR] 裏面住所を使用:", chosenAddr);
+      } else if (frontAddr && frontAddr !== "null") {
+        chosenAddr = String(frontAddr);
+        const frontPostal = frontData?.postal_code;
+        if (frontPostal && frontPostal !== "null") chosenPostal = String(frontPostal);
+        console.log("[OCR] 表面住所を使用:", chosenAddr);
+      }
     }
 
     result.japanAddress = chosenAddr;

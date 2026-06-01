@@ -685,9 +685,27 @@ export async function saveChecklistDocumentAndOcr(
       base64 = fileUrl.slice(commaIdx + 1);
       imageMimeType = fileUrl.slice(5, commaIdx).split(";")[0];
     } else {
-      const res = await fetch(fileUrl);
-      if (!res.ok) throw new Error("ファイルの取得に失敗しました");
-      const buf = await res.arrayBuffer();
+      // Vercel Blob URL など外部 URL からファイルを取得
+      // 失敗してもアップロード自体は成功扱いにする（OCR のみスキップ）
+      let fetchRes: Response;
+      try {
+        fetchRes = await fetch(fileUrl, { signal: AbortSignal.timeout(15000) });
+      } catch (fetchErr: any) {
+        console.error("[OCR] Blob fetch failed:", fetchErr?.message);
+        // ファイル保存は成功済み。OCR のみスキップして正常終了
+        const [item2] = await db.select({ applicationId: applicationDocumentChecklist.applicationId })
+          .from(applicationDocumentChecklist).where(eq(applicationDocumentChecklist.id, checklistItemId)).limit(1);
+        if (item2) revalidatePath(`/applications/${item2.applicationId}`);
+        return { success: true };
+      }
+      if (!fetchRes.ok) {
+        console.error("[OCR] Blob fetch not ok:", fetchRes.status);
+        const [item2] = await db.select({ applicationId: applicationDocumentChecklist.applicationId })
+          .from(applicationDocumentChecklist).where(eq(applicationDocumentChecklist.id, checklistItemId)).limit(1);
+        if (item2) revalidatePath(`/applications/${item2.applicationId}`);
+        return { success: true }; // OCR のみスキップ
+      }
+      const buf = await fetchRes.arrayBuffer();
       base64 = Buffer.from(buf).toString("base64");
       imageMimeType = mimeType;
     }

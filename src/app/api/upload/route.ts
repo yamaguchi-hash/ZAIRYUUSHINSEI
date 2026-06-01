@@ -19,7 +19,13 @@ const EXT_TO_MIME: Record<string, string> = {
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
+  // auth() は JWT 検証失敗等で throw することがあるため try-catch で保護
+  let session;
+  try {
+    session = await auth();
+  } catch {
+    return NextResponse.json({ error: "認証エラーが発生しました。再ログインしてください。" }, { status: 401 });
+  }
   if (!session?.user) {
     return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
   }

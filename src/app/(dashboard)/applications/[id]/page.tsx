@@ -60,18 +60,27 @@ export default async function ApplicationDetailPage({
   let data;
   try {
     data = await getApplicationById(id);
-  } catch {
+  } catch (e) {
+    console.error("[ApplicationDetailPage] getApplicationById failed:", e);
     notFound();
   }
+
+  // data が取れなかった場合は notFound() が throw するので、ここには到達しない
+  if (!data) notFound();
 
   const { application, applicant, organization, checklist, questionnaire } = data;
   const checkResult = application.consistencyCheckResult as any;
 
   // 書類マスター取得（ビザ種別・申請種別でフィルタ）
-  const masterDocuments = await getDocumentRequirements(
-    application.visaType,
-    application.applicationType
-  );
+  let masterDocuments: Awaited<ReturnType<typeof getDocumentRequirements>> = [];
+  try {
+    masterDocuments = await getDocumentRequirements(
+      application.visaType,
+      application.applicationType
+    );
+  } catch (e) {
+    console.error("[ApplicationDetailPage] getDocumentRequirements failed:", e);
+  }
   const issues = checkResult?.issues ?? [];
 
   const currentStepIndex = WORKFLOW_STEPS.findIndex((s) => s.key === application.status);

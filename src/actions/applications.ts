@@ -78,8 +78,34 @@ export async function getApplicationById(id: string) {
     : null;
 
   const checklist = await db
-    .select()
+    .select({
+      id:                    applicationDocumentChecklist.id,
+      applicationId:         applicationDocumentChecklist.applicationId,
+      documentRequirementId: applicationDocumentChecklist.documentRequirementId,
+      documentName:          applicationDocumentChecklist.documentName,
+      isRequiredByExpert:    applicationDocumentChecklist.isRequiredByExpert,
+      status:                applicationDocumentChecklist.status,
+      fileUrl:               applicationDocumentChecklist.fileUrl,
+      fileName:              applicationDocumentChecklist.fileName,
+      fileSize:              applicationDocumentChecklist.fileSize,
+      mimeType:              applicationDocumentChecklist.mimeType,
+      ocrExtractedData:      applicationDocumentChecklist.ocrExtractedData,
+      expertNotes:           applicationDocumentChecklist.expertNotes,
+      submittedAt:           applicationDocumentChecklist.submittedAt,
+      reviewedAt:            applicationDocumentChecklist.reviewedAt,
+      reviewedBy:            applicationDocumentChecklist.reviewedBy,
+      createdAt:             applicationDocumentChecklist.createdAt,
+      updatedAt:             applicationDocumentChecklist.updatedAt,
+      // マスターから留意事項・条件を取得
+      masterDescription:     documentRequirementMaster.description,
+      masterConditions:      documentRequirementMaster.conditions,
+      masterIsAlwaysRequired: documentRequirementMaster.isAlwaysRequired,
+    })
     .from(applicationDocumentChecklist)
+    .leftJoin(
+      documentRequirementMaster,
+      eq(applicationDocumentChecklist.documentRequirementId, documentRequirementMaster.id)
+    )
     .where(eq(applicationDocumentChecklist.applicationId, id))
     .orderBy(applicationDocumentChecklist.createdAt);
 

@@ -370,7 +370,9 @@ function CategoryGroup({
                     <span className="text-xs text-red-500 font-medium">必須</span>
                   )}
                   {doc.description && (
-                    <span className="text-xs text-gray-400 block mt-0.5">{doc.description}</span>
+                    <span className="text-xs text-blue-600 block mt-0.5 leading-relaxed">
+                      ℹ {doc.description}
+                    </span>
                   )}
                 </span>
                 {isAdded && <span className="text-xs text-green-600 flex-shrink-0 mt-0.5">追加済</span>}

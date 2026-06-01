@@ -28,6 +28,8 @@ interface ChecklistItem {
   fileName: string | null;
   expertNotes: string | null;
   ocrExtractedData?: Record<string, any> | null;
+  /** マスターの留意事項（description フィールド） */
+  masterDescription?: string | null;
 }
 
 interface DocumentChecklistProps {
@@ -462,7 +464,14 @@ export function DocumentChecklist({
                         <span className="ml-2 text-xs text-red-500 font-normal">必須</span>
                       )}
                     </p>
-                    {/* 備考（インライン編集） */}
+                    {/* 留意事項（マスターから自動表示） */}
+                    {item.masterDescription && (
+                      <p className="text-xs text-blue-600 mt-0.5 leading-relaxed">
+                        ℹ {item.masterDescription}
+                      </p>
+                    )}
+
+                    {/* 備考（専門家によるインライン編集） */}
                     {editingNotesId === item.id ? (
                       <div className="flex items-center gap-1 mt-1">
                         <input
@@ -495,7 +504,7 @@ export function DocumentChecklist({
                     ) : (
                       <div className="flex items-center gap-1 mt-0.5 group/notes">
                         {item.expertNotes ? (
-                          <p className="text-xs text-orange-600">{item.expertNotes}</p>
+                          <p className="text-xs text-orange-600">📝 {item.expertNotes}</p>
                         ) : (
                           <p className="text-xs text-gray-300 hidden group-hover/notes:block">備考を追加...</p>
                         )}

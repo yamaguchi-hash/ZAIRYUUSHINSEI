@@ -360,6 +360,7 @@ export default async function ApplicationDetailPage({
             fileName: c.fileName,
             expertNotes: c.expertNotes,
             ocrExtractedData: (c.ocrExtractedData ?? null) as Record<string, any> | null,
+            masterDescription: (c as any).masterDescription ?? null,
           }))}
           applicationId={application.id}
           userRole={userRole}

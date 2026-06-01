@@ -77,11 +77,7 @@ export async function getApplicationById(id: string) {
         .then((r) => r[0])
     : null;
 
-  // ── NOTE: fileUrl が data: URL の場合は巨大な base64 文字列になり
-  //          RSC シリアライズサイズ制限を超えてエラーになるため、
-  //          data: URL はプレースホルダー "(data)" に置換して返す。
-  //          実際のファイル内容は個別アクションで取得する。
-  const { sql: sqlExpr } = await import("drizzle-orm");
+  // ── チェックリスト取得（LEFT JOIN でマスターの留意事項も取得）
   const rawChecklist = await db
     .select({
       id:                    applicationDocumentChecklist.id,
@@ -90,8 +86,7 @@ export async function getApplicationById(id: string) {
       documentName:          applicationDocumentChecklist.documentName,
       isRequiredByExpert:    applicationDocumentChecklist.isRequiredByExpert,
       status:                applicationDocumentChecklist.status,
-      // data: URL は "(data)" プレースホルダーに置換（RSCペイロード肥大化防止）
-      fileUrl:  sqlExpr<string | null>`CASE WHEN ${applicationDocumentChecklist.fileUrl} LIKE 'data:%' THEN '(data)' ELSE ${applicationDocumentChecklist.fileUrl} END`,
+      fileUrl:               applicationDocumentChecklist.fileUrl,
       fileName:              applicationDocumentChecklist.fileName,
       fileSize:              applicationDocumentChecklist.fileSize,
       mimeType:              applicationDocumentChecklist.mimeType,
@@ -113,8 +108,12 @@ export async function getApplicationById(id: string) {
     .where(eq(applicationDocumentChecklist.applicationId, id))
     .orderBy(applicationDocumentChecklist.createdAt);
 
-  // "(data)" プレースホルダーはファイルあり扱いにする（表示・差し替えは別途取得）
-  const checklist = rawChecklist;
+  // ── data: URL は RSC シリアライズサイズ制限を超えるため "(data)" に置換
+  //    Vercel Blob 未設定時にファイルが base64 として DB に保存される場合の対策
+  const checklist = rawChecklist.map((item) => ({
+    ...item,
+    fileUrl: item.fileUrl?.startsWith("data:") ? "(data)" : (item.fileUrl ?? null),
+  }));
 
   const questionnaire = await db
     .select()

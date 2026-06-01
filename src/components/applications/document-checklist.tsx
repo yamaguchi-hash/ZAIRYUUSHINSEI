@@ -553,25 +553,29 @@ export function DocumentChecklist({
                   !item.isRequiredByExpert && "opacity-60"
                 )}
               >
-                {/* 追加枠は上段を省略して枠番号のみ表示 */}
+                {/* 追加枠はラベル＋削除ボタン＋アップロードゾーンを表示（書類名等の上段は省略） */}
                 {isAddedSlot ? (
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs text-gray-400 font-medium">
-                      {groupInfo!.index + 1}枚目
-                    </span>
-                    {/* 追加枠の削除ボタン */}
-                    {isExpert && (
-                      <button
-                        onClick={async () => {
-                          await removeDocumentFromChecklist(item.id);
-                          setLocalChecklist(prev => prev.filter(i => i.id !== item.id));
-                        }}
-                        className="text-xs text-red-400 hover:text-red-600 underline"
-                        title="この枠を削除"
-                      >
-                        この枠を削除
-                      </button>
-                    )}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-xs text-gray-500 font-medium">
+                        {groupInfo!.index + 1}枚目
+                      </span>
+                      {/* 追加枠の削除ボタン（ファイル未アップロード時のみ） */}
+                      {!item.fileUrl && isExpert && (
+                        <button
+                          onClick={async () => {
+                            await removeDocumentFromChecklist(item.id);
+                            setLocalChecklist(prev => prev.filter(i => i.id !== item.id));
+                          }}
+                          className="text-xs text-red-400 hover:text-red-600 underline"
+                          title="この枠を削除"
+                        >
+                          この枠を削除
+                        </button>
+                      )}
+                    </div>
+                    {/* アップロードゾーン（追加枠にも必要） */}
+                    <ChecklistItemUpload item={item} onUploaded={handleUploaded} onCleared={handleCleared} />
                   </div>
                 ) : (
                 <>

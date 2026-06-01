@@ -372,6 +372,71 @@ export interface ApplicationFormData {
   orgPlacementProviderLicenseNo: string;
   orgPlacementProviderLicenseDate: string;
 
+  // 派遣先（Item 2 (12) — V型用詳細）
+  orgVDispatchName: string;            // 氏名又は名称
+  orgVDispatchCorporateNo: string;     // 法人番号（13桁）
+  orgVDispatchInsuranceNo: string;     // 雇用保険適用事業所番号
+  orgVDispatchAddress: string;         // 住所（所在地）
+  orgVDispatchPhone: string;           // 電話番号
+  orgVDispatchRepresentative: string;  // 代表者の氏名
+  orgVDispatchStartDate: string;       // 派遣期間（始）
+  orgVDispatchEndDate: string;         // 派遣期間（終）
+
+  // 取次機関（Item 2 (14) — V2シート）
+  orgIntermediaryName: string;         // 氏名又は名称
+  orgIntermediaryAddress: string;      // 住所（所在地）
+  orgIntermediaryPhone: string;        // 電話番号
+
+  // 所属機関コンプライアンス確認 — V2シート (11)〜(21)
+  orgLaborLawViolation: string;        // (11) 労働・社会保険・租税法令違反の有無
+  orgLaborLawViolationDetail: string;  // (11) 詳細
+  orgInvoluntaryDismissal: string;     // (12) 非自発的離職の有無
+  orgInvoluntaryDismissalDetail: string;
+  orgMissingPerson: string;            // (13) 行方不明者を発生させたことの有無
+  orgMissingPersonDetail: string;
+  orgCriminalPunishment: string;       // (14) 刑事処分（刑罰）の有無
+  orgCriminalPunishmentDetail: string;
+  orgMentalDisability: string;         // (15) 精神の機能の障害による欠格の有無
+  orgMentalDisabilityDetail: string;
+  orgBankruptcy: string;               // (16) 破産手続開始の有無
+  orgBankruptcyDetail: string;
+  orgTrainingRevoked: string;          // (17) 実習認定取消の有無
+  orgTrainingRevokedDetail: string;
+  orgWasOfficerOfRevoked: string;      // (18) 実習認定取消法人の役員であった有無
+  orgWasOfficerOfRevokedDetail: string;
+  orgIllegalActFiveYears: string;      // (19) 出入国・労働法令上の不正行為（5年以内）
+  orgIllegalActFiveYearsDetail: string;
+  orgGangsterMember: string;           // (20) 暴力団員（現在または5年以内）
+  orgGangsterMemberDetail: string;
+  orgLegalAgentViolation: string;      // (21) 法定代理人が(14)〜(20)に該当（未成年の場合）
+  orgLegalAgentViolationDetail: string;
+
+  // 所属機関追加コンプライアンス — V3シート (22)〜(33)
+  orgGangsterControl: string;          // (22) 暴力団員等に事業活動を支配される者か
+  orgGangsterControlDetail: string;
+  orgActivityDocumentKept: string;     // (23) 活動内容文書の作成・1年以上保管
+  orgAwareOfDeposit: string;           // (24) 保証金・財産管理等契約を認識しての締結
+  orgAwareOfDepositDetail: string;
+  orgPenaltyContractExists: string;    // (25) 不履行についての違約金支払契約の有無
+  orgPenaltyContractDetail: string;
+  orgSupportCostNotBurdened: string;   // (26) 支援費用を外国人に負担させないこと（1号）
+  orgDispatchMeetsCondition: string;   // (27) 派遣先が法定要件のいずれかに該当
+  orgDispatchConditionDetail: string;
+  orgDispatchMeetsCompliance: string;  // (28) 派遣先が(11)〜(22)に該当しないこと
+  orgDispatchComplianceDetail: string;
+  orgAccidentInsurance: string;        // (29) 労災保険加入等の措置
+  orgAccidentInsuranceDetail: string;
+  orgContinuousPerformance: string;    // (30) 特定技能雇用契約を継続して履行する体制
+  orgSalaryPaymentVerifiable: string;  // (31) 報酬の支払を客観的方法で確認できること
+  orgCoexistenceCooperation: string;   // (32) 共生社会施策への協力・協力確認書提出
+  orgCoexistenceWorkplaceCity: string; // (32) 勤務地市区町村への協力確認書提出日
+  orgCoexistenceWorkplaceCityDate: string;
+  orgCoexistenceWorkplaceCityName: string;
+  orgCoexistenceResidenceCity: string; // (32) 住居地市区町村への協力確認書提出日
+  orgCoexistenceResidenceCityDate: string;
+  orgCoexistenceResidenceCityName: string;
+  orgFieldSpecificContractCriteria: string; // (33) 分野別雇用契約適正履行基準への適合
+
   // 特定技能１号支援計画（特定技能１号の場合のみ）
   // 支援責任者・支援担当者
   supportManagerName: string;         // 支援責任者氏名
@@ -549,6 +614,39 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   orgPlacementProviderName: '', orgPlacementProviderCorporateNo: '', orgPlacementProviderInsuranceNo: '',
   orgPlacementProviderAddress: '', orgPlacementProviderPhone: '',
   orgPlacementProviderLicenseNo: '', orgPlacementProviderLicenseDate: '',
+  // V型 派遣先詳細
+  orgVDispatchName: '', orgVDispatchCorporateNo: '', orgVDispatchInsuranceNo: '',
+  orgVDispatchAddress: '', orgVDispatchPhone: '', orgVDispatchRepresentative: '',
+  orgVDispatchStartDate: '', orgVDispatchEndDate: '',
+  // V型 取次機関
+  orgIntermediaryName: '', orgIntermediaryAddress: '', orgIntermediaryPhone: '',
+  // V型 機関コンプライアンス (11)〜(21)
+  orgLaborLawViolation: '無', orgLaborLawViolationDetail: '',
+  orgInvoluntaryDismissal: '無', orgInvoluntaryDismissalDetail: '',
+  orgMissingPerson: '無', orgMissingPersonDetail: '',
+  orgCriminalPunishment: '無', orgCriminalPunishmentDetail: '',
+  orgMentalDisability: '無', orgMentalDisabilityDetail: '',
+  orgBankruptcy: '無', orgBankruptcyDetail: '',
+  orgTrainingRevoked: '無', orgTrainingRevokedDetail: '',
+  orgWasOfficerOfRevoked: '無', orgWasOfficerOfRevokedDetail: '',
+  orgIllegalActFiveYears: '無', orgIllegalActFiveYearsDetail: '',
+  orgGangsterMember: '無', orgGangsterMemberDetail: '',
+  orgLegalAgentViolation: '無', orgLegalAgentViolationDetail: '',
+  // V型 追加コンプライアンス (22)〜(33)
+  orgGangsterControl: '無', orgGangsterControlDetail: '',
+  orgActivityDocumentKept: '有',
+  orgAwareOfDeposit: '無', orgAwareOfDepositDetail: '',
+  orgPenaltyContractExists: '無', orgPenaltyContractDetail: '',
+  orgSupportCostNotBurdened: '有',
+  orgDispatchMeetsCondition: '無', orgDispatchConditionDetail: '',
+  orgDispatchMeetsCompliance: '無', orgDispatchComplianceDetail: '',
+  orgAccidentInsurance: '有', orgAccidentInsuranceDetail: '',
+  orgContinuousPerformance: '有',
+  orgSalaryPaymentVerifiable: '有',
+  orgCoexistenceCooperation: '有',
+  orgCoexistenceWorkplaceCity: '有', orgCoexistenceWorkplaceCityDate: '', orgCoexistenceWorkplaceCityName: '',
+  orgCoexistenceResidenceCity: '有', orgCoexistenceResidenceCityDate: '', orgCoexistenceResidenceCityName: '',
+  orgFieldSpecificContractCriteria: '有',
   supportManagerName: '', supportManagerTitle: '', supportStaffName: '', supportStaffTitle: '',
   rsoName: '', rsoCorporateNo: '', rsoInsuranceNo: '', rsoAddress: '', rsoPhone: '',
   rsoRepresentative: '', rsoRegNo: '', rsoRegDate: '',

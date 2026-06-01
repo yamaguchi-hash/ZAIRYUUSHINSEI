@@ -1345,6 +1345,29 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 </CardContent>
               </Card>
 
+              {/* ── 28. 職歴（V型 Part 3 V） ──────────────────────────── */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">28. 職歴（外国におけるものを含む）</CardTitle>
+                    <button onClick={addWorkHistory} className="inline-flex items-center gap-1 text-xs text-blue-600 border border-blue-200 rounded px-2 py-1 hover:bg-blue-50"><Plus className="w-3 h-3" />追加</button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {(form.workHistory ?? []).map((w, idx) => (
+                    <div key={idx} className="grid grid-cols-3 gap-2 items-end">
+                      <Field label={`${idx + 1}. 入社年月`}><input className={inputCls} type="month" value={w.joinDate} onChange={e => updateWorkHistory(idx, "joinDate", e.target.value)} /></Field>
+                      <Field label="退社年月（在職中は空欄）"><input className={inputCls} type="month" value={w.leaveDate} onChange={e => updateWorkHistory(idx, "leaveDate", e.target.value)} /></Field>
+                      <div className="flex gap-1">
+                        <div className="flex-1"><Field label="勤務先名称"><input className={inputCls} value={w.employer} onChange={e => updateWorkHistory(idx, "employer", e.target.value)} /></Field></div>
+                        <button onClick={() => removeWorkHistory(idx)} className="mb-1 text-gray-300 hover:text-red-500 self-end"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  ))}
+                  {(form.workHistory ?? []).length === 0 && <p className="text-sm text-gray-400 text-center py-2">「追加」で職歴を入力してください</p>}
+                </CardContent>
+              </Card>
+
               {/* ── 所属機関 Part 1 V — 特定技能雇用契約 ─────────────── */}
               <Card>
                 <CardHeader>
@@ -1408,6 +1431,180 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       </div>
                     </div>
                   ))}
+                </CardContent>
+              </Card>
+
+              {/* ── (12) 派遣先（V型・労働者派遣の場合） ────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">(12) 派遣先（労働者派遣の対象とする場合に記入）</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="氏名又は名称"><input className={inputCls} value={form.orgVDispatchName} onChange={e => set("orgVDispatchName", e.target.value)} /></Field>
+                    <Field label="法人番号（13桁）"><input className={inputCls} value={form.orgVDispatchCorporateNo} onChange={e => set("orgVDispatchCorporateNo", e.target.value)} maxLength={13} /></Field>
+                  </div>
+                  <Field label="雇用保険適用事業所番号（11桁）"><input className={inputCls} value={form.orgVDispatchInsuranceNo} onChange={e => set("orgVDispatchInsuranceNo", e.target.value)} /></Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="住所（所在地）"><input className={inputCls} value={form.orgVDispatchAddress} onChange={e => set("orgVDispatchAddress", e.target.value)} /></Field>
+                    <Field label="電話番号"><input className={inputCls} value={form.orgVDispatchPhone} onChange={e => set("orgVDispatchPhone", e.target.value)} /></Field>
+                  </div>
+                  <Field label="代表者の氏名"><input className={inputCls} value={form.orgVDispatchRepresentative} onChange={e => set("orgVDispatchRepresentative", e.target.value)} /></Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="派遣期間（開始）"><input className={inputCls} type="date" value={form.orgVDispatchStartDate} onChange={e => set("orgVDispatchStartDate", e.target.value)} /></Field>
+                    <Field label="派遣期間（終了）"><input className={inputCls} type="date" value={form.orgVDispatchEndDate} onChange={e => set("orgVDispatchEndDate", e.target.value)} /></Field>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ── (13) 職業紹介事業者 ──────────────────────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">(13) 職業紹介事業者（特定技能雇用契約の締結をあっせんした場合）</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="氏名又は名称"><input className={inputCls} value={form.orgPlacementProviderName} onChange={e => set("orgPlacementProviderName", e.target.value)} /></Field>
+                    <Field label="法人番号（13桁）"><input className={inputCls} value={form.orgPlacementProviderCorporateNo} onChange={e => set("orgPlacementProviderCorporateNo", e.target.value)} maxLength={13} /></Field>
+                  </div>
+                  <Field label="雇用保険適用事業所番号（11桁）"><input className={inputCls} value={form.orgPlacementProviderInsuranceNo} onChange={e => set("orgPlacementProviderInsuranceNo", e.target.value)} /></Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="住所（所在地）"><input className={inputCls} value={form.orgPlacementProviderAddress} onChange={e => set("orgPlacementProviderAddress", e.target.value)} /></Field>
+                    <Field label="電話番号"><input className={inputCls} value={form.orgPlacementProviderPhone} onChange={e => set("orgPlacementProviderPhone", e.target.value)} /></Field>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="許可・届出番号"><input className={inputCls} value={form.orgPlacementProviderLicenseNo} onChange={e => set("orgPlacementProviderLicenseNo", e.target.value)} /></Field>
+                    <Field label="受理年月日"><input className={inputCls} type="date" value={form.orgPlacementProviderLicenseDate} onChange={e => set("orgPlacementProviderLicenseDate", e.target.value)} /></Field>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ── (14) 取次機関 ─────────────────────────────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">(14) 取次機関（職業紹介事業者があっせん時に情報の取次ぎをする者がある場合）</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Field label="氏名又は名称"><input className={inputCls} value={form.orgIntermediaryName} onChange={e => set("orgIntermediaryName", e.target.value)} /></Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="住所（所在地）"><input className={inputCls} value={form.orgIntermediaryAddress} onChange={e => set("orgIntermediaryAddress", e.target.value)} /></Field>
+                    <Field label="電話番号"><input className={inputCls} value={form.orgIntermediaryPhone} onChange={e => set("orgIntermediaryPhone", e.target.value)} /></Field>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ── 所属機関コンプライアンス確認 (11)〜(21) ─────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">所属機関等 コンプライアンス確認（項目(11)〜(21)）</CardTitle>
+                  <p className="text-xs text-gray-500 mt-1">「有」の場合は内容・該当者名を記入してください</p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {[
+                    { hasKey: "orgLaborLawViolation" as const, detailKey: "orgLaborLawViolationDetail" as const, label: "(11) 労働・社会保険・租税法令に違反したことの有無" },
+                    { hasKey: "orgInvoluntaryDismissal" as const, detailKey: "orgInvoluntaryDismissalDetail" as const, label: "(12) 特定技能雇用契約締結前1年以内または締結後に同種業務労働者を非自発的に離職させたことの有無" },
+                    { hasKey: "orgMissingPerson" as const, detailKey: "orgMissingPersonDetail" as const, label: "(13) 特定技能雇用契約締結前1年以内または締結後に外国人の行方不明者を発生させたことの有無" },
+                    { hasKey: "orgCriminalPunishment" as const, detailKey: "orgCriminalPunishmentDetail" as const, label: "(14) 特定技能所属機関・役員・支援責任者・支援担当者が法令違反により刑に処せられたことの有無" },
+                    { hasKey: "orgMentalDisability" as const, detailKey: "orgMentalDisabilityDetail" as const, label: "(15) 精神の機能の障害を有することの有無（適正な履行に影響するもの）" },
+                    { hasKey: "orgBankruptcy" as const, detailKey: "orgBankruptcyDetail" as const, label: "(16) 破産手続開始の決定を受けて復権を得ないことの有無" },
+                    { hasKey: "orgTrainingRevoked" as const, detailKey: "orgTrainingRevokedDetail" as const, label: "(17) 技能実習法第16条第1項により実習認定を取り消されたことの有無" },
+                    { hasKey: "orgWasOfficerOfRevoked" as const, detailKey: "orgWasOfficerOfRevokedDetail" as const, label: "(18) 実習認定取消法人の役員であったことの有無" },
+                    { hasKey: "orgIllegalActFiveYears" as const, detailKey: "orgIllegalActFiveYearsDetail" as const, label: "(19) 特定技能雇用契約締結前5年以内または締結後に出入国・労働法令で不正または著しく不当な行為をしたことの有無" },
+                    { hasKey: "orgGangsterMember" as const, detailKey: "orgGangsterMemberDetail" as const, label: "(20) 暴力団員であること、または5年以内に暴力団員であったことの有無" },
+                    { hasKey: "orgLegalAgentViolation" as const, detailKey: "orgLegalAgentViolationDetail" as const, label: "(21) 法定代理人が(14)〜(20)に該当すること（未成年の場合のみ記入）" },
+                  ].map(({ hasKey, detailKey, label }) => (
+                    <div key={hasKey} className="border rounded-lg p-3 bg-gray-50">
+                      <p className="text-xs font-medium text-gray-700 mb-2">{label}</p>
+                      <div className="flex gap-4 mb-2">
+                        {["有", "無"].map(o => (
+                          <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                            <input type="radio" name={hasKey} value={o} checked={form[hasKey] === o} onChange={() => set(hasKey, o)} />
+                            {o}
+                          </label>
+                        ))}
+                      </div>
+                      {form[hasKey] === "有" && (
+                        <input className={inputCls} value={form[detailKey]} onChange={e => set(detailKey, e.target.value)} placeholder="内容・該当者名を記入" />
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* ── 追加コンプライアンス確認 (22)〜(33) ─────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">所属機関等 追加確認事項（項目(22)〜(33)）</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* (22) 暴力団支配 */}
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-700 mb-2">(22) 暴力団員または5年以内に暴力団員であった者がその事業活動を支配する者であることの有無</p>
+                    <div className="flex gap-4 mb-2">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="orgGangsterControl" value={o} checked={form.orgGangsterControl === o} onChange={() => set("orgGangsterControl", o)} />{o}</label>)}
+                    </div>
+                    {form.orgGangsterControl === "有" && <input className={inputCls} value={form.orgGangsterControlDetail} onChange={e => set("orgGangsterControlDetail", e.target.value)} placeholder="内容" />}
+                  </div>
+                  {/* 単純 有/無 項目 */}
+                  {[
+                    { key: "orgActivityDocumentKept" as const, label: "(23) 外国人の活動内容に関する文書を作成し、雇用契約終了日から1年以上備えて置くこととしていることの有無" },
+                    { key: "orgSupportCostNotBurdened" as const, label: "(26) 1号特定技能外国人支援に要する費用を直接・間接に外国人に負担させないこととしていることの有無（1号の場合に記入）" },
+                    { key: "orgContinuousPerformance" as const, label: "(30) 特定技能雇用契約を継続して履行する体制が適切に整備されていることの有無" },
+                    { key: "orgSalaryPaymentVerifiable" as const, label: "(31) 報酬の額が口座振込その他客観的に確認できる方法で支払われることとしていることの有無" },
+                    { key: "orgFieldSpecificContractCriteria" as const, label: "(33) 特定産業分野に特有の事情に鑑みた雇用契約適正履行確保の基準に適合していることの有無（基準が定められている場合に記入）" },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="border rounded-lg p-2 bg-gray-50">
+                      <p className="text-xs font-medium text-gray-700 mb-1">{label}</p>
+                      <div className="flex gap-4">
+                        {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name={key} value={o} checked={form[key] === o} onChange={() => set(key, o)} />{o}</label>)}
+                      </div>
+                    </div>
+                  ))}
+                  {/* (24)(25) 保証金・違約金 */}
+                  {[
+                    { hasKey: "orgAwareOfDeposit" as const, detailKey: "orgAwareOfDepositDetail" as const, label: "(24) 保証金の徴収その他財産管理または違約金等の支払契約があることを認識して特定技能雇用契約を締結していることの有無" },
+                    { hasKey: "orgPenaltyContractExists" as const, detailKey: "orgPenaltyContractDetail" as const, label: "(25) 特定技能雇用契約の不履行について違約金等の支払契約を締結していることの有無" },
+                    { hasKey: "orgAccidentInsurance" as const, detailKey: "orgAccidentInsuranceDetail" as const, label: "(29) 労災保険加入等の措置の有無" },
+                  ].map(({ hasKey, detailKey, label }) => (
+                    <div key={hasKey} className="border rounded-lg p-3 bg-gray-50">
+                      <p className="text-xs font-medium text-gray-700 mb-2">{label}</p>
+                      <div className="flex gap-4 mb-2">
+                        {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name={hasKey} value={o} checked={form[hasKey] === o} onChange={() => set(hasKey, o)} />{o}</label>)}
+                      </div>
+                      {form[hasKey] === "有" && <input className={inputCls} value={form[detailKey]} onChange={e => set(detailKey, e.target.value)} placeholder="内容" />}
+                    </div>
+                  ))}
+                  {/* (32) 共生社会施策への協力 */}
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-700 mb-2">(32) 共生社会関係施策への協力・市区町村への協力確認書の提出</p>
+                    <div className="flex gap-4 mb-3">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="orgCoexistenceCooperation" value={o} checked={form.orgCoexistenceCooperation === o} onChange={() => set("orgCoexistenceCooperation", o)} />{o}</label>)}
+                    </div>
+                    {form.orgCoexistenceCooperation === "有" && (
+                      <div className="space-y-2 pl-3 border-l-2 border-blue-200">
+                        <p className="text-xs font-medium text-gray-600">勤務先事業所所在地の市区町村への協力確認書</p>
+                        <div className="flex gap-4 mb-2">
+                          {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="radio" name="orgCoexistenceWorkplaceCity" value={o} checked={form.orgCoexistenceWorkplaceCity === o} onChange={() => set("orgCoexistenceWorkplaceCity", o)} />{o}</label>)}
+                        </div>
+                        {form.orgCoexistenceWorkplaceCity === "有" && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <Field label="提出年月日"><input className={inputCls} type="date" value={form.orgCoexistenceWorkplaceCityDate} onChange={e => set("orgCoexistenceWorkplaceCityDate", e.target.value)} /></Field>
+                            <Field label="提出先市区町村名"><input className={inputCls} value={form.orgCoexistenceWorkplaceCityName} onChange={e => set("orgCoexistenceWorkplaceCityName", e.target.value)} placeholder="例: 大阪市" /></Field>
+                          </div>
+                        )}
+                        <p className="text-xs font-medium text-gray-600 mt-2">外国人住居地の市区町村への協力確認書</p>
+                        <div className="flex gap-4 mb-2">
+                          {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="radio" name="orgCoexistenceResidenceCity" value={o} checked={form.orgCoexistenceResidenceCity === o} onChange={() => set("orgCoexistenceResidenceCity", o)} />{o}</label>)}
+                        </div>
+                        {form.orgCoexistenceResidenceCity === "有" && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <Field label="提出年月日"><input className={inputCls} type="date" value={form.orgCoexistenceResidenceCityDate} onChange={e => set("orgCoexistenceResidenceCityDate", e.target.value)} /></Field>
+                            <Field label="提出先市区町村名"><input className={inputCls} value={form.orgCoexistenceResidenceCityName} onChange={e => set("orgCoexistenceResidenceCityName", e.target.value)} placeholder="例: 大阪市" /></Field>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 

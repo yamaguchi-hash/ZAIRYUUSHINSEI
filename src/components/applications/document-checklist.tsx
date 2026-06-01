@@ -43,12 +43,17 @@ interface DocumentChecklistProps {
   applicationStatus: string;
 }
 
-const STATUS_ICONS: Record<string, React.ReactNode> = {
-  not_submitted: <Clock className="w-4 h-4 text-gray-400" />,
-  submitted:     <CheckCircle className="w-4 h-4 text-blue-500" />,
-  approved:      <CheckCircle className="w-4 h-4 text-green-500" />,
-  resubmit_required: <AlertCircle className="w-4 h-4 text-red-500" />,
-};
+// STATUS_ICONS はモジュールレベルに置かずコンポーネント内で生成する関数にする
+// （React 19 での hydration mismatch を防ぐため）
+function getStatusIcon(status: string): React.ReactNode {
+  switch (status) {
+    case "not_submitted":     return <Clock className="w-4 h-4 text-gray-400" />;
+    case "submitted":         return <CheckCircle className="w-4 h-4 text-blue-500" />;
+    case "approved":          return <CheckCircle className="w-4 h-4 text-green-500" />;
+    case "resubmit_required": return <AlertCircle className="w-4 h-4 text-red-500" />;
+    default:                  return <Clock className="w-4 h-4 text-gray-400" />;
+  }
+}
 const STATUS_LABELS: Record<string, string> = {
   not_submitted: "未提出",
   submitted:     "提出済",
@@ -522,7 +527,7 @@ export function DocumentChecklist({
 
                   {/* ステータス */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {STATUS_ICONS[item.status]}
+                    {getStatusIcon(item.status)}
                     <span className="text-xs text-gray-500 hidden sm:block">{STATUS_LABELS[item.status]}</span>
                   </div>
 

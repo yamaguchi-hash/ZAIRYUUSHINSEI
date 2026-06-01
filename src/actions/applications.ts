@@ -91,7 +91,6 @@ export async function getApplicationById(id: string) {
   ];
   const masterDescMap: Record<string, string | null> = {};
   if (requirementIds.length > 0) {
-    const { inArray } = await import("drizzle-orm");
     const masters = await db
       .select({ id: documentRequirementMaster.id, description: documentRequirementMaster.description })
       .from(documentRequirementMaster)
@@ -123,7 +122,12 @@ export async function getApplicationById(id: string) {
       ? (masterDescMap[item.documentRequirementId] ?? null)
       : null,
     // Date オブジェクトは文字列に変換（RSC シリアライズ安全化）
-    submittedAt: item.submittedAt ? item.submittedAt.toISOString() : null,
+    // Neon HTTP ドライバーが文字列で返す場合も対応
+    submittedAt: item.submittedAt
+      ? (item.submittedAt instanceof Date
+          ? item.submittedAt.toISOString()
+          : String(item.submittedAt))
+      : null,
   }));
 
   const questionnaire = await db
@@ -445,7 +449,7 @@ export async function getDocumentRequirements(visaType: string, applicationType:
   const session = await auth();
   if (!session?.user) throw new Error("認証が必要です");
 
-  const { inArray } = await import("drizzle-orm");
+  
 
   // "common"（全ビザ共通）と指定ビザ種別の書類を返す
   const searchVisaTypes = ["common", visaType];
@@ -512,7 +516,7 @@ export async function addDocumentsToChecklist(
     }
 
     // マスターから書類名を取得
-    const { inArray } = await import("drizzle-orm");
+    
     const masters = await db
       .select()
       .from(documentRequirementMaster)

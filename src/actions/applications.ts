@@ -489,40 +489,6 @@ export async function addDocumentsToChecklist(
       .from(documentRequirementMaster)
       .where(inArray(documentRequirementMaster.id, newIds));
 
-    // 在留カード表面が含まれる場合、同カテゴリーの裏面も自動追加（逆も同様）
-    const cardNames = masters.map((m) => m.documentName);
-    const hasFront = cardNames.some((n) => /在留カード（表面）/.test(n));
-    const hasBack  = cardNames.some((n) => /在留カード（裏面）/.test(n));
-    if (hasFront && !hasBack) {
-      // 表面と同じ visa_type・application_type の裏面を探す
-      const frontMaster = masters.find((m) => /在留カード（表面）/.test(m.documentName))!;
-      const [backMaster] = await db.select().from(documentRequirementMaster)
-        .where(and(
-          eq(documentRequirementMaster.visaType, frontMaster.visaType),
-          eq(documentRequirementMaster.applicationType, frontMaster.applicationType),
-          eq(documentRequirementMaster.isActive, true)
-        ))
-        .then(rows => rows.filter(r => /在留カード（裏面）/.test(r.documentName)));
-      if (backMaster && !existingIds.has(backMaster.id) && !newIds.includes(backMaster.id)) {
-        masters.push(backMaster);
-        newIds.push(backMaster.id);
-      }
-    }
-    if (hasBack && !hasFront) {
-      const backMaster = masters.find((m) => /在留カード（裏面）/.test(m.documentName))!;
-      const [frontMasterAuto] = await db.select().from(documentRequirementMaster)
-        .where(and(
-          eq(documentRequirementMaster.visaType, backMaster.visaType),
-          eq(documentRequirementMaster.applicationType, backMaster.applicationType),
-          eq(documentRequirementMaster.isActive, true)
-        ))
-        .then(rows => rows.filter(r => /在留カード（表面）/.test(r.documentName)));
-      if (frontMasterAuto && !existingIds.has(frontMasterAuto.id) && !newIds.includes(frontMasterAuto.id)) {
-        masters.push(frontMasterAuto);
-        newIds.push(frontMasterAuto.id);
-      }
-    }
-
     await db.insert(applicationDocumentChecklist).values(
       masters.map((m) => ({
         applicationId,
@@ -798,17 +764,13 @@ export async function shareApplicantDocumentsToChecklist(
         }
       }
 
-      // ─── 在留カード（裏面） ───────────────────────────────────
-      else if (/在留カード/.test(name) && /裏面|裏/.test(name)) {
-        uploadedDoc = docByType["residence_card_back"] ?? null;
-        if (uploadedDoc?.ocrExtractedData) {
-          ocrData = uploadedDoc.ocrExtractedData as Record<string, any>;
-        }
-      }
-
-      // ─── 在留カード（表面・一般） ─────────────────────────────
+      // ─── 在留カード ──────────────────────────────────────────
+      // 申請人マスターでは "residence_card" タイプで保存されるため両方を確認
       else if (/在留カード/.test(name)) {
-        uploadedDoc = docByType["residence_card_front"] ?? null;
+        uploadedDoc =
+          docByType["residence_card"] ??
+          docByType["residence_card_front"] ??
+          null;
 
         ocrData = {
           full_name_ja: [applicant.familyNameJa, applicant.givenNameJa].filter(Boolean).join(" ") || null,

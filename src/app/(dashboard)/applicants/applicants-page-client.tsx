@@ -19,6 +19,16 @@ type Applicant = {
   currentVisaType: string | null;
 };
 
+/** 満年齢を計算する */
+function calcAge(dateOfBirth: string): number {
+  const today = new Date();
+  const birth = new Date(dateOfBirth);
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
 export function ApplicantsPageClient({ applicants }: { applicants: Applicant[] }) {
   const [showModal, setShowModal] = useState(false);
 
@@ -79,7 +89,12 @@ export function ApplicantsPageClient({ applicants }: { applicants: Applicant[] }
                     </p>
                     <p className="text-xs text-gray-500">
                       {a.nationality}
-                      {a.dateOfBirth && ` ・ ${formatDate(a.dateOfBirth)}`}
+                      {a.dateOfBirth && (
+                        <>
+                          {` ・ ${formatDate(a.dateOfBirth)}`}
+                          <span className="ml-1 text-gray-400">（{calcAge(a.dateOfBirth)}歳）</span>
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="text-right flex-shrink-0">

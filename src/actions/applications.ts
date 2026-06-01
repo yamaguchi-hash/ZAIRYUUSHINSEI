@@ -77,10 +77,26 @@ export async function getApplicationById(id: string) {
         .then((r) => r[0])
     : null;
 
-  // ── チェックリスト取得（シンプルな SELECT のみ・LEFT JOIN なし）
-  // LEFT JOIN を使わず 2 ステップで取得することで Drizzle ORM の型推論問題を回避
+  // ── チェックリスト取得（file_url を除外して DB 転送量を削減）
+  // file_url は base64 data URL として最大 1MB+ になるため SELECT から除外する。
+  // ファイルの有無は file_name の有無（null チェック）で判断する。
   const rawChecklist = await db
-    .select()
+    .select({
+      id:                    applicationDocumentChecklist.id,
+      applicationId:         applicationDocumentChecklist.applicationId,
+      documentRequirementId: applicationDocumentChecklist.documentRequirementId,
+      documentName:          applicationDocumentChecklist.documentName,
+      isRequiredByExpert:    applicationDocumentChecklist.isRequiredByExpert,
+      status:                applicationDocumentChecklist.status,
+      // file_url は除外（base64 が巨大なため）
+      fileName:              applicationDocumentChecklist.fileName,
+      fileSize:              applicationDocumentChecklist.fileSize,
+      mimeType:              applicationDocumentChecklist.mimeType,
+      ocrExtractedData:      applicationDocumentChecklist.ocrExtractedData,
+      expertNotes:           applicationDocumentChecklist.expertNotes,
+      submittedAt:           applicationDocumentChecklist.submittedAt,
+      createdAt:             applicationDocumentChecklist.createdAt,
+    })
     .from(applicationDocumentChecklist)
     .where(eq(applicationDocumentChecklist.applicationId, id))
     .orderBy(applicationDocumentChecklist.createdAt);
@@ -109,8 +125,9 @@ export async function getApplicationById(id: string) {
     documentName:          item.documentName,
     isRequiredByExpert:    item.isRequiredByExpert,
     status:                item.status,
-    // data: URL はプレースホルダーに置換（数 MB → 6 文字）
-    fileUrl:    item.fileUrl?.startsWith("data:") ? "(data)" : (item.fileUrl ?? null),
+    // fileUrl は SELECT から除外済み（巨大な base64 URL を DB から取得しない）
+    // file_name が存在すればファイルアップロード済みと判断する
+    fileUrl:    item.fileName ? "(uploaded)" : null,
     fileName:   item.fileName ?? null,
     fileSize:   item.fileSize ?? null,
     mimeType:   item.mimeType ?? null,

@@ -87,19 +87,25 @@ const OCR_DISPLAY_FIELDS: { key: string; label: string }[] = [
   { key: "notes",           label: "備考" },
 ];
 
-// ── 書類アップロード（per item）──────────────────────────────────────────────
+// ── 書類アップロード（per item・複数ファイル対応）────────────────────────────
 function ChecklistItemUpload({
   item,
+  applicationId,
   onUploaded,
   onCleared,
+  onSlotAdded,
 }: {
   item: ChecklistItem;
+  applicationId: string;
   onUploaded: (id: string, updates: Partial<ChecklistItem>) => void;
   onCleared: (id: string) => void;
+  /** 複数ファイル時、2枚目以降のスロットが自動作成されたときに呼ばれる */
+  onSlotAdded: (newEntry: ChecklistItem) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [isClearing, setIsClearing] = useState(false);
   const [error, setError] = useState("");
   const [ocrStatus, setOcrStatus] = useState<"idle" | "processing" | "done">("idle");
@@ -110,44 +116,90 @@ function ChecklistItemUpload({
     ? OCR_DISPLAY_FIELDS.filter((f) => ocr[f.key] && ocr[f.key] !== "null")
     : [];
 
-  async function handleFile(file: File) {
+  /** 1ファイルを指定スロットIDにアップロードして DB 保存。URL と OCR 結果を返す。 */
+  async function uploadToSlot(slotId: string, file: File) {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "アップロード失敗");
+
+    const result = await saveChecklistDocumentAndOcr(
+      slotId,
+      data.url,
+      file.name,
+      file.size,
+      data.mimeType,
+      item.documentName
+    );
+    if (!result.success) throw new Error(result.error ?? "保存失敗");
+
+    return {
+      fileUrl: data.url as string,
+      fileName: file.name,
+      mimeType: data.mimeType as string,
+      extracted: result.extracted ?? null,
+    };
+  }
+
+  /**
+   * 複数ファイル対応アップロード
+   * - 1枚目: 現スロット (item.id) へ
+   * - 2枚目以降: duplicateChecklistItem でスロットを自動生成してアップロード
+   */
+  async function handleFiles(files: File[]) {
+    if (files.length === 0) return;
     setError("");
     setIsUploading(true);
     setOcrStatus("idle");
+    const total = files.length;
+    if (total > 1) setUploadProgress({ current: 1, total });
+
     try {
-      // Step1: /api/upload でファイルをアップロード（docTypeなし = DB保存なし）
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "アップロード失敗");
-
-      setOcrStatus("processing");
-
-      // Step2: Server Action でDB保存 + Gemini OCR
-      const result = await saveChecklistDocumentAndOcr(
-        item.id,
-        data.url,
-        file.name,
-        file.size,
-        data.mimeType,
-        item.documentName
-      );
-
-      if (!result.success) throw new Error(result.error ?? "保存失敗");
-
+      // ── 1枚目: 現スロット ──
+      const first = await uploadToSlot(item.id, files[0]);
       onUploaded(item.id, {
-        fileUrl: data.url,
-        fileName: file.name,
+        fileUrl: first.fileUrl,
+        fileName: first.fileName,
         status: "submitted",
-        ocrExtractedData: result.extracted ?? null,
+        ocrExtractedData: first.extracted,
       });
       setOcrStatus("done");
+
+      // ── 2枚目以降: 自動スロット作成 ──
+      for (let i = 1; i < total; i++) {
+        if (total > 1) setUploadProgress({ current: i + 1, total });
+        try {
+          const dupeResult = await duplicateChecklistItem(item.id, applicationId);
+          if (!dupeResult.success || !dupeResult.newItem) continue;
+
+          const extra = await uploadToSlot(dupeResult.newItem.id, files[i]);
+
+          // 新スロットを親の localChecklist に追加
+          onSlotAdded({
+            id: dupeResult.newItem.id,
+            documentName: dupeResult.newItem.documentName,
+            documentRequirementId: dupeResult.newItem.documentRequirementId,
+            isRequiredByExpert: dupeResult.newItem.isRequiredByExpert,
+            status: "submitted",
+            fileUrl: extra.fileUrl,
+            fileName: extra.fileName,
+            expertNotes: null,
+            ocrExtractedData: extra.extracted,
+            masterDescription: item.masterDescription,
+            masterSortOrder: item.masterSortOrder,
+            createdAt: new Date().toISOString(),
+          });
+        } catch {
+          // 一部失敗しても残りを続行
+        }
+      }
     } catch (err: any) {
       setError(err.message ?? "アップロードに失敗しました");
       setOcrStatus("idle");
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
   }
 
@@ -171,7 +223,6 @@ function ChecklistItemUpload({
   }
 
   // ファイルあり → ファイル名＋OCR結果表示
-  // "(uploaded)" は Vercel Blob / "(data)" は data: URL のプレースホルダー
   const hasFile = item.fileUrl && item.fileName;
   if (hasFile) {
     return (
@@ -212,9 +263,13 @@ function ChecklistItemUpload({
           <input
             ref={inputRef}
             type="file"
+            multiple
             accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,image/jpeg,image/png,application/pdf"
             className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) { handleFile(f); e.target.value = ""; } }}
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              if (files.length) { handleFiles(files); e.target.value = ""; }
+            }}
           />
         </div>
 
@@ -241,7 +296,7 @@ function ChecklistItemUpload({
     );
   }
 
-  // ファイルなし → ドロップゾーン
+  // ファイルなし → ドロップゾーン（複数ファイル対応）
   return (
     <div className="mt-2 ml-8">
       <div
@@ -253,25 +308,45 @@ function ChecklistItemUpload({
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
-        onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragging(false);
+          const files = Array.from(e.dataTransfer.files);
+          if (files.length) handleFiles(files);
+        }}
       >
-        {isUploading ? (
+        {isUploading && uploadProgress ? (
+          <>
+            <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin flex-shrink-0" />
+            <span className="text-blue-600">
+              {uploadProgress.current}/{uploadProgress.total} ファイルをアップロード中...
+            </span>
+          </>
+        ) : isUploading ? (
           <><Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" /><span className="text-blue-600">アップロード中...</span></>
         ) : ocrStatus === "processing" ? (
           <><Sparkles className="w-3.5 h-3.5 text-purple-500 animate-pulse" /><span className="text-purple-600">AIが読み込み中...</span></>
         ) : isDragging ? (
           <><Upload className="w-3.5 h-3.5 text-blue-500" /><span className="text-blue-600">ここにドロップ</span></>
         ) : (
-          <><Upload className="w-3.5 h-3.5 text-gray-400" /><span className="text-gray-400">クリックまたはドロップで添付・AI自動読込</span></>
+          <>
+            <Upload className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+            <span className="text-gray-400">クリックまたはドロップで添付・AI自動読込</span>
+            <span className="text-gray-300 text-xs">（複数可）</span>
+          </>
         )}
       </div>
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
       <input
         ref={inputRef}
         type="file"
+        multiple
         accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,image/jpeg,image/png,application/pdf"
         className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) { handleFile(f); e.target.value = ""; } }}
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          if (files.length) { handleFiles(files); e.target.value = ""; }
+        }}
       />
     </div>
   );
@@ -340,6 +415,25 @@ export function DocumentChecklist({
           : i
       )
     );
+  }
+
+  /** 複数ファイル一括ドロップ時に 2枚目以降の自動スロットを localChecklist に追加 */
+  function handleSlotAdded(newEntry: ChecklistItem) {
+    setLocalChecklist((prev) => {
+      // 同じグループの末尾アイテムの直後に挿入
+      const groupKey = newEntry.documentRequirementId ?? `name:${newEntry.documentName}`;
+      let insertAfterIdx = -1;
+      for (let i = prev.length - 1; i >= 0; i--) {
+        const key = prev[i].documentRequirementId ?? `name:${prev[i].documentName}`;
+        if (key === groupKey) { insertAfterIdx = i; break; }
+      }
+      if (insertAfterIdx >= 0) {
+        const next = [...prev];
+        next.splice(insertAfterIdx + 1, 0, newEntry);
+        return next;
+      }
+      return [...prev, newEntry];
+    });
   }
 
   async function handleConsistencyCheck() {
@@ -700,7 +794,7 @@ export function DocumentChecklist({
                 {/* ── 下段: アップロードゾーン＋追加ボタン（追加枠・通常枠とも表示）── */}
                 {item.isRequiredByExpert && !isApplicationForm(item.documentName) && (
                   <div>
-                    <ChecklistItemUpload item={item} onUploaded={handleUploaded} onCleared={handleCleared} />
+                    <ChecklistItemUpload item={item} applicationId={applicationId} onUploaded={handleUploaded} onCleared={handleCleared} onSlotAdded={handleSlotAdded} />
                     {/* 追加ボタン: グループの最後アイテムにだけ表示 */}
                     {isLastInGroup && (() => {
                       const info = groupInfoMap.get(item.id);

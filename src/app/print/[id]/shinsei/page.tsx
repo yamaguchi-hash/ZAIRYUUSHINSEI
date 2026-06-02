@@ -110,31 +110,39 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
         <title>申請書 - {form.familyNameEn} {form.givenNameEn}</title>
         <style>{`
           *{box-sizing:border-box;margin:0;padding:0;}
-          body{font-family:"MS Mincho","ＭＳ 明朝","Hiragino Mincho ProN",serif;font-size:11px;color:#000;background:#f3f4f6;}
+          body{
+            font-family:"MS Mincho","ＭＳ 明朝","Hiragino Mincho ProN","游明朝",serif;
+            font-size:11px;color:#000;background:#f3f4f6;line-height:1.5;
+          }
           .page{background:#fff;max-width:210mm;margin:0 auto;padding:14mm 16mm;min-height:297mm;}
           @media screen{.page{margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.12);border-radius:4px;}}
-          @media print{body{background:#fff;}.page{padding:8mm 10mm;max-width:100%;min-height:auto;}.no-print{display:none!important;}}
+          @media print{
+            body{background:#fff;}
+            *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
+            .page{padding:10mm 13mm;max-width:100%;min-height:auto;}
+            .no-print{display:none!important;}
+          }
 
-          .form-title{text-align:center;font-size:14px;font-weight:bold;border:2px solid #000;padding:6px 12px;margin-bottom:8px;}
-          .form-subtitle{font-size:9px;text-align:right;margin-bottom:10px;color:#555;}
+          .form-title{text-align:center;font-size:15px;font-weight:bold;border:2px solid #000;padding:7px 14px;margin-bottom:10px;letter-spacing:0.05em;}
+          .form-subtitle{font-size:9px;text-align:right;margin-bottom:10px;color:#444;}
 
-          table{width:100%;border-collapse:collapse;margin-bottom:6px;}
-          td,th{border:1px solid #555;padding:3px 5px;vertical-align:middle;font-size:10px;}
-          .lbl{background:#e8e8e8;font-weight:bold;white-space:nowrap;width:25%;}
+          table{width:100%;border-collapse:collapse;margin-bottom:8px;}
+          td,th{border:1px solid #333;padding:4px 8px;vertical-align:middle;font-size:10.5px;line-height:1.45;}
+          .lbl{background:#d5d5d5;font-weight:bold;white-space:nowrap;width:25%;}
           .lbl-w20{width:20%;}
 
-          .section{background:#222;color:#fff;font-weight:bold;font-size:11px;padding:4px 8px;margin:12px 0 4px;}
-          .section2{background:#555;color:#fff;font-size:10px;padding:2px 6px;margin:6px 0 3px;}
-          .section3{background:#888;color:#fff;font-size:9.5px;padding:2px 6px;margin:4px 0 2px;}
+          .section{background:#1c1c1c;color:#fff;font-weight:bold;font-size:11.5px;padding:5px 9px;margin:14px 0 5px;letter-spacing:0.03em;}
+          .section2{background:#444;color:#fff;font-size:10.5px;padding:3px 8px;margin:8px 0 4px;}
+          .section3{background:#777;color:#fff;font-size:10px;padding:3px 7px;margin:5px 0 3px;}
 
-          .sign-table td{height:38px;}
+          .sign-table td{height:44px;}
           .page-break{page-break-before:always;}
 
           /* 署名日・年月日の表示/非表示切替 */
-          .sign-date { transition: visibility 0s; }
-          body.hide-sign-date .sign-date { visibility: hidden; }
-          @media print { body.hide-sign-date .sign-date { visibility: hidden !important; } }
-          th{background:#d0d0d0;font-weight:bold;}
+          .sign-date{transition:visibility 0s;}
+          body.hide-sign-date .sign-date{visibility:hidden;}
+          @media print{body.hide-sign-date .sign-date{visibility:hidden!important;}}
+          th{background:#c8c8c8;font-weight:bold;}
         `}</style>
       </head>
       <body>

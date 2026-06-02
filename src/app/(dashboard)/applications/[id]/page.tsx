@@ -36,8 +36,10 @@ import { FileDown, FolderArchive, Zap } from "lucide-react";
 import { MergePdfButton } from "@/components/applications/merge-pdf-button";
 import { QuestionnaireDocxButton } from "@/components/applications/questionnaire-docx-button";
 import { RasensXmlPanel } from "@/components/applications/rasens-xml-panel";
+import { SubmissionInfoPanel } from "@/components/applications/submission-info-panel";
+import { PermitResultPanel } from "@/components/applications/permit-result-panel";
 
-// 7ステップのワークフロー
+// 8ステップのワークフロー
 const WORKFLOW_STEPS = [
   { key: "draft",                label: "①基本設定" },
   { key: "documents_requested",  label: "②書類リスト" },
@@ -46,6 +48,7 @@ const WORKFLOW_STEPS = [
   { key: "questionnaire_sent",   label: "⑤質問書聴取" },
   { key: "under_review",         label: "⑥申請書反映" },
   { key: "submitted",            label: "⑦署名・提出" },
+  { key: "completed",            label: "⑧許可・完了" },
 ];
 
 export default async function ApplicationDetailPage({
@@ -403,6 +406,29 @@ export default async function ApplicationDetailPage({
             }))}
             applicationId={application.id}
             userRole={userRole}
+          />
+        </div>
+      )}
+
+      {/* ⑦ 申請日・申請番号（submitted 以降で表示） */}
+      {(application.status === "submitted" || application.status === "completed") && (
+        <div className="mb-6">
+          <SubmissionInfoPanel
+            applicationId={application.id}
+            savedData={(application.draftData as any)?._submission}
+          />
+        </div>
+      )}
+
+      {/* ⑧ 許可・完了（submitted 以降で表示） */}
+      {(application.status === "submitted" || application.status === "completed") && (
+        <div className="mb-6">
+          <PermitResultPanel
+            applicationId={application.id}
+            applicationType={application.applicationType}
+            currentVisaType={(application.formData as any)?.currentStatusOfResidence}
+            desiredVisaType={(application.formData as any)?.desiredStatusOfResidence}
+            resultData={(application.draftData as any)?._result}
           />
         </div>
       )}

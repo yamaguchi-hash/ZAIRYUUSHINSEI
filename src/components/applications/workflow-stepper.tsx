@@ -21,7 +21,7 @@ interface WorkflowStepperProps {
   hasQuestionnaire?: boolean;
 }
 
-// 7ステップの順序（DB status値）
+// 8ステップの順序（DB status値）
 const STEP_ORDER = [
   "draft",
   "documents_requested",
@@ -30,6 +30,7 @@ const STEP_ORDER = [
   "questionnaire_sent",
   "under_review",
   "submitted",
+  "completed",
 ];
 
 // 各ステップの説明
@@ -60,7 +61,11 @@ const STEP_DESCRIPTIONS: Record<string, { action: string; hint: string }> = {
   },
   submitted: {
     action: "「書類一覧PDF」ボタンから申請書をPDF出力し、お客様に署名していただいてください",
-    hint: "署名済み書類を受領後、入管へ申請書類を提出します",
+    hint: "署名済み書類を受領後、入管へ提出。申請日と申請番号を下の欄に記録してください",
+  },
+  completed: {
+    action: "⑧ 許可・完了ステップです",
+    hint: "許可日を記録し、更新・変更の場合は新しい在留カードで申請人マスターを更新して完了にしてください",
   },
 };
 

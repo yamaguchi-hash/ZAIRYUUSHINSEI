@@ -68,7 +68,7 @@ export const APPLICATION_STATUS_LABELS: Record<string, string> = {
   under_review: "⑥申請書反映・確認",
   approved: "承認済",
   submitted: "⑦署名・提出",
-  completed: "完了",
+  completed: "⑧許可・完了",
   rejected: "却下",
   cancelled: "削除済",
 };

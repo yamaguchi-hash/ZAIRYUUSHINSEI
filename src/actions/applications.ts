@@ -2201,3 +2201,84 @@ export async function saveApplicationDraft(
     return { success: false, error: err.message ?? "保存に失敗しました" };
   }
 }
+
+// ─── ⑦ 申請日・申請番号を保存 ──────────────────────────────────────────────
+export async function saveSubmissionInfo(
+  applicationId: string,
+  data: { applicationDate: string; applicationNumber: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db.select().from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId))).limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    const existing = (app.draftData as Record<string, any>) ?? {};
+    await db.update(applications)
+      .set({
+        draftData: { ...existing, _submission: data },
+        updatedAt: new Date(),
+      })
+      .where(eq(applications.id, applicationId));
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "保存に失敗しました" };
+  }
+}
+
+// ─── ⑧ 許可日・完了処理（申請人マスター更新含む） ───────────────────────────
+export async function completeWithPermit(
+  applicationId: string,
+  data: {
+    permittedDate: string;
+    newCardNumber?: string;
+    newVisaExpiry?: string;
+    newVisaType?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db.select().from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId))).limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    const existing = (app.draftData as Record<string, any>) ?? {};
+
+    // 申請人マスターを更新（新しい在留カード番号・有効期限）
+    if (data.newCardNumber || data.newVisaExpiry || data.newVisaType) {
+      const updateFields: Record<string, any> = { updatedAt: new Date() };
+      if (data.newCardNumber)  updateFields.residenceCardNumber = data.newCardNumber;
+      if (data.newVisaExpiry)  updateFields.currentVisaExpiry = data.newVisaExpiry;
+      if (data.newVisaType)    updateFields.currentVisaType = data.newVisaType;
+      await db.update(applicantMaster)
+        .set(updateFields)
+        .where(eq(applicantMaster.id, app.applicantId));
+    }
+
+    // アプリケーションを completed に更新
+    await db.update(applications)
+      .set({
+        status: "completed" as any,
+        draftData: {
+          ...existing,
+          _result: { ...data, completedAt: new Date().toISOString() },
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(applications.id, applicationId));
+
+    revalidatePath(`/applications/${applicationId}`);
+    revalidatePath("/applications");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "完了処理に失敗しました" };
+  }
+}

@@ -23,6 +23,7 @@ interface Props {
   initialForm: ApplicationFormData;
   applicationType: string;
   userRole?: string;
+  isCompleted?: boolean;
 }
 
 const inputCls = "w-full text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white";
@@ -75,7 +76,7 @@ const CATEGORY_LABELS: Record<VisaFormCategory, string> = {
 
 type TabKey = "meta" | "p1a" | "p1b" | "p2" | "org1" | "org2" | "gaikatsu" | "statement";
 
-export function ShinseiFormEditor({ applicationId, initialForm, applicationType, userRole }: Props) {
+export function ShinseiFormEditor({ applicationId, initialForm, applicationType, userRole, isCompleted }: Props) {
   const [form, setForm] = useState<ApplicationFormData>(initialForm);
   const [tab, setTab] = useState<TabKey>("meta");
   const [isSaving, setIsSaving] = useState(false);
@@ -293,9 +294,10 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
   ];
 
   return (
-    <div>
-      {/* ツールバー */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+    <fieldset disabled={isCompleted} className={isCompleted ? "opacity-60" : ""}>
+      <div>
+        {/* ツールバー */}
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         {/* 全書類一括読み取りボタン */}
         <div className="flex flex-col gap-1">
           <button
@@ -315,8 +317,9 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
         </div>
         <div className="flex items-center gap-3">
           {msg && <span className={cn("text-xs", msg.startsWith("エラー") ? "text-red-600" : "text-green-600")}>{msg}</span>}
-          <button onClick={handleSave} disabled={isSaving}
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50">
+          <button onClick={handleSave} disabled={isSaving || isCompleted}
+            title={isCompleted ? "申請が完了しているため編集できません" : undefined}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}保存
           </button>
         </div>
@@ -2427,11 +2430,13 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
       {/* 下部保存ボタン */}
       <div className="mt-6 flex justify-end gap-3">
         {msg && <span className={cn("text-sm flex items-center", msg.startsWith("エラー") ? "text-red-600" : "text-green-600")}>{msg}</span>}
-        <button onClick={handleSave} disabled={isSaving}
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5 py-2 text-sm font-medium disabled:opacity-50">
+        <button onClick={handleSave} disabled={isSaving || isCompleted}
+          title={isCompleted ? "申請が完了しているため編集できません" : undefined}
+          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
           {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}保存
         </button>
       </div>
     </div>
+    </fieldset>
   );
 }

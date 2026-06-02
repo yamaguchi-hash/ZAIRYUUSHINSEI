@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { getApplicationById } from "@/actions/applications";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, FileDown } from "lucide-react";
+import { ArrowLeft, FileDown, AlertCircle } from "lucide-react";
 import { QuestionnaireDocxButton } from "@/components/applications/questionnaire-docx-button";
 import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
 import { ShinseiFormEditor } from "./shinsei-form-editor";
@@ -151,11 +151,26 @@ export default async function ShinseiFormPage({
         </p>
       </div>
 
+      {/* 完了後は編集不可 */}
+      {application.status === "completed" && (
+        <div className="mb-6 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800">
+            <p className="font-semibold mb-1">申請が完了しています</p>
+            <p className="text-amber-700">
+              この申請案件は完了済みのため、申請書の内容は編集できません。
+              申請人マスターの情報は更新されます（新在留カード番号など）。
+            </p>
+          </div>
+        </div>
+      )}
+
       <ShinseiFormEditor
         applicationId={id}
         initialForm={initialForm}
         applicationType={application.applicationType}
         userRole={userRole}
+        isCompleted={application.status === "completed"}
       />
     </div>
   );

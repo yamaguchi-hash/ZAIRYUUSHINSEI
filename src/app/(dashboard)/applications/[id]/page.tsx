@@ -38,6 +38,7 @@ import { QuestionnaireDocxButton } from "@/components/applications/questionnaire
 import { RasensXmlPanel } from "@/components/applications/rasens-xml-panel";
 import { SubmissionInfoPanel } from "@/components/applications/submission-info-panel";
 import { PermitResultPanel } from "@/components/applications/permit-result-panel";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
 // 8ステップのワークフロー
 const WORKFLOW_STEPS = [
@@ -384,16 +385,26 @@ export default async function ApplicationDetailPage({
         </Card>
       </div>
 
-      {/* Consistency check panel */}
+      {/* 整合性チェック */}
       {issues.length > 0 && (
-        <div className="mb-6">
+        <CollapsibleSection
+          title="整合性チェック結果"
+          badge={`${issues.length}件の問題`}
+          defaultOpen={true}
+          accentClass="bg-amber-400"
+        >
           <ConsistencyCheckPanel issues={issues} applicationId={application.id} />
-        </div>
+        </CollapsibleSection>
       )}
 
-      {/* ⑤ 質問書パネル（ステップ5以降に表示） */}
-      {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted") && (
-        <div className="mb-6">
+      {/* ⑤ 質問書（ステップ5以降） */}
+      {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted" || application.status === "completed") && (
+        <CollapsibleSection
+          title="質問書・顧客聴取"
+          badge={questionnaire.length > 0 ? `${questionnaire.length}件` : undefined}
+          defaultOpen={application.status === "questionnaire_sent"}
+          accentClass="bg-orange-400"
+        >
           <QuestionnairePanel
             questions={questionnaire.map((q) => ({
               id: q.id,
@@ -407,22 +418,30 @@ export default async function ApplicationDetailPage({
             applicationId={application.id}
             userRole={userRole}
           />
-        </div>
+        </CollapsibleSection>
       )}
 
-      {/* ⑦ 申請日・申請番号（submitted 以降で表示） */}
+      {/* ⑦ 申請日・申請番号（submitted 以降） */}
       {(application.status === "submitted" || application.status === "completed") && (
-        <div className="mb-6">
+        <CollapsibleSection
+          title="⑦ 申請日・申請番号の記録"
+          defaultOpen={!((application.draftData as any)?._submission?.applicationDate)}
+          accentClass="bg-teal-500"
+        >
           <SubmissionInfoPanel
             applicationId={application.id}
             savedData={(application.draftData as any)?._submission}
           />
-        </div>
+        </CollapsibleSection>
       )}
 
-      {/* ⑧ 許可・完了（submitted 以降で表示） */}
+      {/* ⑧ 許可・完了（submitted 以降） */}
       {(application.status === "submitted" || application.status === "completed") && (
-        <div className="mb-6">
+        <CollapsibleSection
+          title="⑧ 許可・完了処理"
+          defaultOpen={!((application.draftData as any)?._result?.completedAt)}
+          accentClass="bg-emerald-500"
+        >
           <PermitResultPanel
             applicationId={application.id}
             applicationType={application.applicationType}
@@ -430,16 +449,25 @@ export default async function ApplicationDetailPage({
             desiredVisaType={(application.formData as any)?.desiredStatusOfResidence}
             resultData={(application.draftData as any)?._result}
           />
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* 入管オンライン申請XML管理 */}
-      <div className="mb-6">
+      <CollapsibleSection
+        title="入管オンライン申請XML管理"
+        defaultOpen={false}
+        accentClass="bg-indigo-400"
+      >
         <RasensXmlPanel applicationId={application.id} />
-      </div>
+      </CollapsibleSection>
 
-      {/* Document checklist + selector */}
-      <div>
+      {/* 必要書類チェックリスト */}
+      <CollapsibleSection
+        title="必要書類チェックリスト"
+        badge={checklist.length > 0 ? `${checklist.length}件` : undefined}
+        defaultOpen={true}
+        accentClass="bg-blue-500"
+      >
         <DocumentChecklist
           checklist={checklist.map((c) => ({
             id: c.id,
@@ -470,7 +498,7 @@ export default async function ApplicationDetailPage({
             status: c.status,
           }))}
         />
-      </div>
+      </CollapsibleSection>
     </div>
   );
 }

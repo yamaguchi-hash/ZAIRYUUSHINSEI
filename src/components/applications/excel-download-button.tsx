@@ -34,18 +34,18 @@ export function ExcelDownloadButton({ applicationId }: { applicationId: string }
   }
 
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="relative">
       <button
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-green-700 hover:bg-green-800 disabled:opacity-50 rounded-lg transition-colors"
+        className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-white bg-green-700 hover:bg-green-800 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap"
         title="オンライン申請用エクセルをダウンロード（各フィールドをコピー＆ペーストして使用）"
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
         {loading ? "作成中..." : "オンライン申請用Excel"}
       </button>
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="absolute top-10 left-0 z-10 text-xs text-red-500 bg-white border border-red-200 rounded px-2 py-1 shadow whitespace-nowrap">{error}</p>}
     </div>
   );
 }

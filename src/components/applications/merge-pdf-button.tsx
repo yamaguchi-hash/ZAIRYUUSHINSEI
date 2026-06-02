@@ -44,12 +44,12 @@ export function MergePdfButton({ applicationId }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="relative">
       <button
         type="button"
         onClick={handleClick}
         disabled={isLoading}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+        className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors whitespace-nowrap"
         title="提出済み書類（写真除く）をPDF一括出力します"
       >
         {isLoading
@@ -59,7 +59,7 @@ export function MergePdfButton({ applicationId }: Props) {
         {isLoading ? "PDF作成中..." : "添付書類一括PDF"}
       </button>
       {error && (
-        <p className="text-xs text-red-500 max-w-[200px]">{error}</p>
+        <p className="absolute top-10 left-0 z-10 text-xs text-red-500 bg-white border border-red-200 rounded px-2 py-1 shadow whitespace-nowrap">{error}</p>
       )}
     </div>
   );

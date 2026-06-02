@@ -141,73 +141,82 @@ export default async function ApplicationDetailPage({
       </div>
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {applicant.familyNameEn} {applicant.givenNameEn}
-          </h1>
-          <div className="flex items-center gap-3 mt-2">
-            <span
-              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLORS[application.status] ?? "bg-gray-100 text-gray-700"}`}
-            >
-              {APPLICATION_STATUS_LABELS[application.status] ?? application.status}
-            </span>
-            <span className="text-sm text-gray-500">
-              {VISA_TYPE_LABELS[application.visaType] ?? application.visaType}
-            </span>
-            <span className="text-sm text-gray-500">
-              {APPLICATION_TYPE_LABELS[application.applicationType] ?? application.applicationType}
-            </span>
+      <div className="mb-6">
+        {/* 申請人名・ステータス */}
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {applicant.familyNameEn} {applicant.givenNameEn}
+            </h1>
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              <span
+                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLORS[application.status] ?? "bg-gray-100 text-gray-700"}`}
+              >
+                {APPLICATION_STATUS_LABELS[application.status] ?? application.status}
+              </span>
+              <span className="text-sm text-gray-500">
+                {VISA_TYPE_LABELS[application.visaType] ?? application.visaType}
+              </span>
+              <span className="text-sm text-gray-500">
+                {APPLICATION_TYPE_LABELS[application.applicationType] ?? application.applicationType}
+              </span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {/* 申請書作成ボタン */}
+
+        {/* ── ボタン群（均一サイズ h-9） ── */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* ── 申請書類 ── */}
           <Link
             href={`/applications/${application.id}/shinsei-form`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors whitespace-nowrap"
           >
             <FileText className="w-4 h-4" />
             申請書を作成
           </Link>
-          {/* 顧客向け質問書（Googleドキュメント） */}
           <QuestionnaireDocxButton applicationId={application.id} />
-          {/* オンライン申請用Excel */}
           <ExcelDownloadButton applicationId={application.id} />
-          {/* 添付書類一括PDF */}
           <MergePdfButton applicationId={application.id} />
-          {/* PDF出力ボタン */}
+
+          {/* 区切り */}
+          <div className="h-6 w-px bg-gray-200" />
+
+          {/* ── 出力・連携 ── */}
           <Link
             href={`/print/${application.id}`}
             target="_blank"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 rounded-lg transition-colors whitespace-nowrap"
           >
             <FileDown className="w-4 h-4" />
             書類一覧PDF
           </Link>
-          {/* RASENS自動入力ツール */}
           <Link
             href={`/applications/${application.id}/rasens-transfer`}
             title="JLSの申請データをRASENS（在留申請オンラインシステム）に自動入力するツール"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-purple-700 border border-purple-300 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-purple-700 border border-purple-200 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors whitespace-nowrap"
           >
             <Zap className="w-4 h-4" />
             RASENS自動入力
           </Link>
-          {/* XMLエクスポート */}
           <a
             href={`/api/applications/${application.id}/export-xml`}
             download
             title="申請書データをXMLで保存します（更新申請・類似申請時のインポート用）"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-700 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors whitespace-nowrap"
           >
             <FileCode2 className="w-4 h-4" />
             XMLで保存
           </a>
+
+          {/* 区切り */}
+          <div className="h-6 w-px bg-gray-200" />
+
+          {/* ── 承認 ── */}
           {(userRole === "expert" || userRole === "admin") && !application.isApproved && (
             <ApproveButton applicationId={application.id} />
           )}
           {application.isApproved && (
-            <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-2 text-sm font-medium">
+            <div className="inline-flex items-center gap-1.5 h-9 px-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm font-medium whitespace-nowrap">
               <CheckCircle className="w-4 h-4" />
               承認済み（{formatDate(application.approvedAt)}）
             </div>

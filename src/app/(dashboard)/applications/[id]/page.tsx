@@ -192,11 +192,11 @@ export default async function ApplicationDetailPage({
           </Link>
           <Link
             href={`/applications/${application.id}/rasens-transfer`}
-            title="JLSの申請データをRASENS（在留申請オンラインシステム）に自動入力するツール"
+            title="RASENSへのコピー＆ペースト転記データシートを表示"
             className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-purple-700 border border-purple-200 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors whitespace-nowrap"
           >
             <Zap className="w-4 h-4" />
-            RASENS自動入力
+            RASENS転記シート
           </Link>
           <a
             href={`/api/applications/${application.id}/export-xml`}

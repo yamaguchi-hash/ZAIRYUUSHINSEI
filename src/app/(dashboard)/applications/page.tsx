@@ -10,6 +10,7 @@ import {
   Filter,
 } from "lucide-react";
 import { XmlImportButton } from "@/components/applications/xml-import-button";
+import { ImmigrationTemplatePanel } from "@/components/applications/immigration-template-panel";
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_TYPE_LABELS,
@@ -51,6 +52,11 @@ export default async function ApplicationsPage({
 
   return (
     <div className="p-8">
+      {/* 入管オンライン申請テンプレートパネル */}
+      <div className="mb-6">
+        <ImmigrationTemplatePanel />
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>

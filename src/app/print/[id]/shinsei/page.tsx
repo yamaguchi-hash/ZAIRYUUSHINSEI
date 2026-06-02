@@ -1351,20 +1351,24 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               </table>
 
               {/* 取次者 */}
-              <table style={{ marginTop: "8px" }}>
+              <div className="section3" style={{ marginTop: "10px" }}>※ 取次者</div>
+              <table>
                 <tbody>
                   <tr>
-                    <td className="lbl" rowSpan={2} style={{ width: "15%", verticalAlign: "middle" }}>取次者</td>
-                    <td className="lbl" style={{ width: "15%" }}>(1) 氏名</td>
-                    <td style={{ width: "25%" }}>{fmt(form.agentName)}</td>
-                    <td className="lbl" style={{ width: "20%" }}>(2) 所属機関等</td>
-                    <td>{fmt(form.agentOrganization)}</td>
+                    <td className="lbl" style={{ width: "20%" }}>(1) 氏名</td>
+                    <td colSpan={3}>山口忠士</td>
                   </tr>
                   <tr>
-                    <td className="lbl">(3) 住所</td>
-                    <td>{fmt(form.agentAddress)}</td>
+                    <td className="lbl">(3) 所属機関等</td>
+                    <td colSpan={3}>兵庫県行政書士会</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(2) 住所</td>
+                    <td colSpan={3}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
+                  </tr>
+                  <tr>
                     <td className="lbl">電話番号</td>
-                    <td>{fmt(form.agentPhone)}</td>
+                    <td colSpan={3}>090-2596-0128</td>
                   </tr>
                 </tbody>
               </table>

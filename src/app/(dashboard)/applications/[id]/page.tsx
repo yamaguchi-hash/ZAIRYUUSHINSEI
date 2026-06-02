@@ -32,7 +32,7 @@ import { ApproveButton } from "@/components/applications/approve-button";
 import { QuestionnairePanel } from "@/components/applications/questionnaire-panel";
 import { getDocumentRequirements } from "@/actions/applications";
 import { DeleteApplicationButton } from "./delete-application-button";
-import { FileDown, FolderArchive, FileCode2 } from "lucide-react";
+import { FileDown, FolderArchive, FileCode2, Zap } from "lucide-react";
 import { MergePdfButton } from "@/components/applications/merge-pdf-button";
 import { ExcelDownloadButton } from "@/components/applications/excel-download-button";
 import { QuestionnaireDocxButton } from "@/components/applications/questionnaire-docx-button";
@@ -183,6 +183,15 @@ export default async function ApplicationDetailPage({
           >
             <FileDown className="w-4 h-4" />
             書類一覧PDF
+          </Link>
+          {/* RASENS自動入力ツール */}
+          <Link
+            href={`/applications/${application.id}/rasens-transfer`}
+            title="JLSの申請データをRASENS（在留申請オンラインシステム）に自動入力するツール"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-purple-700 border border-purple-300 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+          >
+            <Zap className="w-4 h-4" />
+            RASENS自動入力
           </Link>
           {/* XMLエクスポート */}
           <a

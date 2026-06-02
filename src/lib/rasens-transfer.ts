@@ -104,6 +104,63 @@ export function buildRasensFields(
         : []),
     ] : []),
 
+    // ── 資格外活動許可申請書（gaikatsuNeeded=有 または R型アルバイトあり） ──
+    ...(() => {
+      // 表示条件: 資格外活動が必要か、R型でアルバイトがあるか
+      const needsGaikatsu =
+        f.gaikatsuNeeded === "有" ||
+        f.gaikatsuEmployerName ||
+        f.gaikatsuCurrentActivity ||
+        f.partTimeWorkExistsR === "有" ||
+        f.partTimeWorkOrgNameR;
+
+      if (!needsGaikatsu) return [];
+
+      // R型（家族滞在）のアルバイト情報を優先的に表示
+      const isRtype = !!(f.partTimeWorkExistsR || f.partTimeWorkOrgNameR);
+
+      // 勤務先名（gaikatsu または R型）
+      const employerName    = f.gaikatsuEmployerName    || f.partTimeWorkOrgNameR    || "";
+      const employerBranch  = f.partTimeWorkBranchNameR || "";
+      const employerAddress = f.gaikatsuEmployerAddress || "";
+      const employerPhone   = f.gaikatsuEmployerPhone   || f.partTimeWorkPhoneR      || "";
+      const bizType         = f.gaikatsuEmployerBusinessType || f.partTimeWorkTypeR  || "";
+      const weeklyHours     = f.gaikatsuWeeklyHours     || f.partTimeWorkHoursR      || "";
+      const salary          = f.gaikatsuSalary          || f.partTimeWorkSalaryR     || "";
+      const salaryType      = f.gaikatsuSalaryType      || f.partTimeWorkSalaryTypeR || "";
+      const activityType    = f.gaikatsuActivityType
+        ? f.gaikatsuActivityType === "その他"
+          ? `その他（${f.gaikatsuActivityTypeOther ?? ""}）`
+          : f.gaikatsuActivityType
+        : "";
+      const salaryStr = salary
+        ? `${Number(salary).toLocaleString()} 円（${salaryType}）`
+        : "";
+
+      return [
+        { label: "資格外　現在の在留活動の内容",      value: f.gaikatsuCurrentActivity || "" },
+        ...(activityType
+          ? [{ label: "資格外　他に従事する活動（職務の内容）", value: activityType }]
+          : []),
+        { label: "資格外　雇用契約期間",              value: f.gaikatsuContractPeriod || "" },
+        ...(weeklyHours
+          ? [{ label: "資格外　週間稼働時間",          value: `${weeklyHours} 時間` }]
+          : []),
+        ...(salaryStr
+          ? [{ label: "資格外　報酬",                  value: salaryStr }]
+          : []),
+        { label: "資格外　勤務先名称",                 value: employerName },
+        ...(employerBranch
+          ? [{ label: "資格外　支店・事業所名",         value: employerBranch }]
+          : []),
+        { label: "資格外　勤務先所在地",               value: employerAddress },
+        { label: "資格外　勤務先電話番号",             value: employerPhone },
+        ...(bizType
+          ? [{ label: "資格外　業種",                  value: bizType }]
+          : []),
+      ].filter((item) => item.value.trim() !== "");
+    })(),
+
     // ── 取次者情報（固定） ────────────────────────────────────────────
     { label: "取次者　氏名",      value: "山口忠士" },
     { label: "取次者　電話番号",  value: "090-2596-0128" },
@@ -118,20 +175,22 @@ export function buildRasensFields(
 /** セクション別に分類 */
 export function buildTransferSections(fields: RasensField[]) {
   const sections: { title: string; fields: RasensField[] }[] = [
-    { title: "申請人　基本情報",   fields: [] },
-    { title: "旅券・在留情報",     fields: [] },
-    { title: "申請内容",           fields: [] },
-    { title: "扶養者情報",         fields: [] },
-    { title: "取次者情報（固定）", fields: [] },
+    { title: "申請人　基本情報",            fields: [] },
+    { title: "旅券・在留情報",              fields: [] },
+    { title: "申請内容",                    fields: [] },
+    { title: "扶養者情報",                  fields: [] },
+    { title: "資格外活動許可申請書",        fields: [] },
+    { title: "取次者情報（固定）",          fields: [] },
   ];
 
   fields.forEach((f) => {
     const l = f.label;
-    if (l.startsWith("取次者"))                                  sections[4].fields.push(f);
-    else if (l.startsWith("扶養者") || l === "申請人との関係")   sections[3].fields.push(f);
+    if (l.startsWith("取次者"))                                          sections[5].fields.push(f);
+    else if (l.startsWith("資格外"))                                     sections[4].fields.push(f);
+    else if (l.startsWith("扶養者") || l === "申請人との関係")           sections[3].fields.push(f);
     else if (["希望する","更新の理由","犯罪","退去"].some(k => l.includes(k))) sections[2].fields.push(f);
     else if (["旅券","在留資格","在留期間","在留カード"].some(k => l.includes(k))) sections[1].fields.push(f);
-    else                                                          sections[0].fields.push(f);
+    else                                                                  sections[0].fields.push(f);
   });
 
   return sections.filter((s) => s.fields.length > 0);

@@ -36,6 +36,7 @@ import { FileDown, FolderArchive, FileCode2 } from "lucide-react";
 import { MergePdfButton } from "@/components/applications/merge-pdf-button";
 import { ExcelDownloadButton } from "@/components/applications/excel-download-button";
 import { QuestionnaireDocxButton } from "@/components/applications/questionnaire-docx-button";
+import { RasensXmlPanel } from "@/components/applications/rasens-xml-panel";
 
 // 7ステップのワークフロー
 const WORKFLOW_STEPS = [
@@ -398,6 +399,11 @@ export default async function ApplicationDetailPage({
           />
         </div>
       )}
+
+      {/* 入管オンライン申請XML管理 */}
+      <div className="mb-6">
+        <RasensXmlPanel applicationId={application.id} />
+      </div>
 
       {/* Document checklist + selector */}
       <div>

@@ -2202,7 +2202,7 @@ export async function saveApplicationDraft(
   }
 }
 
-// ─── ⑦ 申請日・申請番号を保存 ──────────────────────────────────────────────
+// ─── ⑦ 申請日・申請番号を保存し、申請番号を案件番号に統一 ──────────────────
 export async function saveSubmissionInfo(
   applicationId: string,
   data: { applicationDate: string; applicationNumber: string }
@@ -2217,11 +2217,18 @@ export async function saveSubmissionInfo(
     if (!app) return { success: false, error: "申請案件が見つかりません" };
 
     const existing = (app.draftData as Record<string, any>) ?? {};
+
+    // 申請番号が入力されていれば、案件番号に統一
+    const updateData: Record<string, any> = {
+      draftData: { ...existing, _submission: data },
+      updatedAt: new Date(),
+    };
+    if (data.applicationNumber) {
+      updateData.caseNumber = data.applicationNumber;
+    }
+
     await db.update(applications)
-      .set({
-        draftData: { ...existing, _submission: data },
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(applications.id, applicationId));
 
     revalidatePath(`/applications/${applicationId}`);
@@ -2280,5 +2287,41 @@ export async function completeWithPermit(
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message ?? "完了処理に失敗しました" };
+  }
+}
+
+// ─── 新在留カード画像アップロード（Vercel Blob） ─────────────────────────────
+export async function uploadNewResidenceCard(
+  applicationId: string,
+  file: File
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db.select().from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId))).limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    // ファイルを Vercel Blob にアップロード
+    const buffer = await file.arrayBuffer();
+    const blobPath = `residence-cards/${applicationId}/${Date.now()}-${file.name}`;
+
+    // Note: Vercel Blob API を使う場合、server action で fetch を使用
+    const blobResponse = await fetch(`/api/applications/${applicationId}/upload-residence-card`, {
+      method: "POST",
+      headers: { "Content-Type": file.type },
+      body: buffer,
+    });
+
+    if (!blobResponse.ok) {
+      return { success: false, error: "ファイルアップロードに失敗しました" };
+    }
+
+    const result = await blobResponse.json();
+    return { success: true, url: result.url };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "アップロードに失敗しました" };
   }
 }

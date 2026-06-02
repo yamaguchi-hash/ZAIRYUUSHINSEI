@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { completeWithPermit } from "@/actions/applications";
-import { Trophy, Loader2, CheckCircle, CreditCard, Calendar } from "lucide-react";
+import { completeWithPermit, uploadNewResidenceCard } from "@/actions/applications";
+import { Trophy, Loader2, CheckCircle, CreditCard, Calendar, Upload, FileUp } from "lucide-react";
 
 interface Props {
   applicationId: string;
@@ -36,10 +36,25 @@ export function PermitResultPanel({
   const [newCardNumber, setNewCardNumber] = useState(resultData?.newCardNumber ?? "");
   const [newVisaExpiry, setNewVisaExpiry] = useState(resultData?.newVisaExpiry ?? "");
   const [newVisaType,   setNewVisaType]   = useState(resultData?.newVisaType   ?? desiredVisaType ?? currentVisaType ?? "");
+  const [cardImageUrl, setCardImageUrl] = useState("");
   const [saving,  setSaving]  = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error,   setError]   = useState("");
 
   const isCompleted = !!resultData?.completedAt;
+
+  async function handleUploadCard(file: File) {
+    setUploading(true);
+    setError("");
+    const result = await uploadNewResidenceCard(applicationId, file);
+    setUploading(false);
+    if (result.success) {
+      setCardImageUrl(result.url ?? "");
+      // アップロード成功後のUI更新
+    } else {
+      setError(result.error ?? "画像アップロードに失敗しました");
+    }
+  }
 
   async function handleComplete() {
     if (!permittedDate) {
@@ -120,6 +135,40 @@ export function PermitResultPanel({
               <CreditCard className="w-4 h-4 text-emerald-600" />
               新しい在留カード情報（申請人マスターに反映されます）
             </p>
+
+            {/* 新在留カード画像アップロード */}
+            <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3">
+              <label className="block text-xs font-semibold text-gray-700 mb-2">
+                新在留カード画像（参照用）
+              </label>
+              <div className="flex items-center gap-2">
+                <label className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => {
+                      const f = e.currentTarget.files?.[0];
+                      if (f) handleUploadCard(f);
+                    }}
+                    disabled={uploading}
+                    className="hidden"
+                  />
+                  <span className={`block text-center py-2 px-3 rounded-lg cursor-pointer text-xs font-medium transition-colors ${
+                    uploading
+                      ? "bg-emerald-200 text-emerald-700"
+                      : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                  }`}>
+                    {uploading
+                      ? <>アップロード中...</>
+                      : <><FileUp className="w-3.5 h-3.5 inline mr-1" />画像を選択</>}
+                  </span>
+                </label>
+              </div>
+              {cardImageUrl && (
+                <p className="text-xs text-emerald-600 mt-2">✓ 画像がアップロードされました</p>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">新在留カード番号</label>

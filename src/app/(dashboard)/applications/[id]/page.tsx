@@ -38,6 +38,7 @@ import { QuestionnaireDocxButton } from "@/components/applications/questionnaire
 import { RasensXmlPanel } from "@/components/applications/rasens-xml-panel";
 import { SubmissionInfoPanel } from "@/components/applications/submission-info-panel";
 import { PermitResultPanel } from "@/components/applications/permit-result-panel";
+import { SignedDocumentsPanel } from "@/components/applications/signed-documents-panel";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
 // 8ステップのワークフロー
@@ -417,6 +418,24 @@ export default async function ApplicationDetailPage({
             }))}
             applicationId={application.id}
             userRole={userRole}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 署名済み申請書（⑦以降） */}
+      {(application.status === "submitted" || application.status === "completed") && (
+        <CollapsibleSection
+          title="署名済み申請書"
+          badge={((application.draftData as any)?._signedDocuments?.length ?? 0) > 0
+            ? `${(application.draftData as any)._signedDocuments.length}件`
+            : undefined}
+          defaultOpen={true}
+          accentClass="bg-cyan-500"
+        >
+          <SignedDocumentsPanel
+            applicationId={application.id}
+            signedDocs={(application.draftData as any)?._signedDocuments ?? []}
+            applicationStatus={application.status}
           />
         </CollapsibleSection>
       )}

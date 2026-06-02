@@ -1319,13 +1319,16 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               <table className="sign-table" style={{ marginTop: "12px" }}>
                 <tbody>
                   <tr>
-                    <td className="lbl" style={{ width: "50%" }}>
-                      以上の記載内容は事実と相違ありません。<br />
-                      <span style={{ fontWeight: "normal", fontSize: "9px" }}>申請人（法定代理人）の署名／申請書作成年月日</span>
+                    <td colSpan={3} style={{ fontWeight: "bold", borderBottom: "none", paddingBottom: "2px" }}>
+                      以上の記載内容は事実と相違ありません。
                     </td>
-                    <td style={{ width: "30%" }}></td>
-                    <td className="lbl" style={{ width: "10%" }}>作成日</td>
-                    <td className="sign-date" style={{ width: "10%" }}>　年　月　日</td>
+                  </tr>
+                  <tr>
+                    <td style={{ width: "60%", borderTop: "none" }}>
+                      <span style={{ fontWeight: "normal", fontSize: "9px" }}>申請人（法定代理人）の署名</span>
+                    </td>
+                    <td className="lbl" style={{ width: "15%" }}>作成日</td>
+                    <td className="sign-date" style={{ width: "25%" }}>　年　月　日</td>
                   </tr>
                 </tbody>
               </table>
@@ -1334,16 +1337,17 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               <table style={{ marginTop: "8px" }}>
                 <tbody>
                   <tr>
-                    <td className="lbl" style={{ width: "15%" }}>取次者</td>
+                    <td className="lbl" rowSpan={2} style={{ width: "15%", verticalAlign: "middle" }}>取次者</td>
                     <td className="lbl" style={{ width: "15%" }}>(1) 氏名</td>
-                    <td>{fmt(form.agentName)}</td>
-                    <td className="lbl" style={{ width: "15%" }}>(2) 住所</td>
-                    <td>{fmt(form.agentAddress)}</td>
+                    <td style={{ width: "25%" }}>{fmt(form.agentName)}</td>
+                    <td className="lbl" style={{ width: "20%" }}>(2) 所属機関等</td>
+                    <td>{fmt(form.agentOrganization)}</td>
                   </tr>
                   <tr>
-                    <td></td>
-                    <td className="lbl">(3) 所属機関等</td>
-                    <td colSpan={3}>{fmt(form.agentOrganization)}　TEL: {fmt(form.agentPhone)}</td>
+                    <td className="lbl">(3) 住所</td>
+                    <td>{fmt(form.agentAddress)}</td>
+                    <td className="lbl">電話番号</td>
+                    <td>{fmt(form.agentPhone)}</td>
                   </tr>
                 </tbody>
               </table>

@@ -1316,19 +1316,36 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               </table>
 
               {/* 署名欄 */}
-              <table className="sign-table" style={{ marginTop: "12px" }}>
+              <table className="sign-table" style={{ marginTop: "14px" }}>
                 <tbody>
+                  {/* 宣誓文 */}
                   <tr>
-                    <td colSpan={3} style={{ fontWeight: "bold", borderBottom: "none", paddingBottom: "2px" }}>
+                    <td colSpan={4} style={{
+                      fontWeight: "bold",
+                      fontSize: "11px",
+                      textAlign: "center",
+                      background: "#f0f0f0",
+                      letterSpacing: "0.05em",
+                      height: "28px",
+                    }}>
                       以上の記載内容は事実と相違ありません。
                     </td>
                   </tr>
+                  {/* 署名者ラベル ｜ 署名スペース ｜ 作成日 */}
                   <tr>
-                    <td style={{ width: "60%", borderTop: "none" }}>
-                      <span style={{ fontWeight: "normal", fontSize: "9px" }}>申請人（法定代理人）の署名</span>
+                    <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "48px" }}>
+                      <div style={{ fontSize: "10px", fontWeight: "bold" }}>申請人（法定代理人）の署名</div>
+                      {(form.familyNameJa || form.givenNameJa || form.familyNameEn || form.givenNameEn) && (
+                        <div style={{ fontSize: "9px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
+                          氏名：{form.familyNameJa
+                            ? `${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}`
+                            : `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}`}
+                        </div>
+                      )}
                     </td>
-                    <td className="lbl" style={{ width: "15%" }}>作成日</td>
-                    <td className="sign-date" style={{ width: "25%" }}>　年　月　日</td>
+                    <td style={{ width: "42%" }}>{/* 署名スペース */}</td>
+                    <td className="lbl" style={{ width: "14%", textAlign: "center", fontWeight: "bold" }}>作成日</td>
+                    <td className="sign-date" style={{ width: "16%" }}>　年　月　日</td>
                   </tr>
                 </tbody>
               </table>

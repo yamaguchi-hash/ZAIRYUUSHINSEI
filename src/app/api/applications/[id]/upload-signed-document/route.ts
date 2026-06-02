@@ -3,6 +3,8 @@ import { db, applications } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { put } from "@vercel/blob";
 
+type DocumentType = "applicant" | "organization" | "gaikatsu";
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -30,6 +32,8 @@ export async function POST(
     // フォームデータからファイルを取得
     const formData = await request.formData();
     const file = formData.get("file") as File;
+    const documentType = (formData.get("documentType") ?? "applicant") as DocumentType;
+
     if (!file) {
       return Response.json({ error: "ファイルが見つかりません" }, { status: 400 });
     }
@@ -55,12 +59,14 @@ export async function POST(
       url: string;
       fileName: string;
       uploadedAt: string;
+      documentType?: DocumentType;
     }>;
 
     signedDocs.push({
       url: blob.url,
       fileName: file.name,
       uploadedAt: new Date().toISOString(),
+      documentType,
     });
 
     await db.update(applications)

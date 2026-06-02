@@ -3,7 +3,6 @@ import { getApplicationById } from "@/actions/applications";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, FileDown } from "lucide-react";
-import { ExcelDownloadButton } from "@/components/applications/excel-download-button";
 import { QuestionnaireDocxButton } from "@/components/applications/questionnaire-docx-button";
 import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
 import { ShinseiFormEditor } from "./shinsei-form-editor";
@@ -131,7 +130,6 @@ export default async function ShinseiFormPage({
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <QuestionnaireDocxButton applicationId={id} />
-          <ExcelDownloadButton applicationId={id} />
           <Link
             href={`/print/${id}/shinsei`}
             target="_blank"

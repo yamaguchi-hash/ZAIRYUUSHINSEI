@@ -34,7 +34,6 @@ import { getDocumentRequirements } from "@/actions/applications";
 import { DeleteApplicationButton } from "./delete-application-button";
 import { FileDown, FolderArchive, FileCode2, Zap } from "lucide-react";
 import { MergePdfButton } from "@/components/applications/merge-pdf-button";
-import { ExcelDownloadButton } from "@/components/applications/excel-download-button";
 import { QuestionnaireDocxButton } from "@/components/applications/questionnaire-docx-button";
 import { RasensXmlPanel } from "@/components/applications/rasens-xml-panel";
 
@@ -175,7 +174,6 @@ export default async function ApplicationDetailPage({
             申請書を作成
           </Link>
           <QuestionnaireDocxButton applicationId={application.id} />
-          <ExcelDownloadButton applicationId={application.id} />
           <MergePdfButton applicationId={application.id} />
 
           {/* 区切り */}

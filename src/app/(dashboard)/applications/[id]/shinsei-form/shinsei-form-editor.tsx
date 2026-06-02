@@ -190,6 +190,69 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
     setMsg("✓ 書類から読み取りました");
   }
 
+  /** 申請書（R型/P型）の入力内容から資格外活動許可申請書フィールドへ一括引用 */
+  function handleImportFromMainForm() {
+    const updates: Partial<typeof form> = {};
+    const imported: string[] = [];
+
+    if (isRtype) {
+      // 11(1) 職務の内容 ← partTimeWorkTypeR
+      if (form.partTimeWorkTypeR && !form.gaikatsuActivityType) {
+        const known = ["翻訳・通訳", "語学教師"];
+        if (known.includes(form.partTimeWorkTypeR)) {
+          updates.gaikatsuActivityType = form.partTimeWorkTypeR;
+        } else {
+          updates.gaikatsuActivityType = "その他";
+          updates.gaikatsuActivityTypeOther = form.partTimeWorkTypeR;
+        }
+        imported.push("職務の内容");
+      }
+      // 11(3) 週間稼働時間 ← partTimeWorkHoursR
+      if (form.partTimeWorkHoursR && !form.gaikatsuWeeklyHours) {
+        updates.gaikatsuWeeklyHours = form.partTimeWorkHoursR;
+        imported.push("週間稼働時間");
+      }
+      // 11(4) 報酬 ← partTimeWorkSalaryR / SalaryTypeR
+      if (form.partTimeWorkSalaryR && !form.gaikatsuSalary) {
+        updates.gaikatsuSalary = form.partTimeWorkSalaryR;
+        imported.push("報酬額");
+      }
+      if (form.partTimeWorkSalaryTypeR && !form.gaikatsuSalaryType) {
+        updates.gaikatsuSalaryType = form.partTimeWorkSalaryTypeR;
+      }
+      // 12(1) 勤務先名称 ← partTimeWorkOrgNameR + BranchNameR
+      if (form.partTimeWorkOrgNameR && !form.gaikatsuEmployerName) {
+        updates.gaikatsuEmployerName = form.partTimeWorkBranchNameR
+          ? `${form.partTimeWorkOrgNameR}　${form.partTimeWorkBranchNameR}`
+          : form.partTimeWorkOrgNameR;
+        imported.push("勤務先名称");
+      }
+      // 12(2) 電話番号 ← partTimeWorkPhoneR
+      if (form.partTimeWorkPhoneR && !form.gaikatsuEmployerPhone) {
+        updates.gaikatsuEmployerPhone = form.partTimeWorkPhoneR;
+        imported.push("勤務先電話番号");
+      }
+    }
+
+    if (isPtype) {
+      // 10. 現在の在留活動 ← 学校情報
+      if (form.schoolName && !form.gaikatsuCurrentActivity) {
+        const parts: string[] = [form.schoolName];
+        if (form.schoolType) parts.push(form.schoolType);
+        if (form.courseOfStudy) parts.push(form.courseOfStudy);
+        updates.gaikatsuCurrentActivity = parts.join("　");
+        imported.push("現在の在留活動（学校情報）");
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      setMsg("⚠ 引用できる項目がありませんでした（引用元が未入力、または既に入力済みです）");
+      return;
+    }
+    setForm(prev => ({ ...prev, ...updates }));
+    setMsg(`✓ ${imported.join("・")} を申請書から引用しました`);
+  }
+
   async function handleExtractMarriage() {
     setIsExtractingMarriage(true);
     setMarriageMsg("");
@@ -2090,6 +2153,37 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
             <p className="text-xs">出入国管理及び難民認定法第19条第2項に基づき、現在の在留資格で許可された活動以外の活動を行う場合に必要です。</p>
           </div>
 
+          {/* 申請書から引用ボタン */}
+          {(isRtype || isPtype) && (
+            <div className="flex items-start gap-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800">申請書（Part 2）の入力内容から引用できます</p>
+                <p className="text-xs text-amber-700 mt-1">
+                  {isRtype && (
+                    <>
+                      <span className="font-medium">R型（家族滞在）</span> から引用可能な項目：
+                      職務の内容（19. 資格外活動の内容）・週間稼働時間・報酬・勤務先名称・電話番号
+                    </>
+                  )}
+                  {isPtype && (
+                    <>
+                      <span className="font-medium">P型（留学）</span> から引用可能な項目：
+                      現在の在留活動の内容（学校情報）
+                    </>
+                  )}
+                </p>
+                <p className="text-xs text-amber-600 mt-1">※ 既に入力済みの項目はスキップされます。引用後に個別修正も可能です。</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleImportFromMainForm}
+                className="flex-shrink-0 inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                申請書から引用する
+              </button>
+            </div>
+          )}
+
           {/* 申請人基本情報（Part 1 から自動引用） */}
           <Card>
             <CardHeader>
@@ -2115,8 +2209,17 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
           {/* 10. 現在の在留活動の内容 */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">10. 現在の在留活動の内容</CardTitle>
-              <p className="text-xs text-gray-500 mt-1">学生の場合は学校名および週間授業時間を記入してください</p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base">10. 現在の在留活動の内容</CardTitle>
+                  <p className="text-xs text-gray-500 mt-1">学生の場合は学校名および週間授業時間を記入してください</p>
+                </div>
+                {isPtype && form.schoolName && !form.gaikatsuCurrentActivity && (
+                  <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1 flex-shrink-0">
+                    引用可：{form.schoolName}
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <textarea
@@ -2124,7 +2227,11 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 rows={3}
                 value={form.gaikatsuCurrentActivity}
                 onChange={e => set("gaikatsuCurrentActivity", e.target.value)}
-                placeholder="例: 〇〇大学情報学部に在籍。週20時間授業。 / 〇〇会社に家族として帯同。専業主婦。"
+                placeholder={
+                  isPtype && form.schoolName
+                    ? `引用可: ${form.schoolName}${form.schoolType ? `（${form.schoolType}）` : ""}${form.courseOfStudy ? `　${form.courseOfStudy}` : ""}`
+                    : "例: 〇〇大学情報学部に在籍。週20時間授業。 / 〇〇会社に家族として帯同。専業主婦。"
+                }
               />
             </CardContent>
           </Card>
@@ -2133,9 +2240,17 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
           <Card>
             <CardHeader>
               <CardTitle className="text-base">11. 他に従事しようとする活動の内容</CardTitle>
+              {isRtype && (form.partTimeWorkTypeR || form.partTimeWorkHoursR || form.partTimeWorkSalaryR) && (
+                <p className="text-xs text-amber-600 mt-1">
+                  ↑「申請書から引用する」ボタンで職務内容・稼働時間・報酬を自動引用できます
+                </p>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
-              <Field label="(1) 職務の内容">
+              <Field
+                label="(1) 職務の内容"
+                note={isRtype && form.partTimeWorkTypeR ? `申請書の入力値: ${form.partTimeWorkTypeR}` : undefined}
+              >
                 <div className="flex flex-wrap gap-4">
                   {["翻訳・通訳", "語学教師", "その他"].map(opt => (
                     <label key={opt} className="flex items-center gap-1.5 text-sm cursor-pointer">
@@ -2169,25 +2284,35 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     placeholder="例: 2025年4月1日〜2026年3月31日"
                   />
                 </Field>
-                <Field label="(3) 週間稼働時間" note="時間">
+                <Field
+                  label="(3) 週間稼働時間"
+                  note={isRtype && form.partTimeWorkHoursR && !form.gaikatsuWeeklyHours
+                    ? `申請書: ${form.partTimeWorkHoursR}時間`
+                    : "時間"}
+                >
                   <input
                     className={inputCls}
                     type="number"
                     value={form.gaikatsuWeeklyHours}
                     onChange={e => set("gaikatsuWeeklyHours", e.target.value)}
-                    placeholder="例: 28"
+                    placeholder={isRtype && form.partTimeWorkHoursR ? form.partTimeWorkHoursR : "例: 28"}
                   />
                 </Field>
               </div>
 
-              <Field label="(4) 報酬">
+              <Field
+                label="(4) 報酬"
+                note={isRtype && form.partTimeWorkSalaryR && !form.gaikatsuSalary
+                  ? `申請書: ${form.partTimeWorkSalaryR}円（${form.partTimeWorkSalaryTypeR || "月額"}）`
+                  : undefined}
+              >
                 <div className="flex gap-2 items-center">
                   <input
                     className={inputCls}
                     type="number"
                     value={form.gaikatsuSalary}
                     onChange={e => set("gaikatsuSalary", e.target.value)}
-                    placeholder="例: 100000"
+                    placeholder={isRtype && form.partTimeWorkSalaryR ? form.partTimeWorkSalaryR : "例: 100000"}
                   />
                   <span className="text-sm text-gray-500 flex-shrink-0">円</span>
                   <div className="flex gap-3 flex-shrink-0">
@@ -2212,14 +2337,28 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
           <Card>
             <CardHeader>
               <CardTitle className="text-base">12. 勤務先（Place of Employment）</CardTitle>
+              {isRtype && (form.partTimeWorkOrgNameR || form.partTimeWorkPhoneR) && (
+                <p className="text-xs text-amber-600 mt-1">
+                  ↑「申請書から引用する」ボタンで勤務先名称・電話番号を自動引用できます
+                </p>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
-              <Field label="(1) 名称">
+              <Field
+                label="(1) 名称"
+                note={isRtype && form.partTimeWorkOrgNameR && !form.gaikatsuEmployerName
+                  ? `申請書: ${form.partTimeWorkOrgNameR}${form.partTimeWorkBranchNameR ? `　${form.partTimeWorkBranchNameR}` : ""}`
+                  : undefined}
+              >
                 <input
                   className={inputCls}
                   value={form.gaikatsuEmployerName}
                   onChange={e => set("gaikatsuEmployerName", e.target.value)}
-                  placeholder="株式会社〇〇 / 〇〇レストラン"
+                  placeholder={
+                    isRtype && form.partTimeWorkOrgNameR
+                      ? form.partTimeWorkOrgNameR
+                      : "株式会社〇〇 / 〇〇レストラン"
+                  }
                 />
               </Field>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2231,12 +2370,17 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     placeholder="東京都〇〇区〇〇1-2-3"
                   />
                 </Field>
-                <Field label="電話番号">
+                <Field
+                  label="電話番号"
+                  note={isRtype && form.partTimeWorkPhoneR && !form.gaikatsuEmployerPhone
+                    ? `申請書: ${form.partTimeWorkPhoneR}`
+                    : undefined}
+                >
                   <input
                     className={inputCls}
                     value={form.gaikatsuEmployerPhone}
                     onChange={e => set("gaikatsuEmployerPhone", e.target.value)}
-                    placeholder="03-0000-0000"
+                    placeholder={isRtype && form.partTimeWorkPhoneR ? form.partTimeWorkPhoneR : "03-0000-0000"}
                   />
                 </Field>
               </div>

@@ -9,6 +9,7 @@ import {
   Search,
   Filter,
 } from "lucide-react";
+import { XmlImportButton } from "@/components/applications/xml-import-button";
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_TYPE_LABELS,
@@ -56,13 +57,16 @@ export default async function ApplicationsPage({
           <h1 className="text-2xl font-bold text-gray-900">申請案件一覧</h1>
           <p className="text-gray-500 text-sm mt-1">全 {apps.length} 件</p>
         </div>
-        <Link
-          href="/applications/new"
-          className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          新規申請作成
-        </Link>
+        <div className="flex items-center gap-2">
+          <XmlImportButton />
+          <Link
+            href="/applications/new"
+            className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            新規申請作成
+          </Link>
+        </div>
       </div>
 
       {/* Table */}

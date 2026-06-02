@@ -32,7 +32,7 @@ import { ApproveButton } from "@/components/applications/approve-button";
 import { QuestionnairePanel } from "@/components/applications/questionnaire-panel";
 import { getDocumentRequirements } from "@/actions/applications";
 import { DeleteApplicationButton } from "./delete-application-button";
-import { FileDown, FolderArchive } from "lucide-react";
+import { FileDown, FolderArchive, FileCode2 } from "lucide-react";
 import { MergePdfButton } from "@/components/applications/merge-pdf-button";
 import { ExcelDownloadButton } from "@/components/applications/excel-download-button";
 import { QuestionnaireDocxButton } from "@/components/applications/questionnaire-docx-button";
@@ -183,6 +183,16 @@ export default async function ApplicationDetailPage({
             <FileDown className="w-4 h-4" />
             書類一覧PDF
           </Link>
+          {/* XMLエクスポート */}
+          <a
+            href={`/api/applications/${application.id}/export-xml`}
+            download
+            title="申請書データをXMLで保存します（更新申請・類似申請時のインポート用）"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-700 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+          >
+            <FileCode2 className="w-4 h-4" />
+            XMLで保存
+          </a>
           {(userRole === "expert" || userRole === "admin") && !application.isApproved && (
             <ApproveButton applicationId={application.id} />
           )}

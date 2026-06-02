@@ -626,10 +626,24 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               <table className="sign-table" style={{ marginTop: "16px" }}>
                 <tbody>
                   <tr>
-                    <td className="lbl" style={{ width: "40%" }}>申請人（法定代理人）の署名／申請書作成年月日</td>
-                    <td style={{ width: "30%" }}></td>
-                    <td className="lbl sign-date" style={{ width: "12%" }}>署名日</td>
-                    <td className="sign-date" style={{ width: "18%" }}>　　年　　月　　日</td>
+                    <td colSpan={4} style={{ fontWeight: "bold", fontSize: "11px", textAlign: "center", background: "#f0f0f0", letterSpacing: "0.05em", height: "26px" }}>
+                      以上の記載内容は事実と相違ありません。
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "50px" }}>
+                      <div style={{ fontSize: "10.5px", fontWeight: "bold" }}>申請人（法定代理人）の署名</div>
+                      {(form.familyNameJa || form.givenNameJa || form.familyNameEn || form.givenNameEn) && (
+                        <div style={{ fontSize: "9.5px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
+                          氏名：{form.familyNameJa
+                            ? `${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}`
+                            : `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}`}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ width: "42%" }}></td>
+                    <td className="lbl sign-date" style={{ width: "14%", textAlign: "center" }}>署名日</td>
+                    <td className="sign-date" style={{ width: "16%" }}>　　年　　月　　日</td>
                   </tr>
                 </tbody>
               </table>
@@ -725,13 +739,27 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               </table>
 
               {/* 扶養者署名欄 */}
-              <table className="sign-table" style={{marginTop:'10px'}}>
+              <table className="sign-table" style={{ marginTop: "12px" }}>
                 <tbody>
                   <tr>
-                    <td className="lbl" style={{width:'35%'}}>扶養者の署名</td>
-                    <td style={{width:'35%'}}></td>
-                    <td className="lbl" style={{width:'12%'}}>署名日</td>
-                    <td className="sign-date" style={{width:'18%'}}>　　年　　月　　日</td>
+                    <td colSpan={4} style={{ fontWeight: "bold", fontSize: "11px", textAlign: "center", background: "#f0f0f0", letterSpacing: "0.05em", height: "26px" }}>
+                      以上の記載内容は事実と相違ありません。
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "50px" }}>
+                      <div style={{ fontSize: "10.5px", fontWeight: "bold" }}>扶養者の署名</div>
+                      {(form.supporterFamilyNameJa || form.supporterGivenNameJa || form.supporterFamilyNameEn || form.supporterGivenNameEn) && (
+                        <div style={{ fontSize: "9.5px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
+                          氏名：{form.supporterFamilyNameJa
+                            ? `${fmt(form.supporterFamilyNameJa)}　${fmt(form.supporterGivenNameJa)}`
+                            : `${fmt(form.supporterFamilyNameEn)} ${fmt(form.supporterGivenNameEn)}`}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ width: "42%" }}></td>
+                    <td className="lbl sign-date" style={{ width: "14%", textAlign: "center" }}>署名日</td>
+                    <td className="sign-date" style={{ width: "16%" }}>　　年　　月　　日</td>
                   </tr>
                 </tbody>
               </table>
@@ -923,10 +951,24 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               <table className="sign-table" style={{ marginTop: "16px" }}>
                 <tbody>
                   <tr>
-                    <td className="lbl" style={{ width: "40%" }}>申請人（法定代理人）の署名／申請書作成年月日</td>
-                    <td style={{ width: "30%" }}></td>
-                    <td className="lbl sign-date" style={{ width: "12%" }}>署名日</td>
-                    <td className="sign-date" style={{ width: "18%" }}>　　年　　月　　日</td>
+                    <td colSpan={4} style={{ fontWeight: "bold", fontSize: "11px", textAlign: "center", background: "#f0f0f0", letterSpacing: "0.05em", height: "26px" }}>
+                      以上の記載内容は事実と相違ありません。
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "50px" }}>
+                      <div style={{ fontSize: "10.5px", fontWeight: "bold" }}>申請人（法定代理人）の署名</div>
+                      {(form.familyNameJa || form.givenNameJa || form.familyNameEn || form.givenNameEn) && (
+                        <div style={{ fontSize: "9.5px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
+                          氏名：{form.familyNameJa
+                            ? `${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}`
+                            : `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}`}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ width: "42%" }}></td>
+                    <td className="lbl sign-date" style={{ width: "14%", textAlign: "center" }}>署名日</td>
+                    <td className="sign-date" style={{ width: "16%" }}>　　年　　月　　日</td>
                   </tr>
                 </tbody>
               </table>
@@ -1339,21 +1381,21 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                       以上の記載内容は事実と相違ありません。
                     </td>
                   </tr>
-                  {/* 署名者ラベル ｜ 署名スペース ｜ 作成日 */}
+                  {/* 署名者ラベル ｜ 署名スペース ｜ 署名日 */}
                   <tr>
-                    <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "48px" }}>
-                      <div style={{ fontSize: "10px", fontWeight: "bold" }}>申請人（法定代理人）の署名</div>
+                    <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "50px" }}>
+                      <div style={{ fontSize: "10.5px", fontWeight: "bold" }}>申請人（法定代理人）の署名</div>
                       {(form.familyNameJa || form.givenNameJa || form.familyNameEn || form.givenNameEn) && (
-                        <div style={{ fontSize: "9px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
+                        <div style={{ fontSize: "9.5px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
                           氏名：{form.familyNameJa
                             ? `${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}`
                             : `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}`}
                         </div>
                       )}
                     </td>
-                    <td style={{ width: "42%" }}>{/* 署名スペース */}</td>
-                    <td className="lbl" style={{ width: "14%", textAlign: "center", fontWeight: "bold" }}>作成日</td>
-                    <td className="sign-date" style={{ width: "16%" }}>　年　月　日</td>
+                    <td style={{ width: "42%" }}></td>
+                    <td className="lbl sign-date" style={{ width: "14%", textAlign: "center" }}>署名日</td>
+                    <td className="sign-date" style={{ width: "16%" }}>　　年　　月　　日</td>
                   </tr>
                 </tbody>
               </table>
@@ -1389,10 +1431,24 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
             <table className="sign-table" style={{ marginTop: "16px" }}>
               <tbody>
                 <tr>
-                  <td className="lbl" style={{ width: "40%" }}>申請人（法定代理人）の署名／申請書作成年月日</td>
-                  <td style={{ width: "30%" }}></td>
-                  <td className="lbl" style={{ width: "12%" }}>署名日</td>
-                  <td style={{ width: "18%" }}>　　年　　月　　日</td>
+                  <td colSpan={4} style={{ fontWeight: "bold", fontSize: "11px", textAlign: "center", background: "#f0f0f0", letterSpacing: "0.05em", height: "26px" }}>
+                    以上の記載内容は事実と相違ありません。
+                  </td>
+                </tr>
+                <tr>
+                  <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "50px" }}>
+                    <div style={{ fontSize: "10.5px", fontWeight: "bold" }}>申請人（法定代理人）の署名</div>
+                    {(form.familyNameJa || form.givenNameJa || form.familyNameEn || form.givenNameEn) && (
+                      <div style={{ fontSize: "9.5px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
+                        氏名：{form.familyNameJa
+                          ? `${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}`
+                          : `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}`}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ width: "42%" }}></td>
+                  <td className="lbl sign-date" style={{ width: "14%", textAlign: "center" }}>署名日</td>
+                  <td className="sign-date" style={{ width: "16%" }}>　　年　　月　　日</td>
                 </tr>
               </tbody>
             </table>

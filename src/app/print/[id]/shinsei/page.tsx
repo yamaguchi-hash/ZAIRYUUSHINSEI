@@ -1158,6 +1158,193 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
             </>
           )}
 
+          {/* ══ 資格外活動許可申請書（別記第二十八号様式） ═══════════════════════ */}
+          {(form.gaikatsuNeeded === "有" ||
+            (isRtype && yes(form.partTimeWorkExistsR)) ||
+            (isPtype)) && (form.gaikatsuActivityType || form.gaikatsuCurrentActivity || form.gaikatsuEmployerName) && (
+            <>
+              <div className="section page-break">
+                資格外活動許可申請書（別記第二十八号様式・第十九条関係）
+              </div>
+              <div style={{ fontSize: "9px", textAlign: "right", marginBottom: "6px", color: "#555" }}>
+                日本国政府法務省　Ministry of Justice, Government of Japan
+              </div>
+              <div style={{ textAlign: "center", fontSize: "13px", fontWeight: "bold", border: "2px solid #000", padding: "5px 12px", marginBottom: "10px" }}>
+                資格外活動許可申請書<br />
+                <span style={{ fontSize: "10px", fontWeight: "normal" }}>APPLICATION FOR PERMISSION TO ENGAGE IN ACTIVITY OTHER THAN THAT PERMITTED UNDER THE STATUS OF RESIDENCE PREVIOUSLY GRANTED</span>
+              </div>
+              <p style={{ fontSize: "10px", marginBottom: "8px" }}>
+                出入国管理及び難民認定法第１９条第２項の規定に基づき，次のとおり資格外活動の許可を申請します。
+              </p>
+
+              {/* 1〜9: 申請人基本情報 */}
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl">1. 国籍・地域</td>
+                    <td>{fmt(form.nationality)}</td>
+                    <td className="lbl">2. 生年月日</td>
+                    <td>{fmtDate(form.dateOfBirth)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">3. 氏名（ローマ字）</td>
+                    <td colSpan={3}>{fmt(form.familyNameEn)}　{fmt(form.givenNameEn)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">4. 性別</td>
+                    <td>{fmtSex(form.sex)}</td>
+                    <td className="lbl">5. 配偶者の有無</td>
+                    <td>{fmt(form.maritalStatus)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">6. 職業</td>
+                    <td colSpan={3}>{fmt(form.occupation)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">7. 住居地</td>
+                    <td colSpan={3}>{fmt(form.addressInJapan)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">　電話番号</td>
+                    <td>{fmt(form.telephoneNo)}</td>
+                    <td className="lbl">携帯電話番号</td>
+                    <td>{fmt(form.cellularPhoneNo)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">8. 旅券番号</td>
+                    <td>{fmt(form.passportNumber)}</td>
+                    <td className="lbl">有効期限</td>
+                    <td>{fmtDate(form.passportExpiry)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">9. 現在の在留資格</td>
+                    <td>{fmt(form.currentStatusOfResidence)}</td>
+                    <td className="lbl">在留期間</td>
+                    <td>{fmt(form.currentPeriodOfStay)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">　在留期間の満了日</td>
+                    <td>{fmtDate(form.currentPeriodExpiry)}</td>
+                    <td className="lbl">10. 在留カード番号</td>
+                    <td>{fmt(form.residenceCardNumber)}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* 10. 現在の在留活動の内容 */}
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{ width: "30%" }}>
+                      11. 現在の在留活動の内容<br />
+                      <span style={{ fontWeight: "normal", fontSize: "9px" }}>(学生は学校名・週間授業時間)</span>
+                    </td>
+                    <td style={{ whiteSpace: "pre-wrap", minHeight: "50px" }}>
+                      {fmt(form.gaikatsuCurrentActivity)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* 11. 他に従事しようとする活動の内容 */}
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl" rowSpan={4} style={{ width: "30%", verticalAlign: "top", paddingTop: "4px" }}>
+                      12. 他に従事しようとする<br />活動の内容
+                    </td>
+                    <td className="lbl" style={{ width: "20%" }}>(1) 職務の内容</td>
+                    <td>
+                      {form.gaikatsuActivityType === "翻訳・通訳" && "■翻訳・通訳　□語学教師　□その他"}
+                      {form.gaikatsuActivityType === "語学教師" && "□翻訳・通訳　■語学教師　□その他"}
+                      {form.gaikatsuActivityType === "その他" && `□翻訳・通訳　□語学教師　■その他（${fmt(form.gaikatsuActivityTypeOther)}）`}
+                      {!form.gaikatsuActivityType && "□翻訳・通訳　□語学教師　□その他"}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(2) 雇用契約期間</td>
+                    <td>{fmt(form.gaikatsuContractPeriod)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(3) 週間稼働時間</td>
+                    <td>{form.gaikatsuWeeklyHours ? `${form.gaikatsuWeeklyHours}時間` : "　"}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(4) 報酬</td>
+                    <td>
+                      {form.gaikatsuSalary
+                        ? `${Number(form.gaikatsuSalary).toLocaleString()}円（${form.gaikatsuSalaryType || "月額"}）`
+                        : "　"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* 12. 勤務先 */}
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl" rowSpan={3} style={{ width: "20%", verticalAlign: "top", paddingTop: "4px" }}>
+                      13. 勤務先
+                    </td>
+                    <td className="lbl" style={{ width: "20%" }}>(1) 名称</td>
+                    <td>{fmt(form.gaikatsuEmployerName)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(2) 所在地</td>
+                    <td>
+                      {fmt(form.gaikatsuEmployerAddress)}
+                      {form.gaikatsuEmployerPhone && `　TEL: ${form.gaikatsuEmployerPhone}`}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(3) 業種</td>
+                    <td>
+                      {["製造", "商業", "教育", "その他"].map(t => (
+                        <span key={t} style={{ marginRight: "12px" }}>
+                          {form.gaikatsuEmployerBusinessType === t ? "■" : "□"}{t}
+                        </span>
+                      ))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* 署名欄 */}
+              <table className="sign-table" style={{ marginTop: "12px" }}>
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{ width: "50%" }}>
+                      以上の記載内容は事実と相違ありません。<br />
+                      <span style={{ fontWeight: "normal", fontSize: "9px" }}>申請人（法定代理人）の署名／申請書作成年月日</span>
+                    </td>
+                    <td style={{ width: "30%" }}></td>
+                    <td className="lbl" style={{ width: "10%" }}>作成日</td>
+                    <td style={{ width: "10%" }}>　年　月　日</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* 取次者 */}
+              <table style={{ marginTop: "8px" }}>
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{ width: "15%" }}>取次者</td>
+                    <td className="lbl" style={{ width: "15%" }}>(1) 氏名</td>
+                    <td>{fmt(form.agentName)}</td>
+                    <td className="lbl" style={{ width: "15%" }}>(2) 住所</td>
+                    <td>{fmt(form.agentAddress)}</td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td className="lbl">(3) 所属機関等</td>
+                    <td colSpan={3}>{fmt(form.agentOrganization)}　TEL: {fmt(form.agentPhone)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </>
+          )}
+
           {/* ── 申請人署名欄（R型・V型以外：申請人等作成用の末尾） ─────────────── */}
           {/* R型はR型ブロック内、V型はV型ブロック内に署名欄を出力済みのため除外 */}
           {!isRtype && !isVtype && (

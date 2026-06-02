@@ -73,7 +73,7 @@ const CATEGORY_LABELS: Record<VisaFormCategory, string> = {
   U: 'U型 — その他',
 };
 
-type TabKey = "meta" | "p1a" | "p1b" | "p2" | "org1" | "org2" | "statement";
+type TabKey = "meta" | "p1a" | "p1b" | "p2" | "org1" | "org2" | "gaikatsu" | "statement";
 
 export function ShinseiFormEditor({ applicationId, initialForm, applicationType, userRole }: Props) {
   const [form, setForm] = useState<ApplicationFormData>(initialForm);
@@ -114,6 +114,13 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
   // COEの場合の項目番号オフセット
   const p2Offset = isCoe ? 5 : 0;  // COE: +5 (22起点), Change/Extension: +0 (17起点)
   const orgDispatchNo = isCoe ? 12 : 11;  // COE:12, Change/Extension:11
+
+  // 資格外活動許可申請書の表示条件
+  // R型で資格外活動あり / P型 / 手動フラグが「有」の場合に表示
+  const showGaikatsu =
+    form.gaikatsuNeeded === "有" ||
+    (isRtype && form.partTimeWorkExistsR === "有") ||
+    (isPtype);
 
   function set<K extends keyof ApplicationFormData>(key: K, value: ApplicationFormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -213,6 +220,12 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
     { key: "p2",        label: "申請人 Part 2",    sub: part2Type === 'N' ? "学歴・勤務先" : part2Type === 'T' ? "配偶者情報" : part2Type === 'R' ? "扶養者情報" : part2Type === 'P' ? "学校情報" : "補足情報" },
     { key: "org1",      label: "所属機関 Part 1",  sub: needsOrg ? "機関情報・雇用条件" : "（不要）", show: needsOrg },
     { key: "org2",      label: "所属機関 Part 2",  sub: needsOrg ? `派遣先等（項目${orgDispatchNo}）` : "（不要）", show: needsOrg },
+    {
+      key: "gaikatsu",
+      label: "資格外活動許可申請書",
+      sub: showGaikatsu ? "別記第二十八号様式" : "（不要・未設定）",
+      show: showGaikatsu,
+    },
     { key: "statement", label: "申請理由書",        sub: "別紙・自由記載" },
   ];
 
@@ -296,6 +309,29 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                    part2Type === 'P' ? 'P型（留学：学校・費用支弁）' : '補足メモ欄のみ'}
                   　|　所属機関等作成用：{needsOrg ? '必要' : '不要'}
                 </p>
+              </div>
+              {/* 資格外活動許可申請書 手動トグル */}
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.gaikatsuNeeded === "有"}
+                    onChange={e => set("gaikatsuNeeded", e.target.checked ? "有" : "無")}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">資格外活動許可申請書（別記第二十八号様式）も作成する</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      留学・家族滞在等でアルバイト・翻訳通訳等を行う場合に必要。
+                      P型・R型で資格外活動「有」を選択した場合は自動表示されます。
+                    </p>
+                  </div>
+                </label>
+                {showGaikatsu && (
+                  <p className="text-xs text-green-600 mt-2 ml-7">
+                    ✓ 「資格外活動許可申請書」タブが有効です
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -2043,6 +2079,185 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
               </CardContent>
             </Card>
           )}
+        </div>
+      )}
+
+      {/* ══ 資格外活動許可申請書（別記第二十八号様式） ════════════════════════ */}
+      {tab === "gaikatsu" && (
+        <div className="space-y-6">
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+            <p className="font-semibold mb-1">資格外活動許可申請書（別記第二十八号様式）</p>
+            <p className="text-xs">出入国管理及び難民認定法第19条第2項に基づき、現在の在留資格で許可された活動以外の活動を行う場合に必要です。</p>
+          </div>
+
+          {/* 申請人基本情報（Part 1 から自動引用） */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">申請人情報（Part 1 から自動引用）</CardTitle>
+              <p className="text-xs text-gray-500 mt-1">以下の項目は申請人 Part 1a・Part 1b の入力内容が印刷時に自動反映されます</p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-gray-600">
+                <div><span className="font-medium">1. 国籍・地域：</span>{form.nationality || "（未入力）"}</div>
+                <div><span className="font-medium">2. 生年月日：</span>{form.dateOfBirth || "（未入力）"}</div>
+                <div><span className="font-medium">3. 氏名：</span>{form.familyNameEn} {form.givenNameEn}</div>
+                <div><span className="font-medium">4. 性別：</span>{form.sex || "（未入力）"}</div>
+                <div><span className="font-medium">5. 配偶者の有無：</span>{form.maritalStatus || "（未入力）"}</div>
+                <div><span className="font-medium">6. 職業：</span>{form.occupation || "（未入力）"}</div>
+                <div><span className="font-medium">7. 住居地：</span>{form.addressInJapan || "（未入力）"}</div>
+                <div><span className="font-medium">8. パスポート番号：</span>{form.passportNumber || "（未入力）"}</div>
+                <div><span className="font-medium">9. 現在の在留資格：</span>{form.currentStatusOfResidence || "（未入力）"}</div>
+                <div><span className="font-medium">　 在留カード番号：</span>{form.residenceCardNumber || "（未入力）"}</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 10. 現在の在留活動の内容 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">10. 現在の在留活動の内容</CardTitle>
+              <p className="text-xs text-gray-500 mt-1">学生の場合は学校名および週間授業時間を記入してください</p>
+            </CardHeader>
+            <CardContent>
+              <textarea
+                className={textareaCls}
+                rows={3}
+                value={form.gaikatsuCurrentActivity}
+                onChange={e => set("gaikatsuCurrentActivity", e.target.value)}
+                placeholder="例: 〇〇大学情報学部に在籍。週20時間授業。 / 〇〇会社に家族として帯同。専業主婦。"
+              />
+            </CardContent>
+          </Card>
+
+          {/* 11. 他に従事しようとする活動の内容 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">11. 他に従事しようとする活動の内容</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Field label="(1) 職務の内容">
+                <div className="flex flex-wrap gap-4">
+                  {["翻訳・通訳", "語学教師", "その他"].map(opt => (
+                    <label key={opt} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        value={opt}
+                        checked={form.gaikatsuActivityType === opt}
+                        onChange={() => set("gaikatsuActivityType", opt)}
+                        className="text-blue-600"
+                      />
+                      <span>{opt}</span>
+                    </label>
+                  ))}
+                </div>
+                {form.gaikatsuActivityType === "その他" && (
+                  <input
+                    className={`${inputCls} mt-2`}
+                    value={form.gaikatsuActivityTypeOther}
+                    onChange={e => set("gaikatsuActivityTypeOther", e.target.value)}
+                    placeholder="活動内容を具体的に記入（例：飲食店での接客・調理補助）"
+                  />
+                )}
+              </Field>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="(2) 雇用契約期間">
+                  <input
+                    className={inputCls}
+                    value={form.gaikatsuContractPeriod}
+                    onChange={e => set("gaikatsuContractPeriod", e.target.value)}
+                    placeholder="例: 2025年4月1日〜2026年3月31日"
+                  />
+                </Field>
+                <Field label="(3) 週間稼働時間" note="時間">
+                  <input
+                    className={inputCls}
+                    type="number"
+                    value={form.gaikatsuWeeklyHours}
+                    onChange={e => set("gaikatsuWeeklyHours", e.target.value)}
+                    placeholder="例: 28"
+                  />
+                </Field>
+              </div>
+
+              <Field label="(4) 報酬">
+                <div className="flex gap-2 items-center">
+                  <input
+                    className={inputCls}
+                    type="number"
+                    value={form.gaikatsuSalary}
+                    onChange={e => set("gaikatsuSalary", e.target.value)}
+                    placeholder="例: 100000"
+                  />
+                  <span className="text-sm text-gray-500 flex-shrink-0">円</span>
+                  <div className="flex gap-3 flex-shrink-0">
+                    {["月額", "週額", "日額"].map(t => (
+                      <label key={t} className="flex items-center gap-1 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          value={t}
+                          checked={form.gaikatsuSalaryType === t}
+                          onChange={() => set("gaikatsuSalaryType", t)}
+                        />
+                        {t}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </Field>
+            </CardContent>
+          </Card>
+
+          {/* 12. 勤務先 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">12. 勤務先（Place of Employment）</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Field label="(1) 名称">
+                <input
+                  className={inputCls}
+                  value={form.gaikatsuEmployerName}
+                  onChange={e => set("gaikatsuEmployerName", e.target.value)}
+                  placeholder="株式会社〇〇 / 〇〇レストラン"
+                />
+              </Field>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="(2) 所在地">
+                  <input
+                    className={inputCls}
+                    value={form.gaikatsuEmployerAddress}
+                    onChange={e => set("gaikatsuEmployerAddress", e.target.value)}
+                    placeholder="東京都〇〇区〇〇1-2-3"
+                  />
+                </Field>
+                <Field label="電話番号">
+                  <input
+                    className={inputCls}
+                    value={form.gaikatsuEmployerPhone}
+                    onChange={e => set("gaikatsuEmployerPhone", e.target.value)}
+                    placeholder="03-0000-0000"
+                  />
+                </Field>
+              </div>
+              <Field label="(3) 業種">
+                <div className="flex flex-wrap gap-4">
+                  {["製造", "商業", "教育", "その他"].map(opt => (
+                    <label key={opt} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        value={opt}
+                        checked={form.gaikatsuEmployerBusinessType === opt}
+                        onChange={() => set("gaikatsuEmployerBusinessType", opt)}
+                        className="text-blue-600"
+                      />
+                      <span>{opt}</span>
+                    </label>
+                  ))}
+                </div>
+              </Field>
+            </CardContent>
+          </Card>
         </div>
       )}
 

@@ -511,6 +511,32 @@ export interface ApplicationFormData {
   dispatchPeriod: string;
 
   // ══════════════════════════════════════════════════════════════════════════
+  // 資格外活動許可申請書（別記第二十八号様式）
+  // 資格外活動の有無が「有」または手動で必要とした場合に使用
+  // ══════════════════════════════════════════════════════════════════════════
+  /** 資格外活動許可申請書を作成するか（手動フラグ） */
+  gaikatsuNeeded: string;                // 有 / 無
+  /** 10. 現在の在留活動の内容（学生は学校名・週間授業時間等） */
+  gaikatsuCurrentActivity: string;
+  /** 11(1) 職務の内容 */
+  gaikatsuActivityType: string;          // 翻訳・通訳 / 語学教師 / その他
+  gaikatsuActivityTypeOther: string;     // その他の場合の詳細
+  /** 11(2) 雇用契約期間 */
+  gaikatsuContractPeriod: string;
+  /** 11(3) 週間稼働時間 */
+  gaikatsuWeeklyHours: string;
+  /** 11(4) 報酬 */
+  gaikatsuSalary: string;               // 金額（円）
+  gaikatsuSalaryType: string;           // 月額 / 週額 / 日額
+  /** 12(1) 勤務先名称 */
+  gaikatsuEmployerName: string;
+  /** 12(2) 勤務先所在地・電話番号 */
+  gaikatsuEmployerAddress: string;
+  gaikatsuEmployerPhone: string;
+  /** 12(3) 業種 */
+  gaikatsuEmployerBusinessType: string;  // 製造 / 商業 / 教育 / その他
+
+  // ══════════════════════════════════════════════════════════════════════════
   // 申請理由書（別紙）
   // ══════════════════════════════════════════════════════════════════════════
   applicationStatement: string;
@@ -673,6 +699,14 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   dispatchOrgEmploymentInsuranceNo: '', dispatchOrgBusinessTypeCode: '',
   dispatchOrgAddress: '', dispatchOrgPhone: '',
   dispatchOrgCapital: '', dispatchOrgAnnualSales: '', dispatchPeriod: '',
+  // 資格外活動許可申請書
+  gaikatsuNeeded: '無',
+  gaikatsuCurrentActivity: '',
+  gaikatsuActivityType: '', gaikatsuActivityTypeOther: '',
+  gaikatsuContractPeriod: '', gaikatsuWeeklyHours: '',
+  gaikatsuSalary: '', gaikatsuSalaryType: '月額',
+  gaikatsuEmployerName: '', gaikatsuEmployerAddress: '', gaikatsuEmployerPhone: '',
+  gaikatsuEmployerBusinessType: '',
   // 理由書
   applicationStatement: '',
 };

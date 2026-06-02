@@ -32,7 +32,7 @@ import { ApproveButton } from "@/components/applications/approve-button";
 import { QuestionnairePanel } from "@/components/applications/questionnaire-panel";
 import { getDocumentRequirements } from "@/actions/applications";
 import { DeleteApplicationButton } from "./delete-application-button";
-import { FileDown, FolderArchive, FileCode2, Zap } from "lucide-react";
+import { FileDown, FolderArchive, Zap } from "lucide-react";
 import { MergePdfButton } from "@/components/applications/merge-pdf-button";
 import { QuestionnaireDocxButton } from "@/components/applications/questionnaire-docx-button";
 import { RasensXmlPanel } from "@/components/applications/rasens-xml-panel";
@@ -196,15 +196,6 @@ export default async function ApplicationDetailPage({
             <Zap className="w-4 h-4" />
             RASENS転記シート
           </Link>
-          <a
-            href={`/api/applications/${application.id}/export-xml`}
-            download
-            title="申請書データをXMLで保存します（更新申請・類似申請時のインポート用）"
-            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors whitespace-nowrap"
-          >
-            <FileCode2 className="w-4 h-4" />
-            XMLで保存
-          </a>
 
           {/* 区切り */}
           <div className="h-6 w-px bg-gray-200" />

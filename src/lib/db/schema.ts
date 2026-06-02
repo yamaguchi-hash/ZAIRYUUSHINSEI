@@ -298,3 +298,24 @@ export const applicationDocumentChecklistRelations = relations(applicationDocume
     references: [documentRequirementMaster.id],
   }),
 }));
+
+// ─── Backup History ───────────────────────────────────────────────────────────
+export const backupHistory = pgTable("backup_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  backupType: text("backup_type").notNull(), // "manual" | "automatic"
+  fileUrl: text("file_url"), // Vercel Blob URL
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size"),
+  applicantMasterCount: integer("applicant_master_count"),
+  applicationsCount: integer("applications_count"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"), // 自動削除予定日時
+  isDeleted: boolean("is_deleted").notNull().default(false),
+});
+
+export const backupHistoryRelations = relations(backupHistory, ({ one }) => ({
+  tenant: one(tenants, { fields: [backupHistory.tenantId], references: [tenants.id] }),
+  createdBy: one(users, { fields: [backupHistory.createdBy], references: [users.id] }),
+}));

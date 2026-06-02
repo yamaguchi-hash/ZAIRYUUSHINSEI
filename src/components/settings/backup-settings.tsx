@@ -1,17 +1,50 @@
 "use client";
 
-import { useState } from "react";
-import { Download, Upload, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
-import { exportBackup, importBackup } from "@/actions/backup";
+import { useState, useEffect } from "react";
+import { Download, Upload, AlertCircle, CheckCircle, Loader2, Calendar, HardDrive } from "lucide-react";
+import { exportBackup, importBackup, fetchBackupHistory } from "@/actions/backup";
 import { formatBytes } from "@/lib/backup-utils";
+
+interface BackupHistoryItem {
+  id: string;
+  backupType: string;
+  fileName: string;
+  fileSize: number | null;
+  applicantMasterCount: number | null;
+  applicationsCount: number | null;
+  createdAt: Date | string;
+  fileUrl: string | null;
+}
 
 export function BackupSettings() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [pendingRestoreData, setPendingRestoreData] = useState("");
+  const [history, setHistory] = useState<BackupHistoryItem[]>([]);
+
+  useEffect(() => {
+    loadBackupHistory();
+  }, []);
+
+  async function loadBackupHistory() {
+    setLoadingHistory(true);
+    try {
+      const result = await fetchBackupHistory();
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      setHistory(result.data || []);
+    } catch (err: any) {
+      setError("バックアップ履歴の読み込みに失敗しました");
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
 
   async function handleExport() {
     setExporting(true);
@@ -40,6 +73,9 @@ export function BackupSettings() {
       setSuccess(
         `バックアップを作成しました: ${result.fileName} (${formatBytes(result.data.metadata.totalSize)})`
       );
+
+      // 履歴をリロード
+      setTimeout(() => loadBackupHistory(), 1000);
     } catch (err: any) {
       setError(err.message ?? "バックアップ作成に失敗しました");
     } finally {
@@ -95,7 +131,7 @@ export function BackupSettings() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* エクスポート */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start gap-3">
@@ -173,6 +209,72 @@ export function BackupSettings() {
         </div>
       </div>
 
+      {/* バックアップ履歴 */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-100">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            バックアップ履歴
+          </h3>
+        </div>
+
+        <div className="divide-y divide-gray-200">
+          {loadingHistory ? (
+            <div className="px-4 py-8 text-center text-gray-500 text-sm">
+              <Loader2 className="w-4 h-4 inline animate-spin mr-2" />
+              読み込み中...
+            </div>
+          ) : history.length === 0 ? (
+            <div className="px-4 py-8 text-center text-gray-500 text-sm">
+              バックアップがまだ作成されていません
+            </div>
+          ) : (
+            history.map((item) => (
+              <div key={item.id} className="px-4 py-3 hover:bg-gray-100">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {item.fileName}
+                    </p>
+                    <div className="flex items-center gap-4 mt-1 text-xs text-gray-600">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(item.createdAt).toLocaleString("ja-JP")}
+                      </span>
+                      {item.fileSize && (
+                        <span className="flex items-center gap-1">
+                          <HardDrive className="w-3 h-3" />
+                          {formatBytes(item.fileSize)}
+                        </span>
+                      )}
+                      {item.backupType === "automatic" && (
+                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                          自動
+                        </span>
+                      )}
+                    </div>
+                    {item.applicantMasterCount !== null && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        申請人: {item.applicantMasterCount}件 / 案件: {item.applicationsCount}件
+                      </p>
+                    )}
+                  </div>
+                  {item.fileUrl && (
+                    <a
+                      href={item.fileUrl}
+                      download
+                      className="px-3 py-1 text-xs text-blue-600 hover:text-blue-700 whitespace-nowrap"
+                    >
+                      ダウンロード
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
       {/* 復元確認ダイアログ */}
       {showRestoreConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -233,7 +335,7 @@ export function BackupSettings() {
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-600">
         <p>
           <strong>ヒント:</strong> バックアップファイルは安全な場所に保存してください。
-          定期的にバックアップを作成することをお勧めします。
+          自動バックアップは毎日 AM 2:00 に実行されます（最新30日分を保持）。
         </p>
       </div>
     </div>

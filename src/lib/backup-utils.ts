@@ -1,5 +1,6 @@
-import { db, applicantMaster, applications } from "@/lib/db";
+import { db, applicantMaster, applications, backupHistory } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { put } from "@vercel/blob";
 
 export interface BackupData {
   version: string;
@@ -49,6 +50,50 @@ export async function createBackupData(tenantId: string): Promise<BackupData> {
   return backupData;
 }
 
+export async function saveBackupToBlob(
+  tenantId: string,
+  backupData: BackupData,
+  fileName: string,
+  userId: string
+): Promise<{ url: string; fileName: string }> {
+  const dataStr = JSON.stringify(backupData, null, 2);
+  const buffer = Buffer.from(dataStr, "utf-8");
+
+  const blob = await put(
+    `backups/${tenantId}/${fileName}`,
+    buffer,
+    { access: "private", contentType: "application/json" }
+  );
+
+  // バックアップ履歴を記録
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30); // 30日保持
+
+  await db.insert(backupHistory).values({
+    tenantId,
+    backupType: "automatic",
+    fileUrl: blob.url,
+    fileName,
+    fileSize: buffer.length,
+    applicantMasterCount: backupData.metadata.applicantMasterCount,
+    applicationsCount: backupData.metadata.applicationsCount,
+    createdBy: userId,
+    expiresAt,
+  });
+
+  return { url: blob.url, fileName };
+}
+
+export async function getBackupHistory(tenantId: string) {
+  const history = await db
+    .select()
+    .from(backupHistory)
+    .where(eq(backupHistory.tenantId, tenantId))
+    .orderBy((t) => t.createdAt);
+
+  return history.filter((h) => !h.isDeleted);
+}
+
 export async function restoreBackupData(
   tenantId: string,
   backupData: BackupData
@@ -77,7 +122,7 @@ export function formatBytes(bytes: number): string {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 }
 
-export function generateBackupFileName(tenantId: string): string {
+export function generateBackupFileName(tenantId: string, backupType: "manual" | "automatic" = "manual"): string {
   const now = new Date();
   const timestamp = now
     .toISOString()
@@ -86,5 +131,6 @@ export function generateBackupFileName(tenantId: string): string {
     String(now.getHours()).padStart(2, "0") +
     String(now.getMinutes()).padStart(2, "0") +
     String(now.getSeconds()).padStart(2, "0");
-  return `backup_${tenantId}_${timestamp}.json`;
+  const prefix = backupType === "automatic" ? "auto_backup" : "backup";
+  return `${prefix}_${tenantId}_${timestamp}.json`;
 }

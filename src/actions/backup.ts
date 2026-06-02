@@ -1,11 +1,13 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { db, applicantMaster, applications } from "@/lib/db";
+import { db, applicantMaster, applications, backupHistory } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import {
   createBackupData,
   generateBackupFileName,
+  saveBackupToBlob,
+  getBackupHistory,
   type BackupData,
 } from "@/lib/backup-utils";
 
@@ -28,7 +30,7 @@ export async function exportBackup() {
     }
 
     const backupData = await createBackupData(tenantId);
-    const fileName = generateBackupFileName(tenantId);
+    const fileName = generateBackupFileName(tenantId, "manual");
 
     return {
       success: true,
@@ -37,6 +39,26 @@ export async function exportBackup() {
     };
   } catch (err: any) {
     return { error: err.message ?? "バックアップ作成に失敗しました" };
+  }
+}
+
+export async function performAutoBackup(tenantId: string, userId: string) {
+  try {
+    const backupData = await createBackupData(tenantId);
+    const fileName = generateBackupFileName(tenantId, "automatic");
+
+    await saveBackupToBlob(tenantId, backupData, fileName, userId);
+
+    return {
+      success: true,
+      message: `自動バックアップ完了: 申請人 ${backupData.metadata.applicantMasterCount}件、案件 ${backupData.metadata.applicationsCount}件`,
+    };
+  } catch (err: any) {
+    console.error("Auto backup failed:", err);
+    return {
+      success: false,
+      error: err.message ?? "自動バックアップに失敗しました",
+    };
   }
 }
 
@@ -124,9 +146,36 @@ export async function importBackup(backupJson: string) {
 
     return {
       success: true,
-      message: `復元完了: 申請人 ${backupData.metadata.applicantMasterCount}件、案件 ${backupData.metadata.applicationsCount}件を復元しました`,
+      message: `復元完了: 申請人 ${backupData.metadata.applicantMasterCount}件、案項 ${backupData.metadata.applicationsCount}件を復元しました`,
     };
   } catch (err: any) {
     return { error: err.message ?? "復元に失敗しました" };
+  }
+}
+
+export async function fetchBackupHistory() {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return { error: "認証が必要です" };
+    }
+
+    const tenantId = (session.user as any)?.tenantId;
+    if (!tenantId) {
+      return { error: "テナントIDが不正です" };
+    }
+
+    const role = (session.user as any)?.role;
+    if (role !== "admin") {
+      return { error: "管理者のみ実行可能です" };
+    }
+
+    const history = await getBackupHistory(tenantId);
+    return {
+      success: true,
+      data: history,
+    };
+  } catch (err: any) {
+    return { error: err.message ?? "バックアップ履歴の取得に失敗しました" };
   }
 }

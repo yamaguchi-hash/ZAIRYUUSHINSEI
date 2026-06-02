@@ -642,7 +642,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                       )}
                     </td>
                     <td style={{ width: "36%" }}></td>
-                    <td className="lbl sign-date" style={{ width: "16%", textAlign: "center" }}>署名日</td>
+                    <td className="lbl" style={{ width: "16%", textAlign: "center" }}>署名日</td>
                     <td className="sign-date" style={{ width: "20%" }}>　　年　　月　　日</td>
                   </tr>
                 </tbody>
@@ -758,7 +758,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                       )}
                     </td>
                     <td style={{ width: "36%" }}></td>
-                    <td className="lbl sign-date" style={{ width: "16%", textAlign: "center" }}>署名日</td>
+                    <td className="lbl" style={{ width: "16%", textAlign: "center" }}>署名日</td>
                     <td className="sign-date" style={{ width: "20%" }}>　　年　　月　　日</td>
                   </tr>
                 </tbody>
@@ -967,7 +967,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                       )}
                     </td>
                     <td style={{ width: "36%" }}></td>
-                    <td className="lbl sign-date" style={{ width: "16%", textAlign: "center" }}>署名日</td>
+                    <td className="lbl" style={{ width: "16%", textAlign: "center" }}>署名日</td>
                     <td className="sign-date" style={{ width: "20%" }}>　　年　　月　　日</td>
                   </tr>
                 </tbody>
@@ -1394,7 +1394,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                       )}
                     </td>
                     <td style={{ width: "36%" }}></td>
-                    <td className="lbl sign-date" style={{ width: "16%", textAlign: "center" }}>署名日</td>
+                    <td className="lbl" style={{ width: "16%", textAlign: "center" }}>署名日</td>
                     <td className="sign-date" style={{ width: "20%" }}>　　年　　月　　日</td>
                   </tr>
                 </tbody>
@@ -1447,7 +1447,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     )}
                   </td>
                   <td style={{ width: "36%" }}></td>
-                  <td className="lbl sign-date" style={{ width: "16%", textAlign: "center" }}>署名日</td>
+                  <td className="lbl" style={{ width: "16%", textAlign: "center" }}>署名日</td>
                   <td className="sign-date" style={{ width: "20%" }}>　　年　　月　　日</td>
                 </tr>
               </tbody>

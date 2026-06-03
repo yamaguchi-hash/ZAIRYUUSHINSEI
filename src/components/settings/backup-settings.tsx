@@ -39,17 +39,23 @@ export function BackupSettings() {
         console.log("[BackupSettings] Settings result:", settingsResult);
 
         if ("error" in settingsResult) {
-          console.error("[BackupSettings] Settings error:", settingsResult.error);
-          setError(settingsResult.error || "バックアップ設定の取得に失敗しました");
+          const errorMsg = settingsResult.error || "バックアップ設定の取得に失敗しました";
+          console.error("[BackupSettings] Settings error:", errorMsg);
+          setError(errorMsg);
+          // エラーが発生しても、UI は表示する
+          setIsLoading(false);
+          return;
         } else {
           console.log("[BackupSettings] Settings loaded:", settingsResult.data);
         }
 
         // Then load history
         await loadBackupHistory();
-      } catch (err) {
+      } catch (err: any) {
         console.error("[BackupSettings] Initialize error:", err);
-        setError("バックアップ設定の初期化に失敗しました");
+        const errorMsg = err?.message || "バックアップ設定の初期化に失敗しました";
+        setError(errorMsg);
+        setIsLoading(false);
       } finally {
         setIsLoading(false);
       }
@@ -177,7 +183,10 @@ export function BackupSettings() {
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-          <p className="text-sm text-red-700">{error}</p>
+          <div>
+            <p className="text-sm text-red-700">{error}</p>
+            <p className="text-xs text-red-600 mt-2">デバッグ情報: ブラウザコンソールでログを確認してください</p>
+          </div>
         </div>
       )}
 

@@ -38,20 +38,36 @@ export async function POST(
       return Response.json({ error: "ファイルが見つかりません" }, { status: 400 });
     }
 
-    // ファイルをバリデート
-    if (!file.type.includes("pdf")) {
+    // ファイルをバリデート（MIMEタイプまたは拡張子で確認）
+    const isPdf = file.type === "application/pdf" ||
+                  file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      console.error("Invalid file type:", { type: file.type, name: file.name });
       return Response.json({ error: "PDF ファイルのみ受け付けます" }, { status: 400 });
     }
 
     const buffer = await file.arrayBuffer();
+    if (buffer.byteLength === 0) {
+      return Response.json({ error: "ファイルが空です" }, { status: 400 });
+    }
+
     const filename = `signed-doc-${id}-${Date.now()}.pdf`;
 
     // Vercel Blob にアップロード
-    const blob = await put(
-      `applications/${id}/${filename}`,
-      buffer,
-      { access: "private", contentType: "application/pdf" }
-    );
+    let blob;
+    try {
+      blob = await put(
+        `applications/${id}/${filename}`,
+        buffer,
+        { access: "private", contentType: "application/pdf" }
+      );
+    } catch (blobErr: any) {
+      console.error("Vercel Blob upload error:", blobErr);
+      return Response.json(
+        { error: `ファイルアップロードエラー: ${blobErr.message}` },
+        { status: 500 }
+      );
+    }
 
     // draftData に署名済みドキュメント情報を追加
     const existing = (app.draftData as Record<string, any>) ?? {};
@@ -69,16 +85,28 @@ export async function POST(
       documentType,
     });
 
-    await db.update(applications)
-      .set({
-        draftData: { ...existing, _signedDocuments: signedDocs },
-        updatedAt: new Date(),
-      })
-      .where(eq(applications.id, id));
+    try {
+      await db.update(applications)
+        .set({
+          draftData: { ...existing, _signedDocuments: signedDocs },
+          updatedAt: new Date(),
+        })
+        .where(eq(applications.id, id));
+    } catch (dbErr: any) {
+      console.error("Database update error:", dbErr);
+      return Response.json(
+        { error: `データベース更新エラー: ${dbErr.message}` },
+        { status: 500 }
+      );
+    }
 
     return Response.json({ url: blob.url, success: true });
   } catch (err: any) {
-    console.error("Signed document upload error:", err);
+    console.error("Signed document upload error:", {
+      message: err.message,
+      stack: err.stack,
+      name: err.name,
+    });
     return Response.json(
       { error: err.message ?? "アップロードに失敗しました" },
       { status: 500 }

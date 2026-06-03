@@ -71,6 +71,14 @@ export function SignedDocumentsPanel({
         throw new Error("PDF ファイルのみアップロード可能です");
       }
 
+      if (file.size === 0) {
+        throw new Error("ファイルが空です");
+      }
+
+      if (file.size > 50 * 1024 * 1024) { // 50MB以上
+        throw new Error("ファイルサイズが大きすぎます（最大50MB）");
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("documentType", selectedType);
@@ -80,14 +88,17 @@ export function SignedDocumentsPanel({
         body: formData,
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("ファイルアップロードに失敗しました");
+        throw new Error(data.error ?? "ファイルアップロードに失敗しました");
       }
 
       // アップロード成功後、ページをリロード
       window.location.reload();
     } catch (err: any) {
       setError(err.message ?? "アップロードに失敗しました");
+      console.error("Upload error:", err);
     } finally {
       setUploading(false);
     }

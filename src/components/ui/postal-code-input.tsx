@@ -417,6 +417,22 @@ function extractCity(rest: string): { city: string; addressLine: string } {
   return { city: "", addressLine: rest };
 }
 
+/** addressLine から町村+丁目部分を抽出（数字部分の直前まで） */
+function extractTown(addressLine: string): { town: string; block: string } {
+  // 「町」「村」「丁目」「丁」で始まる部分を抽出
+  // 例: 売布4-3-30 → town: 売布, block: 4-3-30
+  // 例: 3丁目1-1 → town: 3丁目, block: 1-1
+  const townMatch = addressLine.match(/^([^0-9]*?(?:町|村|丁目|丁))/);
+  if (townMatch) {
+    const town = townMatch[1];
+    const block = addressLine.slice(town.length);
+    return { town, block };
+  }
+
+  // 丁目が見つからない場合、全て block とする
+  return { town: "", block: addressLine };
+}
+
 interface AddressSplitSimpleProps {
   value: string;
   onChange: (value: string) => void;
@@ -444,22 +460,23 @@ export function AddressSplitSimple({
 
   const { prefecture, rest } = extractPrefecture(value || "");
   const { city, addressLine } = extractCity(rest);
+  const { town, block } = extractTown(addressLine);
 
-  function handleChange(pref: string, ct: string, addr: string) {
-    onChange(`${pref}${ct}${addr}`);
+  function handleChange(pref: string, ct: string, twn: string, blk: string) {
+    onChange(`${pref}${ct}${twn}${blk}`);
   }
 
   function cleanZip(v: string) {
     return v.replace(/[-ー−\s]/g, "");
   }
 
-  /** 郵便番号 → 都道府県・市区町村を自動入力 */
+  /** 郵便番号 → 都道府県・市区町村・町村を自動入力 */
   async function zipToAddress(zipValue: string) {
     setZipLoading(true);
     setZipError("");
     const result = await fetchAddressFromZip(zipValue);
     if (result) {
-      handleChange(result.prefecture, result.city + result.town, addressLine);
+      handleChange(result.prefecture, result.city, result.town, block);
     } else {
       setZipError("該当する住所が見つかりませんでした");
     }
@@ -477,7 +494,7 @@ export function AddressSplitSimple({
 
   /** 住所 → 郵便番号を逆引き */
   async function addressToZip() {
-    const addr = `${prefecture}${city}${addressLine}`.trim();
+    const addr = `${prefecture}${city}${town}`.trim();
     if (!addr) { setZipError("都道府県・市区町村を入力してください"); return; }
     setReverseLoading(true);
     setZipError("");
@@ -520,7 +537,7 @@ export function AddressSplitSimple({
           <button
             type="button"
             onClick={addressToZip}
-            disabled={reverseLoading || !(prefecture || city)}
+            disabled={reverseLoading || !(prefecture && city)}
             title="住所から郵便番号を自動検索"
             className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors"
           >
@@ -531,41 +548,61 @@ export function AddressSplitSimple({
         {zipError && <p className="text-xs text-red-500 mt-1">{zipError}</p>}
       </div>
 
-      {/* 都道府県 */}
-      <div>
-        <label className={labelClassName}>{labelPrefix}都道府県</label>
-        <select
-          value={prefecture}
-          onChange={(e) => { handleChange(e.target.value, city, addressLine); setZipError(""); }}
-          className={inputClassName}
-        >
-          <option value="">選択してください</option>
-          {PREFECTURES.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+      {/* セクション1：都道府県・市区町村・町村（丁目） */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <label className="block text-xs font-semibold text-gray-700">{labelPrefix}位置情報</label>
+
+        {/* 都道府県 */}
+        <div>
+          <label className={labelClassName}>都道府県</label>
+          <select
+            value={prefecture}
+            onChange={(e) => { handleChange(e.target.value, city, town, block); setZipError(""); }}
+            className={inputClassName}
+          >
+            <option value="">選択してください</option>
+            {PREFECTURES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+
+        {/* 市区町村 */}
+        <div>
+          <label className={labelClassName}>市区町村</label>
+          <input
+            type="text"
+            value={city}
+            onChange={(e) => { handleChange(prefecture, e.target.value, town, block); setZipError(""); }}
+            placeholder="渋谷区"
+            className={inputClassName}
+          />
+        </div>
+
+        {/* 町村・丁目 */}
+        <div>
+          <label className={labelClassName}>町村・丁目</label>
+          <input
+            type="text"
+            value={town}
+            onChange={(e) => { handleChange(prefecture, city, e.target.value, block); setZipError(""); }}
+            placeholder="売布"
+            className={inputClassName}
+          />
+        </div>
       </div>
 
-      {/* 市区町村 */}
-      <div>
-        <label className={labelClassName}>{labelPrefix}市区町村</label>
-        <input
-          type="text"
-          value={city}
-          onChange={(e) => { handleChange(prefecture, e.target.value, addressLine); setZipError(""); }}
-          placeholder="渋谷区"
-          className={inputClassName}
-        />
-      </div>
-
-      {/* 番地・建物・部屋番号 */}
-      <div>
-        <label className={labelClassName}>{labelPrefix}番地・建物・部屋番号</label>
-        <input
-          type="text"
-          value={addressLine}
-          onChange={(e) => { handleChange(prefecture, city, e.target.value); setZipError(""); }}
-          placeholder="代々木1-1-1 〇〇ビル101号室"
-          className={inputClassName}
-        />
+      {/* セクション2：番地・建物・部屋番号 */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <label className="block text-xs font-semibold text-gray-700">{labelPrefix}詳細住所</label>
+        <div>
+          <label className={labelClassName}>番地・建物・部屋番号</label>
+          <input
+            type="text"
+            value={block}
+            onChange={(e) => { handleChange(prefecture, city, town, e.target.value); setZipError(""); }}
+            placeholder="4-3-30　〇〇ビル201号室"
+            className={inputClassName}
+          />
+        </div>
       </div>
     </div>
   );

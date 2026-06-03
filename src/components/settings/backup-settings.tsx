@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download, Upload, AlertCircle, CheckCircle, Loader2, Calendar, HardDrive } from "lucide-react";
-import { exportBackup, importBackup, fetchBackupHistory } from "@/actions/backup";
+import { Download, Upload, AlertCircle, CheckCircle, Loader2, Calendar, HardDrive, Settings, Clock, Trash2 } from "lucide-react";
+import { exportBackup, importBackup, fetchBackupHistory, getBackupSettings, updateBackupSettings } from "@/actions/backup";
 import { formatBytes } from "@/lib/backup-utils";
 
 interface BackupHistoryItem {
@@ -16,18 +16,39 @@ interface BackupHistoryItem {
   fileUrl: string | null;
 }
 
+interface BackupSettings {
+  id: string;
+  tenantId: string;
+  isAutoBackupEnabled: boolean;
+  autoBackupSchedule: string;
+  retentionDays: number;
+  backupDestination: string;
+  lastBackupAt: string | null;
+  lastBackupStatus: string | null;
+  lastBackupError: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 export function BackupSettings() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [pendingRestoreData, setPendingRestoreData] = useState("");
   const [history, setHistory] = useState<BackupHistoryItem[]>([]);
+  const [settings, setSettings] = useState<BackupSettings | null>(null);
+  const [schedule, setSchedule] = useState("02:00");
+  const [retention, setRetention] = useState(30);
+  const [autoEnabled, setAutoEnabled] = useState(true);
 
   useEffect(() => {
     loadBackupHistory();
+    loadSettings();
   }, []);
 
   async function loadBackupHistory() {
@@ -43,6 +64,46 @@ export function BackupSettings() {
       setError("バックアップ履歴の読み込みに失敗しました");
     } finally {
       setLoadingHistory(false);
+    }
+  }
+
+  async function loadSettings() {
+    setLoadingSettings(true);
+    try {
+      const result = await getBackupSettings();
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      setSettings(result.data);
+      setSchedule(result.data.autoBackupSchedule);
+      setRetention(result.data.retentionDays);
+      setAutoEnabled(result.data.isAutoBackupEnabled);
+    } catch (err: any) {
+      setError("バックアップ設定の読み込みに失敗しました");
+    } finally {
+      setLoadingSettings(false);
+    }
+  }
+
+  async function handleSaveSettings() {
+    setSavingSettings(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const result = await updateBackupSettings(autoEnabled, schedule, retention);
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+
+      setSettings(result.data);
+      setSuccess(result.message);
+    } catch (err: any) {
+      setError(err.message ?? "設定の保存に失敗しました");
+    } finally {
+      setSavingSettings(false);
     }
   }
 
@@ -132,6 +193,133 @@ export function BackupSettings() {
 
   return (
     <div className="space-y-6">
+      {/* 自動バックアップ設定 */}
+      {!loadingSettings && settings && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Settings className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-indigo-900 mb-4">自動バックアップ設定</h3>
+
+              <div className="space-y-4 bg-white rounded-lg p-4 border border-indigo-100">
+                {/* 有効/無効 */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      自動バックアップ
+                    </label>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      毎日自動的にバックアップを取得します
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoEnabled}
+                      onChange={(e) => setAutoEnabled(e.target.checked)}
+                      disabled={savingSettings}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className={`text-sm font-medium ${autoEnabled ? "text-green-600" : "text-gray-600"}`}>
+                      {autoEnabled ? "有効" : "無効"}
+                    </span>
+                  </label>
+                </div>
+
+                {autoEnabled && (
+                  <>
+                    {/* スケジュール */}
+                    <div className="pt-4 border-t border-gray-200">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <Clock className="w-4 h-4 inline mr-1" />
+                        バックアップ実行時刻
+                      </label>
+                      <input
+                        type="time"
+                        value={schedule}
+                        onChange={(e) => setSchedule(e.target.value)}
+                        disabled={savingSettings}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 disabled:bg-gray-100"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        UTC時刻で設定してください
+                      </p>
+                    </div>
+
+                    {/* 保持期間 */}
+                    <div className="pt-4 border-t border-gray-200">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <Trash2 className="w-4 h-4 inline mr-1" />
+                        バックアップ保持期間
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          min="1"
+                          max="365"
+                          value={retention}
+                          onChange={(e) => setRetention(parseInt(e.target.value))}
+                          disabled={savingSettings}
+                          className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 disabled:bg-gray-100"
+                        />
+                        <span className="text-sm text-gray-600">日間</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        この期間を超えたバックアップは自動削除されます
+                      </p>
+                    </div>
+
+                    {/* 最後のバックアップ情報 */}
+                    {settings.lastBackupAt && (
+                      <div className="pt-4 border-t border-gray-200">
+                        <p className="text-xs text-gray-600">
+                          <strong>最後の実行:</strong> {new Date(settings.lastBackupAt).toLocaleString("ja-JP")}
+                        </p>
+                        {settings.lastBackupStatus === "success" && (
+                          <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
+                            <CheckCircle className="w-3 h-3" /> 成功
+                          </p>
+                        )}
+                        {settings.lastBackupStatus === "failed" && (
+                          <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
+                            <AlertCircle className="w-3 h-3" /> 失敗
+                            {settings.lastBackupError && (
+                              <span className="ml-1">({settings.lastBackupError})</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* 保存ボタン */}
+                <div className="pt-4 border-t border-gray-200 flex gap-2">
+                  <button
+                    onClick={handleSaveSettings}
+                    disabled={savingSettings}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                      savingSettings
+                        ? "bg-indigo-200 text-indigo-700 cursor-not-allowed"
+                        : "bg-indigo-600 text-white hover:bg-indigo-700"
+                    }`}
+                  >
+                    {savingSettings ? (
+                      <>
+                        <Loader2 className="w-4 h-4 inline mr-2 animate-spin" />
+                        保存中...
+                      </>
+                    ) : (
+                      "設定を保存"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* エクスポート */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start gap-3">
@@ -332,11 +520,16 @@ export function BackupSettings() {
       )}
 
       {/* 情報 */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-600">
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-600 space-y-2">
         <p>
           <strong>ヒント:</strong> バックアップファイルは安全な場所に保存してください。
-          自動バックアップは毎日 AM 2:00 に実行されます（最新30日分を保持）。
         </p>
+        <ul className="list-disc list-inside space-y-1 text-gray-600">
+          <li>手動バックアップはいつでも「バックアップをダウンロード」から実行できます</li>
+          <li>自動バックアップの実行時刻と保持期間は上記の設定で変更できます</li>
+          <li>自動バックアップは有効にすると、毎日指定時刻に自動実行されます</li>
+          <li>バックアップには申請人マスターと案件情報がJSON形式で保存されます</li>
+        </ul>
       </div>
     </div>
   );

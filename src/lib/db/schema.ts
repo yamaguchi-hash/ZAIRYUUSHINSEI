@@ -319,3 +319,22 @@ export const backupHistoryRelations = relations(backupHistory, ({ one }) => ({
   tenant: one(tenants, { fields: [backupHistory.tenantId], references: [tenants.id] }),
   createdBy: one(users, { fields: [backupHistory.createdBy], references: [users.id] }),
 }));
+
+// ─── Backup Settings ──────────────────────────────────────────────────────────
+export const backupSettings = pgTable("backup_settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().unique().references(() => tenants.id),
+  isAutoBackupEnabled: boolean("is_auto_backup_enabled").notNull().default(true),
+  autoBackupSchedule: text("auto_backup_schedule").notNull().default("02:00"), // HH:mm 形式
+  retentionDays: integer("retention_days").notNull().default(30),
+  backupDestination: text("backup_destination").notNull().default("vercel_blob"), // "vercel_blob"
+  lastBackupAt: timestamp("last_backup_at"),
+  lastBackupStatus: text("last_backup_status"), // "success" | "failed"
+  lastBackupError: text("last_backup_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const backupSettingsRelations = relations(backupSettings, ({ one }) => ({
+  tenant: one(tenants, { fields: [backupSettings.tenantId], references: [tenants.id] }),
+}));

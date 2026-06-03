@@ -223,16 +223,30 @@ export async function listBackupFiles(
  */
 export async function testGoogleDriveConnection(): Promise<boolean> {
   try {
+    console.log("[Google Drive] Testing connection...");
+
+    // 環境変数の確認
+    const keyExists = !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+    console.log("[Google Drive] Service account key exists:", keyExists);
+
     const drive = initializeDriveClient();
-    await drive.files.list({
+    console.log("[Google Drive] Drive client initialized");
+
+    const response = await drive.files.list({
       spaces: "drive",
       pageSize: 1,
       fields: "files(id)",
     });
-    console.log("[Google Drive] Connection test successful");
+
+    console.log("[Google Drive] Connection test successful, response:", response.status);
     return true;
   } catch (err: any) {
-    console.error("[Google Drive] Connection test failed:", err);
+    console.error("[Google Drive] Connection test failed");
+    console.error("- Error name:", err.name);
+    console.error("- Error message:", err.message);
+    console.error("- Error code:", err.code);
+    console.error("- Error status:", err.status);
+    console.error("- Full error:", JSON.stringify(err, null, 2));
     return false;
   }
 }

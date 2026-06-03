@@ -312,6 +312,19 @@ export async function checkGoogleDriveConnection() {
       return { error: "管理者のみ実行可能です" };
     }
 
+    // 環境変数の存在チェック
+    const keyExists = !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+    const keyLength = process.env.GOOGLE_SERVICE_ACCOUNT_KEY?.length ?? 0;
+    console.log("[checkGoogleDriveConnection] Key exists:", keyExists, "Length:", keyLength);
+
+    if (!keyExists || keyLength < 100) {
+      return {
+        success: false,
+        connected: false,
+        error: `GOOGLE_SERVICE_ACCOUNT_KEY が設定されていません (exists: ${keyExists}, length: ${keyLength})`,
+      };
+    }
+
     console.log("[checkGoogleDriveConnection] Testing connection...");
     const isConnected = await testGoogleDriveConnection();
 
@@ -325,15 +338,15 @@ export async function checkGoogleDriveConnection() {
       return {
         success: false,
         connected: false,
-        error: "Google Drive に接続できません。GOOGLE_SERVICE_ACCOUNT_KEY を確認してください。",
+        error: "Google Drive に接続できません。サービスアカウントキーを確認してください。",
       };
     }
   } catch (err: any) {
-    console.error("[checkGoogleDriveConnection] Error:", err);
+    console.error("[checkGoogleDriveConnection] Error:", err.message);
     return {
       success: false,
       connected: false,
-      error: err.message ?? "Google Drive 接続テストに失敗しました",
+      error: `Google Drive 接続エラー: ${err.message}`,
     };
   }
 }

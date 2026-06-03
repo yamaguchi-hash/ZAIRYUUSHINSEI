@@ -1,24 +1,55 @@
 import { google, drive_v3 } from "googleapis";
 import { JWT } from "google-auth-library";
 
-let driveClient: drive_v3.Drive | null = null;
-
 /**
- * Google Drive クライアントを初期化
+ * Google Drive クライアントを毎回新規作成（キャッシュ問題を回避）
  */
 function initializeDriveClient(): drive_v3.Drive {
-  if (driveClient) {
-    return driveClient;
-  }
-
   try {
-    const serviceAccountKey = JSON.parse(
-      process.env.GOOGLE_SERVICE_ACCOUNT_KEY || "{}"
-    );
+    const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+    console.log("[Google Drive] Raw key exists:", !!rawKey);
+    console.log("[Google Drive] Raw key length:", rawKey?.length ?? 0);
+
+    if (!rawKey || rawKey.trim().length === 0) {
+      throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY environment variable is empty or not set");
+    }
+
+    // JSON パース（シングルクォートが残っている場合も対応）
+    let cleanKey = rawKey.trim();
+    if (cleanKey.startsWith("'") && cleanKey.endsWith("'")) {
+      cleanKey = cleanKey.slice(1, -1);
+    }
+    if (cleanKey.startsWith('"') && cleanKey.endsWith('"')) {
+      cleanKey = cleanKey.slice(1, -1);
+    }
+
+    console.log("[Google Drive] Clean key length:", cleanKey.length);
+    console.log("[Google Drive] Clean key starts with:", cleanKey.substring(0, 20));
+
+    let serviceAccountKey: any;
+    try {
+      serviceAccountKey = JSON.parse(cleanKey);
+    } catch (parseErr: any) {
+      console.error("[Google Drive] JSON parse error:", parseErr.message);
+      console.error("[Google Drive] First 100 chars:", cleanKey.substring(0, 100));
+      throw new Error(`Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY as JSON: ${parseErr.message}`);
+    }
 
     if (!serviceAccountKey.project_id) {
-      throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY is not configured");
+      throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY is missing 'project_id' field");
     }
+
+    if (!serviceAccountKey.client_email) {
+      throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY is missing 'client_email' field");
+    }
+
+    if (!serviceAccountKey.private_key) {
+      throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY is missing 'private_key' field");
+    }
+
+    console.log("[Google Drive] Project:", serviceAccountKey.project_id);
+    console.log("[Google Drive] Email:", serviceAccountKey.client_email);
+    console.log("[Google Drive] Key length:", serviceAccountKey.private_key.length);
 
     const auth = new JWT({
       email: serviceAccountKey.client_email,
@@ -26,10 +57,10 @@ function initializeDriveClient(): drive_v3.Drive {
       scopes: ["https://www.googleapis.com/auth/drive"],
     });
 
-    driveClient = google.drive({ version: "v3", auth });
+    const client = google.drive({ version: "v3", auth });
     console.log("[Google Drive] Client initialized successfully");
 
-    return driveClient;
+    return client;
   } catch (err: any) {
     console.error("[Google Drive] Initialization failed:", err.message);
     throw new Error(`Google Drive initialization failed: ${err.message}`);

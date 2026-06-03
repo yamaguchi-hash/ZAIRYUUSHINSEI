@@ -2,24 +2,45 @@ import { auth } from "@/lib/auth";
 import { db, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Lock, Users, HardDrive } from "lucide-react";
+import { User, Lock, Users } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/utils";
 import { EmailForm } from "./email-form";
 import { PasswordForm } from "./password-form";
 import { NameForm } from "./name-form";
 import { UserManagementPanel } from "./user-management-panel";
-import { BackupSettings } from "@/components/settings/backup-settings";
+import { BackupSection } from "./backup-section";
 
 export default async function SettingsPage() {
-  const session = await auth();
+  console.log("[SettingsPage] Rendering settings page");
+
+  let session;
+  try {
+    session = await auth();
+    console.log("[SettingsPage] Session obtained:", session?.user?.id);
+  } catch (err) {
+    console.error("[SettingsPage] Auth error:", err);
+    throw err;
+  }
+
   const userId = session?.user?.id;
   const userRole = (session?.user as any)?.role;
 
-  const [currentUser] = await db
-    .select({ id: users.id, email: users.email, name: users.name, role: users.role })
-    .from(users)
-    .where(eq(users.id, userId!))
-    .limit(1);
+  console.log("[SettingsPage] User role:", userRole);
+
+  let currentUser;
+  try {
+    const result = await db
+      .select({ id: users.id, email: users.email, name: users.name, role: users.role })
+      .from(users)
+      .where(eq(users.id, userId!))
+      .limit(1);
+
+    [currentUser] = result;
+    console.log("[SettingsPage] Current user loaded:", currentUser?.id);
+  } catch (err) {
+    console.error("[SettingsPage] Database error:", err);
+    throw err;
+  }
 
   return (
     <div className="p-8 max-w-3xl">
@@ -120,21 +141,9 @@ export default async function SettingsPage() {
 
         {/* Admin: backup & restore */}
         {userRole === "admin" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <HardDrive className="w-4 h-4" />
-                バックアップ・復元（管理者）
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-600 mb-6">
-                システムのすべての申請人と案件情報をバックアップ・復元できます。
-                データ損失に備えて定期的にバックアップを作成することをお勧めします。
-              </p>
-              <BackupSettings />
-            </CardContent>
-          </Card>
+          <>
+            <BackupSection />
+          </>
         )}
       </div>
     </div>

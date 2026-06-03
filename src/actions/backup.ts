@@ -277,7 +277,7 @@ export async function getBackupSettings() {
         isAutoBackupEnabled: true,
         autoBackupSchedule: "02:00",
         retentionDays: 30,
-        backupDestination: "vercel_blob",
+        backupDestination: "google_drive",
       });
 
       settings = await db
@@ -371,7 +371,7 @@ export async function updateBackupSettings(
     }
 
     // 保存先の検証
-    if (backupDestination && !["vercel_blob", "local_download"].includes(backupDestination)) {
+    if (backupDestination && !["google_drive", "vercel_blob", "local_download"].includes(backupDestination)) {
       return { error: "無効な保存先が指定されています" };
     }
 

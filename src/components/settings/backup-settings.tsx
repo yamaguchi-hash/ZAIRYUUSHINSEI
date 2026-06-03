@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download, Upload, AlertCircle, CheckCircle, Loader2, Calendar, HardDrive, Settings, Clock, Trash2 } from "lucide-react";
+import { Download, Upload, AlertCircle, CheckCircle, Loader2, Calendar, HardDrive, Settings, Clock, Trash2, Cloud, Computer } from "lucide-react";
 import { exportBackup, importBackup, fetchBackupHistory, getBackupSettings, updateBackupSettings } from "@/actions/backup";
 import { formatBytes } from "@/lib/backup-utils";
 
@@ -45,6 +45,7 @@ export function BackupSettings() {
   const [schedule, setSchedule] = useState("02:00");
   const [retention, setRetention] = useState(30);
   const [autoEnabled, setAutoEnabled] = useState(true);
+  const [backupDestination, setBackupDestination] = useState<"vercel_blob" | "local_download">("vercel_blob");
 
   useEffect(() => {
     console.log("BackupSettings component mounted");
@@ -83,6 +84,7 @@ export function BackupSettings() {
       setSchedule(result.data.autoBackupSchedule);
       setRetention(result.data.retentionDays);
       setAutoEnabled(result.data.isAutoBackupEnabled);
+      setBackupDestination(result.data.backupDestination as "vercel_blob" | "local_download" || "vercel_blob");
     } catch (err: any) {
       console.error("Exception loading settings:", err);
       setError("バックアップ設定の読み込みに失敗しました");
@@ -97,7 +99,7 @@ export function BackupSettings() {
     setSuccess("");
 
     try {
-      const result = await updateBackupSettings(autoEnabled, schedule, retention);
+      const result = await updateBackupSettings(autoEnabled, schedule, retention, backupDestination);
       if ("error" in result) {
         setError(result.error);
         return;
@@ -261,6 +263,57 @@ export function BackupSettings() {
 
                 {autoEnabled && (
                   <>
+                    {/* 保存先 */}
+                    <div className="pt-4 border-t border-gray-200">
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        <HardDrive className="w-4 h-4 inline mr-1" />
+                        バックアップ保存先
+                      </label>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                          <input
+                            type="radio"
+                            name="backup-destination"
+                            value="vercel_blob"
+                            checked={backupDestination === "vercel_blob"}
+                            onChange={(e) => setBackupDestination(e.target.value as "vercel_blob")}
+                            disabled={savingSettings}
+                            className="w-4 h-4"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Cloud className="w-4 h-4 text-blue-600" />
+                              <span className="font-medium text-gray-900">クラウド保存（Vercel Blob）</span>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-0.5">
+                              クラウドに自動保存されます。安全で確実です。
+                            </p>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                          <input
+                            type="radio"
+                            name="backup-destination"
+                            value="local_download"
+                            checked={backupDestination === "local_download"}
+                            onChange={(e) => setBackupDestination(e.target.value as "local_download")}
+                            disabled={savingSettings}
+                            className="w-4 h-4"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Computer className="w-4 h-4 text-green-600" />
+                              <span className="font-medium text-gray-900">ローカル保存（パソコン）</span>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-0.5">
+                              パソコンにダウンロード保存します。手動ダウンロードが必要です。
+                            </p>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
                     {/* スケジュール */}
                     <div className="pt-4 border-t border-gray-200">
                       <label className="block text-sm font-medium text-gray-700 mb-2">

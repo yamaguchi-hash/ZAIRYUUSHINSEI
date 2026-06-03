@@ -248,7 +248,8 @@ export async function getBackupSettings() {
 export async function updateBackupSettings(
   isAutoBackupEnabled?: boolean,
   autoBackupSchedule?: string,
-  retentionDays?: number
+  retentionDays?: number,
+  backupDestination?: string
 ) {
   try {
     const session = await auth();
@@ -276,6 +277,11 @@ export async function updateBackupSettings(
       return { error: "保持期間は1日～365日の範囲で指定してください" };
     }
 
+    // 保存先の検証
+    if (backupDestination && !["vercel_blob", "local_download"].includes(backupDestination)) {
+      return { error: "無効な保存先が指定されています" };
+    }
+
     const updates: Record<string, any> = {
       updatedAt: new Date(),
     };
@@ -288,6 +294,9 @@ export async function updateBackupSettings(
     }
     if (retentionDays !== undefined) {
       updates.retentionDays = retentionDays;
+    }
+    if (backupDestination !== undefined) {
+      updates.backupDestination = backupDestination;
     }
 
     await db

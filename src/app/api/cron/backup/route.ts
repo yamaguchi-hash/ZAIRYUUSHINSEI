@@ -36,11 +36,25 @@ export async function GET(request: Request) {
           continue;
         }
 
-        // バックアップを実行
-        const result = await performAutoBackup(
-          tenant.id,
-          tenant.id // システム実行なので、テナントIDをuserIdとして使用
-        );
+        // バックアップ保存先を確認
+        const destination = settings.length > 0 ? settings[0].backupDestination : "vercel_blob";
+
+        let result: any;
+
+        if (destination === "local_download") {
+          // ローカル保存の場合：バックアップファイルを生成して一時的に保存
+          // （ユーザーが手動でダウンロードするため、自動アップロードは不要）
+          result = {
+            success: true,
+            message: `バックアップファイルを生成準備完了（ローカルダウンロード設定）。設定ページからダウンロードしてください。`,
+          };
+        } else {
+          // クラウド保存の場合：通常の自動バックアップを実行
+          result = await performAutoBackup(
+            tenant.id,
+            tenant.id // システム実行なので、テナントIDをuserIdとして使用
+          );
+        }
 
         // 設定を更新（実行日時とステータスを記録）
         if (settings.length > 0) {

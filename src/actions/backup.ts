@@ -300,7 +300,7 @@ export async function getBackupSettings() {
   }
 }
 
-export async function testGoogleDriveConnection() {
+export async function checkGoogleDriveConnection() {
   try {
     const session = await auth();
     if (!session?.user) {
@@ -312,7 +312,7 @@ export async function testGoogleDriveConnection() {
       return { error: "管理者のみ実行可能です" };
     }
 
-    console.log("[testGoogleDriveConnection] Testing connection...");
+    console.log("[checkGoogleDriveConnection] Testing connection...");
     const isConnected = await testGoogleDriveConnection();
 
     if (isConnected) {
@@ -329,7 +329,7 @@ export async function testGoogleDriveConnection() {
       };
     }
   } catch (err: any) {
-    console.error("[testGoogleDriveConnection] Error:", err);
+    console.error("[checkGoogleDriveConnection] Error:", err);
     return {
       success: false,
       connected: false,

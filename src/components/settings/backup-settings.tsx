@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Download, Upload, AlertCircle, CheckCircle, Loader2, Calendar, HardDrive, Settings, Clock, Trash2, Cloud, Computer, Wifi } from "lucide-react";
-import { exportBackup, importBackup, fetchBackupHistory, getBackupSettings, updateBackupSettings, testGoogleDriveConnection } from "@/actions/backup";
+import { exportBackup, importBackup, fetchBackupHistory, getBackupSettings, updateBackupSettings, checkGoogleDriveConnection } from "@/actions/backup";
 import { formatBytes } from "@/lib/backup-utils";
 
 interface BackupHistoryItem {
@@ -51,14 +51,14 @@ export function BackupSettings() {
     console.log("[BackupSettings] Component mounted");
     loadSettings();
     loadBackupHistory();
-    checkGoogleDriveConnection();
+    testGoogleDriveConnectionStatus();
   }, []);
 
-  async function checkGoogleDriveConnection() {
+  async function testGoogleDriveConnectionStatus() {
     setTestingConnection(true);
     try {
       console.log("[BackupSettings] Testing Google Drive connection...");
-      const result = await testGoogleDriveConnection();
+      const result = await checkGoogleDriveConnection();
 
       if ("error" in result) {
         console.warn("[BackupSettings] Google Drive error:", result.error);

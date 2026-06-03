@@ -119,7 +119,10 @@ export async function updateDisplayName(name: string) {
     newValue: name,
   });
 
+  // キャッシュを無効化（ダッシュボード内のすべてのページ）
   revalidatePath("/settings");
+  revalidatePath("/(dashboard)");
+  revalidatePath("/");
 }
 
 // Admin: update any user's email/password

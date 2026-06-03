@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { updateDisplayName } from "@/actions/account";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 
 export function NameForm({ currentName }: { currentName: string }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [name, setName] = useState(currentName);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
@@ -18,6 +20,11 @@ export function NameForm({ currentName }: { currentName: string }) {
         await updateDisplayName(name);
         setStatus("success");
         setMessage("表示名を変更しました");
+
+        // ページをリフレッシュしてサーバーの最新データを取得
+        setTimeout(() => {
+          router.refresh();
+        }, 500);
       } catch (err: any) {
         setStatus("error");
         setMessage(err.message ?? "変更に失敗しました");

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -63,8 +64,13 @@ interface SidebarProps {
   userName?: string;
 }
 
-export function Sidebar({ userRole, userName }: SidebarProps) {
+export function Sidebar({ userRole: initialUserRole, userName: initialUserName }: SidebarProps) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  // useSession() から取得した値を使用（これは常に最新の値）
+  const userRole = (session?.user as any)?.role ?? initialUserRole;
+  const userName = session?.user?.name ?? initialUserName;
 
   const visibleItems = navItems.filter(
     (item) => !item.roles || item.roles.includes(userRole ?? "")

@@ -140,11 +140,7 @@ export default async function SettingsPage() {
         )}
 
         {/* Admin: backup & restore */}
-        {userRole === "admin" && (
-          <>
-            <BackupSection />
-          </>
-        )}
+        <BackupSection userRole={userRole} />
       </div>
     </div>
   );

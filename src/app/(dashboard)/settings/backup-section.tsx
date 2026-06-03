@@ -3,7 +3,16 @@
 import { HardDrive } from "lucide-react";
 import { BackupSettings } from "@/components/settings/backup-settings";
 
-export function BackupSection() {
+interface BackupSectionProps {
+  userRole?: string;
+}
+
+export function BackupSection({ userRole }: BackupSectionProps) {
+  // Admin ロールでない場合は表示しない
+  if (userRole !== "admin") {
+    return null;
+  }
+
   return (
     <div style={{ marginTop: "1.5rem", marginBottom: "1.5rem" }}>
       <div style={{ borderTop: "1px solid #e5e7eb", borderRight: "1px solid #e5e7eb", borderLeft: "1px solid #e5e7eb", borderRadius: "0.5rem", overflow: "hidden" }}>

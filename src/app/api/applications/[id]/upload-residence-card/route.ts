@@ -32,10 +32,11 @@ export async function POST(
     const filename = `residence-card-${id}-${Date.now()}.jpg`;
 
     // Vercel Blob にアップロード
+    // 注: 現在のストアが「public」設定のため access: "public" を使用
     const blob = await put(
       `applications/${id}/${filename}`,
       buffer,
-      { access: "private" }
+      { access: "public" }
     );
 
     return Response.json({ url: blob.url, success: true });

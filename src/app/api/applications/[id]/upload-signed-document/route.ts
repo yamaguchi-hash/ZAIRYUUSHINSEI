@@ -79,6 +79,8 @@ export async function POST(
     console.log("アップロードファイル名:", filename);
 
     // Vercel Blob にアップロード
+    // 注: 現在のストアが「public」設定のため access: "public" を使用
+    // セキュリティを強化するには Vercel ダッシュボードで Blob ストアを「private access」に変更してください
     let blob;
     try {
       console.log("Vercel Blob へアップロード開始...");
@@ -86,7 +88,7 @@ export async function POST(
       blob = await put(
         `applications/${id}/${filename}`,
         buffer,
-        { access: "private", contentType: "application/pdf" }
+        { access: "public", contentType: "application/pdf" }
       );
       console.log("Vercel Blob アップロード成功:", blob.url);
     } catch (blobErr: any) {

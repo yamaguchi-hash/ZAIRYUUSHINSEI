@@ -27,7 +27,7 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const userName = session.user.name ?? session.user.email;
+  const userName = session.user.name ?? session.user.email ?? undefined;
   const userRole = (session.user as any).role;
 
   console.log("[DashboardLayout] Passing to Sidebar:", {
@@ -39,7 +39,7 @@ export default async function DashboardLayout({
     <div className="flex min-h-screen">
       <Sidebar
         userRole={userRole}
-        userName={userName}
+        userName={userName ?? undefined}
       />
       <main className="flex-1 overflow-auto">
         <BackButton />

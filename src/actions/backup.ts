@@ -10,6 +10,13 @@ import {
   getBackupHistory,
   type BackupData,
 } from "@/lib/backup-utils";
+import {
+  saveFileToGoogleDrive,
+  deleteOldBackups,
+  listBackupFiles,
+  ensureBackupFolder,
+  testGoogleDriveConnection,
+} from "@/lib/google-drive";
 
 export async function exportBackup() {
   try {
@@ -46,12 +53,60 @@ export async function performAutoBackup(tenantId: string, userId: string) {
   try {
     const backupData = await createBackupData(tenantId);
     const fileName = generateBackupFileName(tenantId, "automatic");
+    const backupJson = JSON.stringify(backupData, null, 2);
 
-    await saveBackupToBlob(tenantId, backupData, fileName, userId);
+    console.log("[performAutoBackup] Starting backup process...");
+
+    // Google Drive に保存を試みる
+    let backupUrl: string | null = null;
+    let destination = "google_drive";
+
+    try {
+      console.log("[performAutoBackup] Attempting Google Drive save...");
+      const { fileUrl } = await saveFileToGoogleDrive(
+        fileName,
+        backupJson,
+        "application/json"
+      );
+      backupUrl = fileUrl;
+      console.log("[performAutoBackup] Google Drive save successful");
+    } catch (gdErr: any) {
+      console.warn("[performAutoBackup] Google Drive save failed, falling back to Blob:", gdErr.message);
+      try {
+        // Google Drive 失敗時は Vercel Blob にフォールバック
+        await saveBackupToBlob(tenantId, backupData, fileName, userId);
+        destination = "vercel_blob";
+        backupUrl = `blob://${fileName}`;
+      } catch (blobErr: any) {
+        console.error("[performAutoBackup] Both Google Drive and Blob failed:", blobErr);
+        return {
+          success: false,
+          error: "バックアップの保存に失敗しました（Google Drive と Blob の両方が利用できません）",
+        };
+      }
+    }
+
+    // バックアップ履歴に記録
+    try {
+      const fileSize = Buffer.byteLength(backupJson, "utf-8");
+      await db.insert(backupHistory).values({
+        tenantId,
+        backupType: "automatic",
+        fileName,
+        fileUrl: backupUrl,
+        fileSize,
+        applicantMasterCount: backupData.metadata.applicantMasterCount,
+        applicationsCount: backupData.metadata.applicationsCount,
+        createdBy: userId,
+      });
+    } catch (dbErr: any) {
+      console.error("[performAutoBackup] Failed to record backup history:", dbErr);
+      // DB 記録失敗は警告のみ（バックアップ自体は成功）
+    }
 
     return {
       success: true,
-      message: `自動バックアップ完了: 申請人 ${backupData.metadata.applicantMasterCount}件、案件 ${backupData.metadata.applicationsCount}件`,
+      message: `自動バックアップ完了 (${destination}): 申請人 ${backupData.metadata.applicantMasterCount}件、案件 ${backupData.metadata.applicationsCount}件`,
     };
   } catch (err: any) {
     console.error("Auto backup failed:", err);
@@ -242,6 +297,44 @@ export async function getBackupSettings() {
   } catch (err: any) {
     console.error("[getBackupSettings] Error:", err);
     return { error: `[getBackupSettings] ${err.message ?? "バックアップ設定の取得に失敗しました"}` };
+  }
+}
+
+export async function testGoogleDriveConnection() {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return { error: "認証が必要です" };
+    }
+
+    const role = (session.user as any)?.role;
+    if (role !== "admin" && role !== "expert") {
+      return { error: "管理者のみ実行可能です" };
+    }
+
+    console.log("[testGoogleDriveConnection] Testing connection...");
+    const isConnected = await testGoogleDriveConnection();
+
+    if (isConnected) {
+      return {
+        success: true,
+        connected: true,
+        message: "Google Drive に正常に接続しました",
+      };
+    } else {
+      return {
+        success: false,
+        connected: false,
+        error: "Google Drive に接続できません。GOOGLE_SERVICE_ACCOUNT_KEY を確認してください。",
+      };
+    }
+  } catch (err: any) {
+    console.error("[testGoogleDriveConnection] Error:", err);
+    return {
+      success: false,
+      connected: false,
+      error: err.message ?? "Google Drive 接続テストに失敗しました",
+    };
   }
 }
 

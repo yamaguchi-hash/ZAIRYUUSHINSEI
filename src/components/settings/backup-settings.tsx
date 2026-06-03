@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download, Upload, AlertCircle, CheckCircle, Loader2, Calendar, HardDrive, Settings, Clock, Trash2, Cloud, Computer } from "lucide-react";
-import { exportBackup, importBackup, fetchBackupHistory, getBackupSettings, updateBackupSettings } from "@/actions/backup";
+import { Download, Upload, AlertCircle, CheckCircle, Loader2, Calendar, HardDrive, Settings, Clock, Trash2, Cloud, Computer, Wifi } from "lucide-react";
+import { exportBackup, importBackup, fetchBackupHistory, getBackupSettings, updateBackupSettings, testGoogleDriveConnection } from "@/actions/backup";
 import { formatBytes } from "@/lib/backup-utils";
 
 interface BackupHistoryItem {
@@ -40,14 +40,40 @@ export function BackupSettings() {
   const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(true);
   const [autoBackupSchedule, setAutoBackupSchedule] = useState("02:00");
   const [retentionDays, setRetentionDays] = useState(30);
-  const [backupDestination, setBackupDestination] = useState("vercel_blob");
+  const [backupDestination, setBackupDestination] = useState("google_drive");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  // Google Drive 接続状態
+  const [googleDriveConnected, setGoogleDriveConnected] = useState<boolean | null>(null);
+  const [testingConnection, setTestingConnection] = useState(false);
 
   useEffect(() => {
     console.log("[BackupSettings] Component mounted");
     loadSettings();
     loadBackupHistory();
+    checkGoogleDriveConnection();
   }, []);
+
+  async function checkGoogleDriveConnection() {
+    setTestingConnection(true);
+    try {
+      console.log("[BackupSettings] Testing Google Drive connection...");
+      const result = await testGoogleDriveConnection();
+
+      if ("error" in result) {
+        console.warn("[BackupSettings] Google Drive error:", result.error);
+        setGoogleDriveConnected(false);
+      } else {
+        setGoogleDriveConnected(result.connected || false);
+        console.log("[BackupSettings] Google Drive connected:", result.connected);
+      }
+    } catch (err: any) {
+      console.error("[BackupSettings] Connection check exception:", err);
+      setGoogleDriveConnected(false);
+    } finally {
+      setTestingConnection(false);
+    }
+  }
 
   async function loadSettings() {
     setLoadingSettings(true);
@@ -298,6 +324,29 @@ export function BackupSettings() {
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">保存先</label>
               <div className="space-y-2">
+                <label className="flex items-center gap-3 p-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100">
+                  <input
+                    type="radio"
+                    name="destination"
+                    value="google_drive"
+                    checked={backupDestination === "google_drive"}
+                    onChange={(e) => setBackupDestination(e.target.value)}
+                    className="w-4 h-4"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-1 font-medium text-gray-900">
+                      <Cloud className="w-4 h-4" />
+                      Google Drive（推奨）
+                    </div>
+                    <p className="text-xs text-gray-500">自動バックアップを Google Drive に保存（15GB 無料）</p>
+                  </div>
+                  <div>
+                    {testingConnection && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+                    {!testingConnection && googleDriveConnected && <CheckCircle className="w-4 h-4 text-green-600" />}
+                    {!testingConnection && googleDriveConnected === false && <AlertCircle className="w-4 h-4 text-red-600" />}
+                  </div>
+                </label>
+
                 <label className="flex items-center gap-3 p-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100">
                   <input
                     type="radio"

@@ -23,11 +23,11 @@ interface BackupSettings {
   autoBackupSchedule: string;
   retentionDays: number;
   backupDestination: string;
-  lastBackupAt: string | null;
+  lastBackupAt: Date | string | null;
   lastBackupStatus: string | null;
   lastBackupError: string | null;
-  createdAt: string | Date;
-  updatedAt: string | Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export function BackupSettings() {

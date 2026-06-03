@@ -531,29 +531,29 @@ export function AddressSplitSimple({
         {zipError && <p className="text-xs text-red-500 mt-1">{zipError}</p>}
       </div>
 
-      {/* 都道府県 + 市区町村 */}
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className={labelClassName}>{labelPrefix}都道府県</label>
-          <select
-            value={prefecture}
-            onChange={(e) => { handleChange(e.target.value, city, addressLine); setZipError(""); }}
-            className={inputClassName}
-          >
-            <option value="">選択してください</option>
-            {PREFECTURES.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={labelClassName}>{labelPrefix}市区町村</label>
-          <input
-            type="text"
-            value={city}
-            onChange={(e) => { handleChange(prefecture, e.target.value, addressLine); setZipError(""); }}
-            placeholder="渋谷区"
-            className={inputClassName}
-          />
-        </div>
+      {/* 都道府県 */}
+      <div>
+        <label className={labelClassName}>{labelPrefix}都道府県</label>
+        <select
+          value={prefecture}
+          onChange={(e) => { handleChange(e.target.value, city, addressLine); setZipError(""); }}
+          className={inputClassName}
+        >
+          <option value="">選択してください</option>
+          {PREFECTURES.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+      </div>
+
+      {/* 市区町村 */}
+      <div>
+        <label className={labelClassName}>{labelPrefix}市区町村</label>
+        <input
+          type="text"
+          value={city}
+          onChange={(e) => { handleChange(prefecture, e.target.value, addressLine); setZipError(""); }}
+          placeholder="渋谷区"
+          className={inputClassName}
+        />
       </div>
 
       {/* 番地・建物・部屋番号 */}

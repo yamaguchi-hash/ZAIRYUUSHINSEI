@@ -25,7 +25,7 @@ export async function exportBackup() {
 
     // 管理者のみ実行可能
     const role = (session.user as any)?.role;
-    if (role !== "admin") {
+    if (role !== "admin" && role !== "expert") {
       return { error: "管理者のみ実行可能です" };
     }
 
@@ -76,7 +76,7 @@ export async function importBackup(backupJson: string) {
 
     // 管理者のみ実行可能
     const role = (session.user as any)?.role;
-    if (role !== "admin") {
+    if (role !== "admin" && role !== "expert") {
       return { error: "管理者のみ実行可能です" };
     }
 
@@ -166,7 +166,7 @@ export async function fetchBackupHistory() {
     }
 
     const role = (session.user as any)?.role;
-    if (role !== "admin") {
+    if (role !== "admin" && role !== "expert") {
       return { error: "管理者のみ実行可能です" };
     }
 
@@ -263,7 +263,7 @@ export async function updateBackupSettings(
     }
 
     const role = (session.user as any)?.role;
-    if (role !== "admin") {
+    if (role !== "admin" && role !== "expert") {
       return { error: "管理者のみ実行可能です" };
     }
 

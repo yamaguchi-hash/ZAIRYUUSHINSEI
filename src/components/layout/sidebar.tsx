@@ -50,7 +50,7 @@ const navItems: NavItem[] = [
     href: "/admin",
     label: "システム管理",
     icon: <Settings className="w-4 h-4" />,
-    roles: ["admin"],
+    roles: ["admin", "expert"],
   },
   {
     href: "/settings",

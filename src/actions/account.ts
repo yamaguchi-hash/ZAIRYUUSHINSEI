@@ -133,7 +133,7 @@ export async function adminUpdateUser(
   const session = await auth();
   if (!session?.user?.id) throw new Error("認証が必要です");
   const callerRole = (session.user as any).role;
-  if (callerRole !== "admin") throw new Error("管理者権限が必要です");
+  if (callerRole !== "admin" && callerRole !== "expert") throw new Error("管理者権限が必要です");
 
   const updateData: Record<string, any> = { updatedAt: new Date() };
 
@@ -191,7 +191,7 @@ export async function getUsers() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("認証が必要です");
   const callerRole = (session.user as any).role;
-  if (callerRole !== "admin") throw new Error("管理者権限が必要です");
+  if (callerRole !== "admin" && callerRole !== "expert") throw new Error("管理者権限が必要です");
 
   const tenantId = (session.user as any).tenantId;
 

@@ -11,7 +11,7 @@ export default async function AdminPage() {
   const session = await auth();
   const userRole = (session?.user as any)?.role;
 
-  if (userRole !== "admin") {
+  if (userRole !== "admin" && userRole !== "expert") {
     redirect("/dashboard");
   }
 

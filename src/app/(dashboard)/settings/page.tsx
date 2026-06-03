@@ -125,12 +125,12 @@ export default async function SettingsPage() {
         </Card>
 
         {/* Admin: user management */}
-        {userRole === "admin" && (
+        {(userRole === "admin" || userRole === "expert") && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                ユーザー管理（管理者）
+                ユーザー管理
               </CardTitle>
             </CardHeader>
             <CardContent>

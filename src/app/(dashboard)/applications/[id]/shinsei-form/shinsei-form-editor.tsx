@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { SectionExtractButton } from "@/components/applications/section-extract-button";
 import { cn } from "@/lib/utils";
-import { AddressSplitInput } from "@/components/ui/postal-code-input";
+import { AddressSplitInput, AddressSplitSimple } from "@/components/ui/postal-code-input";
 import type { ApplicationFormData, WorkHistoryEntry, FamilyMember, ApplicationFormType, VisaFormCategory } from "@/lib/form-types";
 import {
   FORM_TYPE_LABELS, PURPOSE_OF_ENTRY_OPTIONS,
@@ -781,7 +781,11 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="(1) 名称（勤務先）" required><input className={inputCls} value={form.employerName} onChange={e => set("employerName", e.target.value)} /></Field>
                   <Field label="    支店・事業所名"><input className={inputCls} value={form.employerBranchName} onChange={e => set("employerBranchName", e.target.value)} /></Field>
-                  <Field label="(2) 所在地（主たる勤務場所）"><input className={inputCls} value={form.employerAddress} onChange={e => set("employerAddress", e.target.value)} /></Field>
+                  <div className="sm:col-span-2">
+                    <Field label="(2) 所在地（主たる勤務場所）">
+                      <AddressSplitSimple value={form.employerAddress} onChange={v => set("employerAddress", v)} inputClassName={inputCls} />
+                    </Field>
+                  </div>
                   <Field label="(3) 電話番号"><input className={inputCls} value={form.employerPhone} onChange={e => set("employerPhone", e.target.value)} /></Field>
                 </CardContent>
               </Card>
@@ -933,7 +937,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   </Field>
                   <div className="sm:col-span-2">
                     <Field label="住所（日本）">
-                      <input className={inputCls} value={form.spouseAddress} onChange={e => set("spouseAddress", e.target.value)} />
+                      <AddressSplitSimple value={form.spouseAddress} onChange={v => set("spouseAddress", v)} inputClassName={inputCls} />
                     </Field>
                   </div>
                 </CardContent>
@@ -1157,7 +1161,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   </Field>
                   <div className="sm:col-span-2">
                     <Field label="(12) 勤務先所在地">
-                      <input className={inputCls} value={form.supporterAddress} onChange={e => set("supporterAddress", e.target.value)} />
+                      <AddressSplitSimple value={form.supporterAddress} onChange={v => set("supporterAddress", v)} inputClassName={inputCls} />
                     </Field>
                   </div>
                   <Field label="(13) 年収（円）">
@@ -1202,7 +1206,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   </Field>
                   <div className="sm:col-span-2">
                     <Field label="所在地">
-                      <input className={inputCls} value={form.schoolAddress} onChange={e => set("schoolAddress", e.target.value)} />
+                      <AddressSplitSimple value={form.schoolAddress} onChange={v => set("schoolAddress", v)} inputClassName={inputCls} />
                     </Field>
                   </div>
                   <Field label="電話番号">
@@ -1540,7 +1544,11 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="(1) 氏名"><input className={inputCls} value={form.representativeName} onChange={e => set("representativeName", e.target.value)} /></Field>
               <Field label="(2) 本人との関係"><input className={inputCls} value={form.representativeRelationship} onChange={e => set("representativeRelationship", e.target.value)} placeholder="例: 法定代理人（親）" /></Field>
-              <div className="sm:col-span-2"><Field label="(3) 住所"><input className={inputCls} value={form.representativeAddress} onChange={e => set("representativeAddress", e.target.value)} /></Field></div>
+              <div className="sm:col-span-2">
+                <Field label="(3) 住所">
+                  <AddressSplitSimple value={form.representativeAddress} onChange={v => set("representativeAddress", v)} inputClassName={inputCls} />
+                </Field>
+              </div>
               <Field label="電話番号"><input className={inputCls} value={form.representativePhone} onChange={e => set("representativePhone", e.target.value)} /></Field>
               <Field label="携帯電話番号"><input className={inputCls} value={form.representativeCellular} onChange={e => set("representativeCellular", e.target.value)} /></Field>
             </CardContent>
@@ -1607,7 +1615,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                         </select>
                       </Field>
                       <Field label="    他の業種（複数選択可）"><input className={inputCls} value={form.orgBusinessTypeOtherCode} onChange={e => set("orgBusinessTypeOtherCode", e.target.value)} placeholder="例: 14, 27" /></Field>
-                      <div className="sm:col-span-2"><Field label="(6) 所在地（Address）" required><input className={inputCls} value={form.orgAddress} onChange={e => set("orgAddress", e.target.value)} /></Field></div>
+                      <div className="sm:col-span-2"><Field label="(6) 所在地（Address）" required><AddressSplitSimple value={form.orgAddress} onChange={v => set("orgAddress", v)} inputClassName={inputCls} /></Field></div>
                       <Field label="    電話番号"><input className={inputCls} value={form.orgPhone} onChange={e => set("orgPhone", e.target.value)} /></Field>
                       <Field label="(7) 資本金（円）"><input className={inputCls} value={form.orgCapital} onChange={e => set("orgCapital", e.target.value)} placeholder="例: 10000000" /></Field>
                       <Field label="(8) 年間売上高（直近年度・円）"><input className={inputCls} value={form.orgAnnualSales} onChange={e => set("orgAnnualSales", e.target.value)} /></Field>
@@ -1772,7 +1780,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       </div>
                       <Field label="雇用保険適用事業所番号（11桁）"><input className={inputCls} value={form.orgVDispatchInsuranceNo} onChange={e => set("orgVDispatchInsuranceNo", e.target.value)} /></Field>
                       <div className="grid grid-cols-2 gap-3">
-                        <Field label="住所（所在地）"><input className={inputCls} value={form.orgVDispatchAddress} onChange={e => set("orgVDispatchAddress", e.target.value)} /></Field>
+                        <Field label="住所（所在地）"><AddressSplitSimple value={form.orgVDispatchAddress} onChange={v => set("orgVDispatchAddress", v)} inputClassName={inputCls} /></Field>
                         <Field label="電話番号"><input className={inputCls} value={form.orgVDispatchPhone} onChange={e => set("orgVDispatchPhone", e.target.value)} /></Field>
                       </div>
                       <Field label="代表者の氏名"><input className={inputCls} value={form.orgVDispatchRepresentative} onChange={e => set("orgVDispatchRepresentative", e.target.value)} /></Field>
@@ -1793,7 +1801,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       </div>
                       <Field label="雇用保険適用事業所番号（11桁）"><input className={inputCls} value={form.orgPlacementProviderInsuranceNo} onChange={e => set("orgPlacementProviderInsuranceNo", e.target.value)} /></Field>
                       <div className="grid grid-cols-2 gap-3">
-                        <Field label="住所（所在地）"><input className={inputCls} value={form.orgPlacementProviderAddress} onChange={e => set("orgPlacementProviderAddress", e.target.value)} /></Field>
+                        <Field label="住所（所在地）"><AddressSplitSimple value={form.orgPlacementProviderAddress} onChange={v => set("orgPlacementProviderAddress", v)} inputClassName={inputCls} /></Field>
                         <Field label="電話番号"><input className={inputCls} value={form.orgPlacementProviderPhone} onChange={e => set("orgPlacementProviderPhone", e.target.value)} /></Field>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
@@ -1809,7 +1817,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     <CardContent className="space-y-3">
                       <Field label="氏名又は名称"><input className={inputCls} value={form.orgIntermediaryName} onChange={e => set("orgIntermediaryName", e.target.value)} /></Field>
                       <div className="grid grid-cols-2 gap-3">
-                        <Field label="住所（所在地）"><input className={inputCls} value={form.orgIntermediaryAddress} onChange={e => set("orgIntermediaryAddress", e.target.value)} /></Field>
+                        <Field label="住所（所在地）"><AddressSplitSimple value={form.orgIntermediaryAddress} onChange={v => set("orgIntermediaryAddress", v)} inputClassName={inputCls} /></Field>
                         <Field label="電話番号"><input className={inputCls} value={form.orgIntermediaryPhone} onChange={e => set("orgIntermediaryPhone", e.target.value)} /></Field>
                       </div>
                     </CardContent>
@@ -1881,7 +1889,9 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     </Field>
                     <Field label="業種コード（その他）"><input className={inputCls} value={form.orgBusinessTypeOtherCode} onChange={e => set("orgBusinessTypeOtherCode", e.target.value)} placeholder="複数選択可" /></Field>
                   </div>
-                  <Field label="(5) 住所（本店または主たる事務所）"><input className={inputCls} value={form.orgAddress} onChange={e => set("orgAddress", e.target.value)} /></Field>
+                  <Field label="(5) 住所（本店または主たる事務所）">
+                    <AddressSplitSimple value={form.orgAddress} onChange={v => set("orgAddress", v)} inputClassName={inputCls} />
+                  </Field>
                   <Field label="電話番号"><input className={inputCls} value={form.orgPhone} onChange={e => set("orgPhone", e.target.value)} /></Field>
                   <div className="grid grid-cols-3 gap-3">
                     <Field label="(6) 資本金（円）"><input className={inputCls} type="number" value={form.orgCapital} onChange={e => set("orgCapital", e.target.value)} /></Field>
@@ -2094,7 +2104,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   </div>
                   <Field label="(3) 雇用保険適用事業所番号"><input className={inputCls} value={form.rsoInsuranceNo} onChange={e => set("rsoInsuranceNo", e.target.value)} /></Field>
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label="(4) 所在地"><input className={inputCls} value={form.rsoAddress} onChange={e => set("rsoAddress", e.target.value)} /></Field>
+                    <Field label="(4) 所在地"><AddressSplitSimple value={form.rsoAddress} onChange={v => set("rsoAddress", v)} inputClassName={inputCls} /></Field>
                     <Field label="電話番号"><input className={inputCls} value={form.rsoPhone} onChange={e => set("rsoPhone", e.target.value)} /></Field>
                   </div>
                   <Field label="(5) 代表者氏名"><input className={inputCls} value={form.rsoRepresentative} onChange={e => set("rsoRepresentative", e.target.value)} /></Field>
@@ -2104,7 +2114,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="(8) 支援実施事業所名"><input className={inputCls} value={form.rsoSupportBusinessName} onChange={e => set("rsoSupportBusinessName", e.target.value)} /></Field>
-                    <Field label="所在地"><input className={inputCls} value={form.rsoSupportBusinessAddress} onChange={e => set("rsoSupportBusinessAddress", e.target.value)} /></Field>
+                    <Field label="所在地"><AddressSplitSimple value={form.rsoSupportBusinessAddress} onChange={v => set("rsoSupportBusinessAddress", v)} inputClassName={inputCls} /></Field>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="(10) 支援責任者"><input className={inputCls} value={form.rsoSupportManager} onChange={e => set("rsoSupportManager", e.target.value)} /></Field>
@@ -2137,7 +2147,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     {BUSINESS_TYPES.map(b => <option key={b.code} value={String(b.code)}>{b.code}. {b.label}</option>)}
                   </select>
                 </Field>
-                <div className="sm:col-span-2"><Field label="(6) 所在地（Address）"><input className={inputCls} value={form.dispatchOrgAddress} onChange={e => set("dispatchOrgAddress", e.target.value)} /></Field></div>
+                <div className="sm:col-span-2"><Field label="(6) 所在地（Address）"><AddressSplitSimple value={form.dispatchOrgAddress} onChange={v => set("dispatchOrgAddress", v)} inputClassName={inputCls} /></Field></div>
                 <Field label="    電話番号"><input className={inputCls} value={form.dispatchOrgPhone} onChange={e => set("dispatchOrgPhone", e.target.value)} /></Field>
                 <Field label="(7) 資本金（円）"><input className={inputCls} value={form.dispatchOrgCapital} onChange={e => set("dispatchOrgCapital", e.target.value)} /></Field>
                 <Field label="(8) 年間売上高（直近年度・円）"><input className={inputCls} value={form.dispatchOrgAnnualSales} onChange={e => set("dispatchOrgAnnualSales", e.target.value)} /></Field>

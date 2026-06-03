@@ -224,7 +224,10 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                       {/* 住所・電話 */}
                       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400">
                         {(org.prefecture || org.city) && (
-                          <span>{[org.prefecture, org.city, org.addressLine].filter(Boolean).join(" ")}</span>
+                          <span>{org.prefecture ?? ""} {org.city ?? ""}</span>
+                        )}
+                        {org.addressLine && (
+                          <span>{org.addressLine}</span>
                         )}
                         {org.phone && (
                           <span className="inline-flex items-center gap-1">

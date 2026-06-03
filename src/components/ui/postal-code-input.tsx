@@ -372,3 +372,111 @@ export function AddressSplitInput({
     </div>
   );
 }
+
+// ─── 簡易住所分割入力（1つの string フィールドを都道府県/市区町村/番地以降に分割）──
+// 既存のデータが「東京都渋谷区代々木1-1-1」のような1行形式のフィールドに使う
+// 内部で都道府県/市区町村+町名/番地以降に分割して入力し、結合して onChange に返す
+
+const PREFECTURES = [
+  "北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県",
+  "茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県",
+  "新潟県","富山県","石川県","福井県","山梨県","長野県","岐阜県",
+  "静岡県","愛知県","三重県","滋賀県","京都府","大阪府","兵庫県",
+  "奈良県","和歌山県","鳥取県","島根県","岡山県","広島県","山口県",
+  "徳島県","香川県","愛媛県","高知県","福岡県","佐賀県","長崎県",
+  "熊本県","大分県","宮崎県","鹿児島県","沖縄県",
+];
+
+/** 住所文字列から都道府県を抽出 */
+function extractPrefecture(address: string): { prefecture: string; rest: string } {
+  for (const pref of PREFECTURES) {
+    if (address.startsWith(pref)) {
+      return { prefecture: pref, rest: address.slice(pref.length) };
+    }
+  }
+  return { prefecture: "", rest: address };
+}
+
+/** 残りの住所から市区町村部分を抽出 */
+function extractCity(rest: string): { city: string; addressLine: string } {
+  const cityPatterns = [
+    /^(.+?市.+?区)/,     // 政令指定都市（例: 横浜市港北区）
+    /^(.+?[市])/,         // 普通の市
+    /^(.+?郡.+?[町村])/,  // 郡+町村
+    /^(.+?[区])/,         // 東京23区
+    /^(.+?[町村])/,       // 町村
+  ];
+
+  for (const pattern of cityPatterns) {
+    const match = rest.match(pattern);
+    if (match) {
+      return { city: match[1], addressLine: rest.slice(match[1].length) };
+    }
+  }
+
+  return { city: "", addressLine: rest };
+}
+
+interface AddressSplitSimpleProps {
+  value: string;
+  onChange: (value: string) => void;
+  inputClassName?: string;
+  labelClassName?: string;
+  labelPrefix?: string;
+}
+
+/**
+ * 1つの住所 string を都道府県 / 市区町村 / 番地以降に分割して入力するコンポーネント。
+ */
+export function AddressSplitSimple({
+  value,
+  onChange,
+  inputClassName = "w-full text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white",
+  labelClassName = "block text-xs font-medium text-gray-600 mb-1",
+  labelPrefix = "",
+}: AddressSplitSimpleProps) {
+  const { prefecture, rest } = extractPrefecture(value || "");
+  const { city, addressLine } = extractCity(rest);
+
+  function handleChange(pref: string, ct: string, addr: string) {
+    onChange(`${pref}${ct}${addr}`);
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={labelClassName}>{labelPrefix}都道府県</label>
+          <select
+            value={prefecture}
+            onChange={(e) => handleChange(e.target.value, city, addressLine)}
+            className={inputClassName}
+          >
+            <option value="">選択してください</option>
+            {PREFECTURES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelClassName}>{labelPrefix}市区町村</label>
+          <input
+            type="text"
+            value={city}
+            onChange={(e) => handleChange(prefecture, e.target.value, addressLine)}
+            placeholder="渋谷区"
+            className={inputClassName}
+          />
+        </div>
+      </div>
+      <div>
+        <label className={labelClassName}>{labelPrefix}番地・建物・部屋番号</label>
+        <input
+          type="text"
+          value={addressLine}
+          onChange={(e) => handleChange(prefecture, city, e.target.value)}
+          placeholder="代々木1-1-1 〇〇ビル101号室"
+          className={inputClassName}
+        />
+      </div>
+    </div>
+  );
+}

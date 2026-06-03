@@ -317,8 +317,16 @@ export default async function ApplicationDetailPage({
                   <dd>{organization.employeeCount ? `${organization.employeeCount}名` : "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-gray-500">所在地</dt>
-                  <dd>{[organization.prefecture, organization.city, organization.addressLine].filter(Boolean).join(" ") || "—"}</dd>
+                  <dt className="text-gray-500">所在地（都道府県）</dt>
+                  <dd>{organization.prefecture || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">所在地（市区町村）</dt>
+                  <dd>{organization.city || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">所在地（番地以降）</dt>
+                  <dd>{organization.addressLine || "—"}</dd>
                 </div>
               </dl>
             ) : (

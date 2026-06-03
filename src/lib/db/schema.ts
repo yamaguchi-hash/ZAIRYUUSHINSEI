@@ -327,7 +327,7 @@ export const backupSettings = pgTable("backup_settings", {
   isAutoBackupEnabled: boolean("is_auto_backup_enabled").notNull().default(true),
   autoBackupSchedule: text("auto_backup_schedule").notNull().default("02:00"), // HH:mm 形式
   retentionDays: integer("retention_days").notNull().default(30),
-  backupDestination: text("backup_destination").notNull().default("vercel_blob"), // "vercel_blob"
+  backupDestination: text("backup_destination").notNull().default("google_drive"), // "google_drive" | "vercel_blob" | "local_download"
   lastBackupAt: timestamp("last_backup_at"),
   lastBackupStatus: text("last_backup_status"), // "success" | "failed"
   lastBackupError: text("last_backup_error"),

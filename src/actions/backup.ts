@@ -345,6 +345,15 @@ export async function updateBackupSettings(
   backupDestination?: string
 ) {
   try {
+    console.log("[updateBackupSettings] Called with:", {
+      isAutoBackupEnabled,
+      autoBackupSchedule,
+      retentionDays,
+      backupDestination,
+      backupDestinationType: typeof backupDestination,
+      backupDestinationLength: backupDestination?.length,
+    });
+
     const session = await auth();
     if (!session?.user) {
       return { error: "認証が必要です" };
@@ -370,9 +379,19 @@ export async function updateBackupSettings(
       return { error: "保持期間は1日～365日の範囲で指定してください" };
     }
 
-    // 保存先の検証
-    if (backupDestination && !["google_drive", "vercel_blob", "local_download"].includes(backupDestination)) {
-      return { error: "無効な保存先が指定されています" };
+    // 保存先の検証（トリム処理を追加）
+    const trimmedDestination = backupDestination?.trim();
+    console.log("[updateBackupSettings] Trimmed destination:", trimmedDestination);
+    const validDestinations = ["google_drive", "vercel_blob", "local_download"];
+    console.log("[updateBackupSettings] Valid destinations:", validDestinations);
+
+    if (trimmedDestination && !validDestinations.includes(trimmedDestination)) {
+      console.error("[updateBackupSettings] Invalid destination error:", {
+        provided: trimmedDestination,
+        valid: validDestinations,
+        matches: validDestinations.filter(d => d === trimmedDestination),
+      });
+      return { error: `無効な保存先が指定されています: '${trimmedDestination}' (許可: ${validDestinations.join(", ")})` };
     }
 
     const updates: Record<string, any> = {
@@ -388,8 +407,8 @@ export async function updateBackupSettings(
     if (retentionDays !== undefined) {
       updates.retentionDays = retentionDays;
     }
-    if (backupDestination !== undefined) {
-      updates.backupDestination = backupDestination;
+    if (trimmedDestination !== undefined) {
+      updates.backupDestination = trimmedDestination;
     }
 
     await db

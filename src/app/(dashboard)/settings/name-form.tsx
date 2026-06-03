@@ -17,26 +17,15 @@ export function NameForm({ currentName }: { currentName: string }) {
     setStatus("idle");
     startTransition(async () => {
       try {
-        console.log("[NameForm] Updating name to:", name);
         await updateDisplayName(name);
-
-        console.log("[NameForm] Update successful, refreshing page");
         setStatus("success");
         setMessage("表示名を変更しました");
 
-        // サーバーキャッシュとセッションを無効化
-        // 1. 短い遅延（サーバー側の処理完了を待つ）
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // 2. ページをリフレッシュしてサーバーの最新データを取得
-        console.log("[NameForm] Calling router.refresh()");
+        // ページをリフレッシュ
+        // Session callback will fetch the latest user data from DB
+        await new Promise(resolve => setTimeout(resolve, 300));
         router.refresh();
-
-        // 3. さらにセッション更新を待つ
-        await new Promise(resolve => setTimeout(resolve, 500));
-        console.log("[NameForm] Page refresh completed");
       } catch (err: any) {
-        console.error("[NameForm] Error:", err);
         setStatus("error");
         setMessage(err.message ?? "変更に失敗しました");
       }

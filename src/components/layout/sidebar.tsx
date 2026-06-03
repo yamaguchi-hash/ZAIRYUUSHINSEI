@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -67,33 +66,18 @@ interface SidebarProps {
 
 export function Sidebar({ userRole: initialUserRole, userName: initialUserName }: SidebarProps) {
   const pathname = usePathname();
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
-  // Client-side state for session data
-  const [displayName, setDisplayName] = useState<string | null | undefined>(initialUserName);
-  const [displayRole, setDisplayRole] = useState<string | undefined>(initialUserRole);
+  // Use session data if available, fallback to initial props
+  // Session callback now fetches latest user data from DB
+  const userRole = (session?.user as any)?.role ?? initialUserRole;
+  const userName = session?.user?.name ?? initialUserName;
 
-  // Watch for session changes and update state
-  useEffect(() => {
-    console.log("[Sidebar] Session status:", status, "Session data:", session?.user);
-
-    if (status === "authenticated" && session?.user) {
-      const name = session.user.name;
-      const role = (session.user as any)?.role;
-
-      console.log("[Sidebar] Updating from session:", { name, role });
-
-      if (name) {
-        setDisplayName(name);
-      }
-      if (role) {
-        setDisplayRole(role);
-      }
-    }
-  }, [session, status]);
-
-  const userRole = displayRole ?? initialUserRole;
-  const userName = displayName ?? initialUserName;
+  console.log("[Sidebar] Rendering with:", {
+    userName,
+    userRole,
+    sessionUser: session?.user,
+  });
 
   const visibleItems = navItems.filter(
     (item) => !item.roles || item.roles.includes(userRole ?? "")

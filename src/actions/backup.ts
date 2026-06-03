@@ -182,29 +182,41 @@ export async function fetchBackupHistory() {
 
 export async function getBackupSettings() {
   try {
+    console.log("[getBackupSettings] Starting...");
+
     const session = await auth();
+    console.log("[getBackupSettings] Session:", session?.user?.id);
     if (!session?.user) {
+      console.log("[getBackupSettings] No session user");
       return { error: "認証が必要です" };
     }
 
     const tenantId = (session.user as any)?.tenantId;
+    console.log("[getBackupSettings] TenantId:", tenantId);
     if (!tenantId) {
+      console.log("[getBackupSettings] No tenantId");
       return { error: "テナントIDが不正です" };
     }
 
     const role = (session.user as any)?.role;
+    console.log("[getBackupSettings] Role:", role);
     if (role !== "admin") {
+      console.log("[getBackupSettings] Not admin user");
       return { error: "管理者のみ実行可能です" };
     }
 
+    console.log("[getBackupSettings] Querying database for tenant:", tenantId);
     let settings = await db
       .select()
       .from(backupSettings)
       .where(eq(backupSettings.tenantId, tenantId))
       .limit(1);
 
+    console.log("[getBackupSettings] Found settings:", settings.length);
+
     // 設定がない場合はデフォルト値で作成
     if (settings.length === 0) {
+      console.log("[getBackupSettings] Creating default settings");
       await db.insert(backupSettings).values({
         tenantId,
         isAutoBackupEnabled: true,
@@ -218,14 +230,18 @@ export async function getBackupSettings() {
         .from(backupSettings)
         .where(eq(backupSettings.tenantId, tenantId))
         .limit(1);
+
+      console.log("[getBackupSettings] Created settings:", settings.length);
     }
 
+    console.log("[getBackupSettings] Returning settings:", settings[0]);
     return {
       success: true,
       data: settings[0],
     };
   } catch (err: any) {
-    return { error: err.message ?? "バックアップ設定の取得に失敗しました" };
+    console.error("[getBackupSettings] Error:", err);
+    return { error: `[getBackupSettings] ${err.message ?? "バックアップ設定の取得に失敗しました"}` };
   }
 }
 

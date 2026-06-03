@@ -171,6 +171,12 @@ export function BackupSettings() {
 
   return (
     <div className="space-y-6">
+      {/* デバッグパネル */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs">
+        <p className="text-gray-600">状態: {isLoading ? "読み込み中" : error ? "エラー" : "正常"}</p>
+        <p className="text-gray-500 mt-1">コンポーネントがマウントされました。ブラウザコンソールで詳細ログを確認してください。</p>
+      </div>
+
       {/* 初期化中 */}
       {isLoading && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
@@ -184,7 +190,8 @@ export function BackupSettings() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm text-red-700">{error}</p>
+            <p className="text-sm text-red-700 font-semibold mb-2">エラー</p>
+            <p className="text-sm text-red-700 bg-red-100 p-2 rounded">{error}</p>
             <p className="text-xs text-red-600 mt-2">デバッグ情報: ブラウザコンソールでログを確認してください</p>
           </div>
         </div>
@@ -199,19 +206,21 @@ export function BackupSettings() {
       )}
 
       {/* エクスポート */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className={`${!error ? "bg-blue-50 border border-blue-200" : "bg-gray-50 border border-gray-300 opacity-75"} rounded-lg p-4`}>
         <div className="flex items-start gap-3">
-          <Download className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+          <Download className={`w-5 h-5 shrink-0 mt-0.5 ${!error ? "text-blue-600" : "text-gray-400"}`} />
           <div className="flex-1">
-            <h3 className="font-semibold text-blue-900 mb-1">バックアップのダウンロード</h3>
-            <p className="text-sm text-blue-700 mb-3">
+            <h3 className={`font-semibold mb-1 ${!error ? "text-blue-900" : "text-gray-600"}`}>バックアップのダウンロード</h3>
+            <p className={`text-sm mb-3 ${!error ? "text-blue-700" : "text-gray-600"}`}>
               現在のすべての申請人と案件情報をJSON形式でバックアップします。
             </p>
             <button
               onClick={handleExport}
-              disabled={exporting}
+              disabled={exporting || !!error}
               className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                exporting
+                error
+                  ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                  : exporting
                   ? "bg-blue-200 text-blue-700 cursor-not-allowed"
                   : "bg-blue-600 text-white hover:bg-blue-700"
               }`}
@@ -233,12 +242,12 @@ export function BackupSettings() {
       </div>
 
       {/* インポート */}
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+      <div className={`${!error ? "bg-green-50 border border-green-200" : "bg-gray-50 border border-gray-300 opacity-75"} rounded-lg p-4`}>
         <div className="flex items-start gap-3">
-          <Upload className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+          <Upload className={`w-5 h-5 shrink-0 mt-0.5 ${!error ? "text-green-600" : "text-gray-400"}`} />
           <div className="flex-1">
-            <h3 className="font-semibold text-green-900 mb-1">バックアップを復元</h3>
-            <p className="text-sm text-green-700 mb-3">
+            <h3 className={`font-semibold mb-1 ${!error ? "text-green-900" : "text-gray-600"}`}>バックアップを復元</h3>
+            <p className={`text-sm mb-3 ${!error ? "text-green-700" : "text-gray-600"}`}>
               保存したバックアップファイルから復元します。
               <strong>既存データは上書きされます。</strong>
             </p>
@@ -250,11 +259,13 @@ export function BackupSettings() {
                   const f = e.currentTarget.files?.[0];
                   if (f) handleImportFile(f);
                 }}
-                disabled={importing}
+                disabled={importing || !!error}
                 className="hidden"
               />
               <span className={`inline-block px-4 py-2 rounded-lg font-medium text-sm transition-colors cursor-pointer ${
-                importing
+                error
+                  ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                  : importing
                   ? "bg-green-200 text-green-700 cursor-not-allowed"
                   : "bg-green-600 text-white hover:bg-green-700"
               }`}>

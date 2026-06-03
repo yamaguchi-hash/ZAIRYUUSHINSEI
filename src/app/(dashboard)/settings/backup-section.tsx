@@ -8,7 +8,7 @@ interface BackupSectionProps {
 }
 
 export function BackupSection({ userRole }: BackupSectionProps) {
-  const isAdmin = userRole === "admin";
+  const isAuthorized = userRole === "admin" || userRole === "expert";
 
   return (
     <div className="mt-6 mb-6">
@@ -17,19 +17,19 @@ export function BackupSection({ userRole }: BackupSectionProps) {
         <div className="p-4 border-b border-gray-200 bg-gray-50">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2">
             <HardDrive className="w-4 h-4" />
-            バックアップ・復元（管理者）
+            バックアップ・復元
           </h3>
         </div>
 
         {/* Content */}
         <div className="p-6">
-          {!isAdmin ? (
+          {!isAuthorized ? (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
               <Lock className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-yellow-900 mb-1">管理者のみが利用可能</p>
+                <p className="text-sm font-semibold text-yellow-900 mb-1">権限が必要です</p>
                 <p className="text-sm text-yellow-700">
-                  バックアップ・復元機能は管理者のみが利用できます。現在のロールは「{userRole || "不明"}」です。
+                  バックアップ・復元機能は管理者および行政書士のみが利用できます。現在のロールは「{userRole || "不明"}」です。
                 </p>
               </div>
             </div>

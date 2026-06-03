@@ -25,10 +25,37 @@ export function BackupSettings() {
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [pendingRestoreData, setPendingRestoreData] = useState("");
   const [history, setHistory] = useState<BackupHistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     console.log("[BackupSettings] Component mounted");
-    loadBackupHistory();
+    const initialize = async () => {
+      try {
+        console.log("[BackupSettings] Initializing...");
+
+        // Get settings first
+        console.log("[BackupSettings] Calling getBackupSettings()...");
+        const settingsResult = await getBackupSettings();
+        console.log("[BackupSettings] Settings result:", settingsResult);
+
+        if ("error" in settingsResult) {
+          console.error("[BackupSettings] Settings error:", settingsResult.error);
+          setError(settingsResult.error);
+        } else {
+          console.log("[BackupSettings] Settings loaded:", settingsResult.data);
+        }
+
+        // Then load history
+        await loadBackupHistory();
+      } catch (err) {
+        console.error("[BackupSettings] Initialize error:", err);
+        setError("バックアップ設定の初期化に失敗しました");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initialize();
   }, []);
 
   async function loadBackupHistory() {
@@ -138,6 +165,14 @@ export function BackupSettings() {
 
   return (
     <div className="space-y-6">
+      {/* 初期化中 */}
+      {isLoading && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+          <Loader2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5 animate-spin" />
+          <p className="text-sm text-blue-700">初期化中...</p>
+        </div>
+      )}
+
       {/* エラー */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">

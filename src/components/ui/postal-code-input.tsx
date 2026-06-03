@@ -234,6 +234,8 @@ interface AddressSplitInputProps {
  * 郵便番号・都道府県・市区町村・番地を分割して入力するコンポーネント。
  * - 郵便番号7桁入力 → 都道府県・市区町村を自動入力（青ボタン）
  * - 都道府県+市区町村+番地入力後 → 〒検索ボタンで郵便番号を逆引き（緑ボタン）
+ *
+ * UI は2セクション：位置情報（都道府県・市区町村・町村）と詳細住所（番地以下）
  */
 export function AddressSplitInput({
   value,
@@ -246,17 +248,21 @@ export function AddressSplitInput({
   const [reverseLoading, setReverseLoading] = useState(false);
   const [zipError, setZipError] = useState("");
 
+  // addressLine を town + block に分割
+  const { town, block } = extractTown(value.addressLine);
+
   function cleanZip(v: string) {
     return v.replace(/[-ー−\s]/g, "");
   }
 
-  /** 郵便番号 → 都道府県・市区町村を自動入力 */
+  /** 郵便番号 → 都道府県・市区町村・町村を自動入力 */
   async function zipToAddress(zipValue: string) {
     setZipLoading(true);
     setZipError("");
     const result = await fetchAddressFromZip(zipValue);
     if (result) {
-      onChange({ prefecture: result.prefecture, city: result.city + result.town });
+      // city + town を結合して city に、town は別に設定
+      onChange({ prefecture: result.prefecture, city: result.city, addressLine: result.town + block });
     } else {
       setZipError("該当する住所が見つかりませんでした");
     }
@@ -274,7 +280,7 @@ export function AddressSplitInput({
 
   /** 住所 → 郵便番号を逆引き */
   async function addressToZip() {
-    const addr = `${value.prefecture}${value.city}${value.addressLine}`.trim();
+    const addr = `${value.prefecture}${value.city}${town}`.trim();
     if (!addr) { setZipError("都道府県・市区町村を入力してください"); return; }
     setReverseLoading(true);
     setZipError("");
@@ -287,13 +293,21 @@ export function AddressSplitInput({
     setReverseLoading(false);
   }
 
+  function handleTownChange(newTown: string) {
+    onChange({ addressLine: newTown + block });
+  }
+
+  function handleBlockChange(newBlock: string) {
+    onChange({ addressLine: town + newBlock });
+  }
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {/* 郵便番号 */}
       <div>
         <label className={labelClassName}>
           郵便番号{required && <span className="text-red-500 ml-0.5">*</span>}
-          <span className="text-gray-400 font-normal ml-1">（7桁入力で住所を自動入力　例: 1600023）</span>
+          <span className="text-gray-400 font-normal ml-1">（7桁入力で住所を自動入力）</span>
         </label>
         <div className="flex gap-1.5">
           <input
@@ -317,7 +331,7 @@ export function AddressSplitInput({
           <button
             type="button"
             onClick={addressToZip}
-            disabled={reverseLoading || !(value.prefecture || value.city)}
+            disabled={reverseLoading || !(value.prefecture && value.city)}
             title="住所から郵便番号を自動検索"
             className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors"
           >
@@ -328,46 +342,62 @@ export function AddressSplitInput({
         {zipError && <p className="text-xs text-red-500 mt-1">{zipError}</p>}
       </div>
 
-      {/* 都道府県 + 市区町村 */}
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className={labelClassName}>
-            都道府県{required && <span className="text-red-500 ml-0.5">*</span>}
-          </label>
-          <input
-            type="text"
-            value={value.prefecture}
-            onChange={(e) => { onChange({ prefecture: e.target.value }); setZipError(""); }}
-            placeholder="東京都"
-            className={inputClassName}
-          />
+      {/* セクション1：位置情報（都道府県・市区町村・町村） */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <label className="block text-xs font-semibold text-gray-700">位置情報</label>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={labelClassName}>
+              都道府県{required && <span className="text-red-500 ml-0.5">*</span>}
+            </label>
+            <input
+              type="text"
+              value={value.prefecture}
+              onChange={(e) => { onChange({ prefecture: e.target.value }); setZipError(""); }}
+              placeholder="東京都"
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className={labelClassName}>
+              市区町村{required && <span className="text-red-500 ml-0.5">*</span>}
+            </label>
+            <input
+              type="text"
+              value={value.city}
+              onChange={(e) => { onChange({ city: e.target.value }); setZipError(""); }}
+              placeholder="渋谷区"
+              className={inputClassName}
+            />
+          </div>
         </div>
+
         <div>
-          <label className={labelClassName}>
-            市区町村{required && <span className="text-red-500 ml-0.5">*</span>}
-          </label>
+          <label className={labelClassName}>町村・丁目</label>
           <input
             type="text"
-            value={value.city}
-            onChange={(e) => { onChange({ city: e.target.value }); setZipError(""); }}
-            placeholder="渋谷区代々木"
+            value={town}
+            onChange={(e) => { handleTownChange(e.target.value); setZipError(""); }}
+            placeholder="代々木"
             className={inputClassName}
           />
         </div>
       </div>
 
-      {/* 番地・建物・部屋番号 */}
-      <div>
-        <label className={labelClassName}>
-          番地・建物・部屋番号
-        </label>
-        <input
-          type="text"
-          value={value.addressLine}
-          onChange={(e) => { onChange({ addressLine: e.target.value }); setZipError(""); }}
-          placeholder="1-1-1 〇〇ビル 101号室"
-          className={inputClassName}
-        />
+      {/* セクション2：詳細住所（番地以下） */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <label className="block text-xs font-semibold text-gray-700">詳細住所</label>
+        <div>
+          <label className={labelClassName}>番地・建物・部屋番号</label>
+          <input
+            type="text"
+            value={block}
+            onChange={(e) => { handleBlockChange(e.target.value); setZipError(""); }}
+            placeholder="1-1-1 〇〇ビル 101号室"
+            className={inputClassName}
+          />
+        </div>
       </div>
     </div>
   );

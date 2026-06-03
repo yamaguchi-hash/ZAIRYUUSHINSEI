@@ -40,7 +40,7 @@ export function BackupSettings() {
 
         if ("error" in settingsResult) {
           console.error("[BackupSettings] Settings error:", settingsResult.error);
-          setError(settingsResult.error);
+          setError(settingsResult.error || "バックアップ設定の取得に失敗しました");
         } else {
           console.log("[BackupSettings] Settings loaded:", settingsResult.data);
         }

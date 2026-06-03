@@ -50,6 +50,7 @@ export function SignedDocumentsPanel({
   const [uploading, setUploading] = useState(false);
   const [selectedType, setSelectedType] = useState<DocumentType>("applicant");
   const [error, setError] = useState("");
+  const [dragActive, setDragActive] = useState(false);
 
   const isCompleted = applicationStatus === "completed";
 
@@ -65,6 +66,11 @@ export function SignedDocumentsPanel({
     setError("");
 
     try {
+      // PDF のみ受け入れ
+      if (!file.name.toLowerCase().endsWith(".pdf")) {
+        throw new Error("PDF ファイルのみアップロード可能です");
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("documentType", selectedType);
@@ -84,6 +90,33 @@ export function SignedDocumentsPanel({
       setError(err.message ?? "アップロードに失敗しました");
     } finally {
       setUploading(false);
+    }
+  }
+
+  function handleDrag(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      // 複数ファイルの場合は最初のファイルのみ処理
+      const file = files[0];
+      if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+        handleUpload(file);
+      } else {
+        setError("PDF ファイルのみアップロード可能です");
+      }
     }
   }
 
@@ -193,7 +226,7 @@ export function SignedDocumentsPanel({
 
         {/* アップロード */}
         {!isCompleted && (
-          <div className="bg-white border border-teal-200 rounded-lg p-3 space-y-2">
+          <div className="bg-white border border-teal-200 rounded-lg p-4 space-y-3">
             <label className="block text-xs font-medium text-gray-700">
               書類タイプを選択してください
             </label>
@@ -208,9 +241,21 @@ export function SignedDocumentsPanel({
               <option value="gaikatsu">💼 資格外活動許可申請書</option>
             </select>
 
-            <label>
+            {/* ドラッグ&ドロップゾーン */}
+            <div
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-all ${
+                dragActive
+                  ? "border-teal-500 bg-teal-50"
+                  : "border-gray-300 hover:border-teal-400 hover:bg-gray-50"
+              } ${uploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+            >
               <input
                 type="file"
+                id="drop-file-input"
                 accept=".pdf"
                 onChange={(e) => {
                   const f = e.currentTarget.files?.[0];
@@ -219,16 +264,26 @@ export function SignedDocumentsPanel({
                 disabled={uploading}
                 className="hidden"
               />
-              <span className={`block text-center py-2 px-3 rounded-lg cursor-pointer text-xs font-medium transition-colors ${
-                uploading
-                  ? "bg-teal-200 text-teal-700"
-                  : "bg-teal-100 text-teal-700 hover:bg-teal-200"
-              }`}>
-                {uploading
-                  ? <>アップロード中...</>
-                  : <><Upload className="w-3.5 h-3.5 inline mr-1" />PDF をアップロード</>}
-              </span>
-            </label>
+
+              <label htmlFor="drop-file-input" className="block cursor-pointer">
+                <div className="flex flex-col items-center gap-2">
+                  {uploading ? (
+                    <>
+                      <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+                      <span className="text-xs font-medium text-teal-700">アップロード中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className={`w-6 h-6 ${dragActive ? "text-teal-600" : "text-gray-400"}`} />
+                      <span className="text-xs font-medium text-gray-700">
+                        PDF をドロップするか、ここをクリックして選択
+                      </span>
+                      <span className="text-xs text-gray-500">（PDF ファイルのみ対応）</span>
+                    </>
+                  )}
+                </div>
+              </label>
+            </div>
           </div>
         )}
 

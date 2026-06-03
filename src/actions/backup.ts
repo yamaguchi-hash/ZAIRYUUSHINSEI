@@ -200,8 +200,8 @@ export async function getBackupSettings() {
 
     const role = (session.user as any)?.role;
     console.log("[getBackupSettings] Role:", role);
-    if (role !== "admin") {
-      console.log("[getBackupSettings] Not admin user");
+    if (role !== "admin" && role !== "expert") {
+      console.log("[getBackupSettings] Not admin or expert user");
       return { error: "管理者のみ実行可能です" };
     }
 

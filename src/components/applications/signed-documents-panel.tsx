@@ -65,6 +65,14 @@ export function SignedDocumentsPanel({
     setUploading(true);
     setError("");
 
+    // デバッグ情報をコンソール出力
+    console.log("=== 署名済み申請書アップロード開始 ===");
+    console.log("ファイル名:", file.name);
+    console.log("ファイルサイズ:", file.size, "bytes");
+    console.log("ファイルタイプ:", file.type);
+    console.log("ドキュメントタイプ:", selectedType);
+    console.log("applicationId:", applicationId);
+
     try {
       // PDF のみ受け入れ
       if (!file.name.toLowerCase().endsWith(".pdf")) {
@@ -83,22 +91,44 @@ export function SignedDocumentsPanel({
       formData.append("file", file);
       formData.append("documentType", selectedType);
 
+      console.log("FormData準備完了、APIにリクエスト送信...");
+      const startTime = Date.now();
+
       const response = await fetch(`/api/applications/${applicationId}/upload-signed-document`, {
         method: "POST",
         body: formData,
       });
 
-      const data = await response.json();
+      const elapsedTime = Date.now() - startTime;
+      console.log("APIレスポンス受信（${elapsedTime}ms）");
+      console.log("ステータスコード:", response.status);
 
-      if (!response.ok) {
-        throw new Error(data.error ?? "ファイルアップロードに失敗しました");
+      let data;
+      try {
+        data = await response.json();
+        console.log("レスポンスJSON:", data);
+      } catch (parseErr) {
+        console.error("JSONパース失敗:", parseErr);
+        const text = await response.text();
+        console.log("レスポンステキスト:", text);
+        throw new Error("レスポンスのパースに失敗しました");
       }
 
+      if (!response.ok) {
+        console.error("アップロード失敗:", data);
+        throw new Error(data.error ?? `アップロード失敗 (${response.status})`);
+      }
+
+      console.log("アップロード成功:", data);
+      console.log("ページをリロードします...");
       // アップロード成功後、ページをリロード
       window.location.reload();
     } catch (err: any) {
+      console.error("=== アップロードエラー ===");
+      console.error("メッセージ:", err.message);
+      console.error("スタック:", err.stack);
+      console.error("エラーオブジェクト:", err);
       setError(err.message ?? "アップロードに失敗しました");
-      console.error("Upload error:", err);
     } finally {
       setUploading(false);
     }
@@ -298,7 +328,16 @@ export function SignedDocumentsPanel({
           </div>
         )}
 
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
+            <p className="text-xs font-semibold text-red-700">❌ エラー</p>
+            <p className="text-xs text-red-600">{error}</p>
+            <p className="text-xs text-red-500">
+              💡 詳細は F12 キーでブラウザのコンソールを開いて確認してください。<br/>
+              エラーログを確認後、画面のスクリーンショットと共にお知らせください。
+            </p>
+          </div>
+        )}
 
         {/* ドキュメント一覧（タイプ別） */}
         <div className="space-y-3">

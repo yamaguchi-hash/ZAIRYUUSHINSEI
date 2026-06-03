@@ -75,7 +75,7 @@ export function BackupSettings() {
       console.log("Backup settings result:", result);
       if ("error" in result) {
         console.error("Error loading settings:", result.error);
-        setError(result.error);
+        setError(result.error || "バックアップ設定の取得に失敗しました");
         return;
       }
       console.log("Settings loaded successfully:", result.data);

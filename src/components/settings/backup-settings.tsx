@@ -16,53 +16,67 @@ interface BackupHistoryItem {
   fileUrl: string | null;
 }
 
+interface BackupSettingsData {
+  id: string;
+  isAutoBackupEnabled: boolean;
+  autoBackupSchedule: string;
+  retentionDays: number;
+  backupDestination: string;
+}
+
 export function BackupSettings() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [loadingSettings, setLoadingSettings] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [pendingRestoreData, setPendingRestoreData] = useState("");
   const [history, setHistory] = useState<BackupHistoryItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  // バックアップ設定の state
+  const [settings, setSettings] = useState<BackupSettingsData | null>(null);
+  const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(true);
+  const [autoBackupSchedule, setAutoBackupSchedule] = useState("02:00");
+  const [retentionDays, setRetentionDays] = useState(30);
+  const [backupDestination, setBackupDestination] = useState("vercel_blob");
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
     console.log("[BackupSettings] Component mounted");
-    const initialize = async () => {
-      try {
-        console.log("[BackupSettings] Initializing...");
-
-        // Get settings first
-        console.log("[BackupSettings] Calling getBackupSettings()...");
-        const settingsResult = await getBackupSettings();
-        console.log("[BackupSettings] Settings result:", settingsResult);
-
-        if ("error" in settingsResult) {
-          const errorMsg = settingsResult.error || "バックアップ設定の取得に失敗しました";
-          console.error("[BackupSettings] Settings error:", errorMsg);
-          setError(errorMsg);
-          // エラーが発生しても、UI は表示する
-          setIsLoading(false);
-          return;
-        } else {
-          console.log("[BackupSettings] Settings loaded:", settingsResult.data);
-        }
-
-        // Then load history
-        await loadBackupHistory();
-      } catch (err: any) {
-        console.error("[BackupSettings] Initialize error:", err);
-        const errorMsg = err?.message || "バックアップ設定の初期化に失敗しました";
-        setError(errorMsg);
-        setIsLoading(false);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initialize();
+    loadSettings();
+    loadBackupHistory();
   }, []);
+
+  async function loadSettings() {
+    setLoadingSettings(true);
+    try {
+      console.log("[BackupSettings] Loading settings...");
+      const result = await getBackupSettings();
+      console.log("[BackupSettings] Settings result:", result);
+
+      if ("error" in result) {
+        console.error("[BackupSettings] Settings error:", result.error);
+        setError(result.error || "バックアップ設定の取得に失敗しました");
+        return;
+      }
+
+      if (result.data) {
+        console.log("[BackupSettings] Settings loaded:", result.data);
+        setSettings(result.data);
+        setIsAutoBackupEnabled(result.data.isAutoBackupEnabled);
+        setAutoBackupSchedule(result.data.autoBackupSchedule);
+        setRetentionDays(result.data.retentionDays);
+        setBackupDestination(result.data.backupDestination);
+      }
+    } catch (err: any) {
+      console.error("[BackupSettings] Exception:", err);
+      setError("バックアップ設定の読み込みに失敗しました");
+    } finally {
+      setLoadingSettings(false);
+    }
+  }
 
   async function loadBackupHistory() {
     setLoadingHistory(true);
@@ -82,6 +96,35 @@ export function BackupSettings() {
       setError("バックアップ履歴の読み込みに失敗しました");
     } finally {
       setLoadingHistory(false);
+    }
+  }
+
+  async function handleSaveSettings() {
+    setIsSavingSettings(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      console.log("[BackupSettings] Saving settings...");
+      const result = await updateBackupSettings(
+        isAutoBackupEnabled,
+        autoBackupSchedule,
+        retentionDays,
+        backupDestination
+      );
+
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+
+      setSettings(result.data);
+      setSuccess("バックアップ設定を保存しました");
+      console.log("[BackupSettings] Settings saved successfully");
+    } catch (err: any) {
+      setError(err.message ?? "設定の保存に失敗しました");
+    } finally {
+      setIsSavingSettings(false);
     }
   }
 
@@ -171,20 +214,6 @@ export function BackupSettings() {
 
   return (
     <div className="space-y-6">
-      {/* デバッグパネル */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs">
-        <p className="text-gray-600">状態: {isLoading ? "読み込み中" : error ? "エラー" : "正常"}</p>
-        <p className="text-gray-500 mt-1">コンポーネントがマウントされました。ブラウザコンソールで詳細ログを確認してください。</p>
-      </div>
-
-      {/* 初期化中 */}
-      {isLoading && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-          <Loader2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5 animate-spin" />
-          <p className="text-sm text-blue-700">初期化中...</p>
-        </div>
-      )}
-
       {/* エラー */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
@@ -192,7 +221,6 @@ export function BackupSettings() {
           <div>
             <p className="text-sm text-red-700 font-semibold mb-2">エラー</p>
             <p className="text-sm text-red-700 bg-red-100 p-2 rounded">{error}</p>
-            <p className="text-xs text-red-600 mt-2">デバッグ情報: ブラウザコンソールでログを確認してください</p>
           </div>
         </div>
       )}
@@ -205,22 +233,142 @@ export function BackupSettings() {
         </div>
       )}
 
+      {/* バックアップ設定 */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+        <div className="flex items-start gap-3 mb-4">
+          <Settings className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+          <h3 className="font-semibold text-indigo-900">バックアップ設定</h3>
+        </div>
+
+        {loadingSettings ? (
+          <div className="flex items-center gap-2 text-indigo-700 text-sm">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            設定を読み込み中...
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* 自動バックアップ有効/無効 */}
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="autoBackupEnabled"
+                checked={isAutoBackupEnabled}
+                onChange={(e) => setIsAutoBackupEnabled(e.target.checked)}
+                className="w-4 h-4 rounded"
+              />
+              <label htmlFor="autoBackupEnabled" className="text-sm font-medium text-gray-900">
+                自動バックアップを有効にする
+              </label>
+            </div>
+
+            {/* 実行時刻 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1">
+                <Clock className="w-4 h-4 inline mr-1" />
+                実行時刻 (HH:mm)
+              </label>
+              <input
+                type="time"
+                value={autoBackupSchedule}
+                onChange={(e) => setAutoBackupSchedule(e.target.value)}
+                disabled={!isAutoBackupEnabled}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100 disabled:text-gray-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">毎日この時刻に自動バックアップが実行されます</p>
+            </div>
+
+            {/* 保持期間 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1">
+                <Calendar className="w-4 h-4 inline mr-1" />
+                保持期間 (日数)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="365"
+                value={retentionDays}
+                onChange={(e) => setRetentionDays(Math.max(1, Math.min(365, parseInt(e.target.value) || 1)))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">この日数を超えたバックアップは自動削除されます (1-365日)</p>
+            </div>
+
+            {/* 保存先 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">保存先</label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100">
+                  <input
+                    type="radio"
+                    name="destination"
+                    value="vercel_blob"
+                    checked={backupDestination === "vercel_blob"}
+                    onChange={(e) => setBackupDestination(e.target.value)}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="flex items-center gap-1 font-medium text-gray-900">
+                      <Cloud className="w-4 h-4" />
+                      クラウド (Vercel Blob)
+                    </div>
+                    <p className="text-xs text-gray-500">自動バックアップをクラウドに保存します</p>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100">
+                  <input
+                    type="radio"
+                    name="destination"
+                    value="local_download"
+                    checked={backupDestination === "local_download"}
+                    onChange={(e) => setBackupDestination(e.target.value)}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <div className="flex items-center gap-1 font-medium text-gray-900">
+                      <Computer className="w-4 h-4" />
+                      ローカル (手動ダウンロード)
+                    </div>
+                    <p className="text-xs text-gray-500">バックアップファイルを生成後、手動でダウンロード</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* 保存ボタン */}
+            <button
+              onClick={handleSaveSettings}
+              disabled={isSavingSettings}
+              className="w-full bg-indigo-600 text-white rounded-lg px-4 py-2 font-medium text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isSavingSettings ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                "設定を保存"
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* エクスポート */}
-      <div className={`${!error ? "bg-blue-50 border border-blue-200" : "bg-gray-50 border border-gray-300 opacity-75"} rounded-lg p-4`}>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start gap-3">
-          <Download className={`w-5 h-5 shrink-0 mt-0.5 ${!error ? "text-blue-600" : "text-gray-400"}`} />
+          <Download className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h3 className={`font-semibold mb-1 ${!error ? "text-blue-900" : "text-gray-600"}`}>バックアップのダウンロード</h3>
-            <p className={`text-sm mb-3 ${!error ? "text-blue-700" : "text-gray-600"}`}>
+            <h3 className="font-semibold text-blue-900 mb-1">バックアップのダウンロード</h3>
+            <p className="text-sm text-blue-700 mb-3">
               現在のすべての申請人と案件情報をJSON形式でバックアップします。
             </p>
             <button
               onClick={handleExport}
               disabled={exporting || !!error}
               className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                error
-                  ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                  : exporting
+                exporting
                   ? "bg-blue-200 text-blue-700 cursor-not-allowed"
                   : "bg-blue-600 text-white hover:bg-blue-700"
               }`}
@@ -242,12 +390,12 @@ export function BackupSettings() {
       </div>
 
       {/* インポート */}
-      <div className={`${!error ? "bg-green-50 border border-green-200" : "bg-gray-50 border border-gray-300 opacity-75"} rounded-lg p-4`}>
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
         <div className="flex items-start gap-3">
-          <Upload className={`w-5 h-5 shrink-0 mt-0.5 ${!error ? "text-green-600" : "text-gray-400"}`} />
+          <Upload className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h3 className={`font-semibold mb-1 ${!error ? "text-green-900" : "text-gray-600"}`}>バックアップを復元</h3>
-            <p className={`text-sm mb-3 ${!error ? "text-green-700" : "text-gray-600"}`}>
+            <h3 className="font-semibold text-green-900 mb-1">バックアップを復元</h3>
+            <p className="text-sm text-green-700 mb-3">
               保存したバックアップファイルから復元します。
               <strong>既存データは上書きされます。</strong>
             </p>
@@ -259,13 +407,11 @@ export function BackupSettings() {
                   const f = e.currentTarget.files?.[0];
                   if (f) handleImportFile(f);
                 }}
-                disabled={importing || !!error}
+                disabled={importing}
                 className="hidden"
               />
               <span className={`inline-block px-4 py-2 rounded-lg font-medium text-sm transition-colors cursor-pointer ${
-                error
-                  ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                  : importing
+                importing
                   ? "bg-green-200 text-green-700 cursor-not-allowed"
                   : "bg-green-600 text-white hover:bg-green-700"
               }`}>
@@ -401,7 +547,7 @@ export function BackupSettings() {
         <ul className="list-disc list-inside space-y-1 text-gray-600">
           <li>手動バックアップはいつでも「バックアップをダウンロード」から実行できます</li>
           <li>バックアップには申請人マスターと案件情報がJSON形式で保存されます</li>
-          <li>自動バックアップ設定は毎日 AM 2:00 に実行されます</li>
+          <li>自動バックアップ設定は有効にすると毎日指定時刻に実行されます</li>
         </ul>
       </div>
     </div>

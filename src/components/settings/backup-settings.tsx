@@ -47,6 +47,7 @@ export function BackupSettings() {
   const [autoEnabled, setAutoEnabled] = useState(true);
 
   useEffect(() => {
+    console.log("BackupSettings component mounted");
     loadBackupHistory();
     loadSettings();
   }, []);
@@ -71,15 +72,19 @@ export function BackupSettings() {
     setLoadingSettings(true);
     try {
       const result = await getBackupSettings();
+      console.log("Backup settings result:", result);
       if ("error" in result) {
+        console.error("Error loading settings:", result.error);
         setError(result.error);
         return;
       }
+      console.log("Settings loaded successfully:", result.data);
       setSettings(result.data);
       setSchedule(result.data.autoBackupSchedule);
       setRetention(result.data.retentionDays);
       setAutoEnabled(result.data.isAutoBackupEnabled);
     } catch (err: any) {
+      console.error("Exception loading settings:", err);
       setError("バックアップ設定の読み込みに失敗しました");
     } finally {
       setLoadingSettings(false);
@@ -193,6 +198,34 @@ export function BackupSettings() {
 
   return (
     <div className="space-y-6">
+      {/* エラー */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-red-700">{error}</p>
+            <p className="text-xs text-red-600 mt-1">ブラウザコンソールでログを確認してください。</p>
+          </div>
+        </div>
+      )}
+
+      {/* ローディング中 */}
+      {loadingSettings && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+          <Loader2 className="w-4 h-4 inline animate-spin mr-2" />
+          設定を読み込み中...
+        </div>
+      )}
+
+      {/* 設定がない場合 */}
+      {!loadingSettings && !settings && !error && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-sm text-yellow-700">
+            バックアップ設定が初期化されていません。ページをリロードしてください。
+          </p>
+        </div>
+      )}
+
       {/* 自動バックアップ設定 */}
       {!loadingSettings && settings && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">

@@ -192,7 +192,13 @@ export function CaseNotesPanel({ applicationId }: Props) {
             name: formData.name || undefined,
             assignee: formData.assignee || undefined,
           });
-          setBusinessLogs(businessLogs.map((n) => (n.id === editingId ? updated : n)));
+          if (updated) {
+            setBusinessLogs(businessLogs.map((n) => (n.id === editingId ? updated : n)));
+            resetBusinessForm();
+            setError("");
+          } else {
+            setError("業務履歴の更新に失敗しました。もう一度お試しください");
+          }
         } else {
           const added = await addCaseNote(applicationId, {
             entryDate: formData.entryDate,
@@ -201,11 +207,17 @@ export function CaseNotesPanel({ applicationId }: Props) {
             name: formData.name || undefined,
             assignee: formData.assignee || undefined,
           });
-          setBusinessLogs([...businessLogs, added]);
+          if (added) {
+            setBusinessLogs([...businessLogs, added]);
+            resetBusinessForm();
+            setError("");
+          } else {
+            setError("業務履歴の保存に失敗しました。もう一度お試しください");
+          }
         }
-        resetBusinessForm();
       } catch (err: any) {
-        setError(err.message || "操作に失敗しました");
+        console.error("Save business log error:", err);
+        setError("予期しないエラーが発生しました");
       }
     });
   };
@@ -240,7 +252,13 @@ export function CaseNotesPanel({ applicationId }: Props) {
             amount: formData.amount ? parseFloat(formData.amount) : undefined,
             remarks: formData.remarks || undefined,
           });
-          setExpenses(expenses.map((e) => (e.id === editingId ? updated : e)));
+          if (updated) {
+            setExpenses(expenses.map((e) => (e.id === editingId ? updated : e)));
+            resetExpenseForm();
+            setError("");
+          } else {
+            setError("経費の更新に失敗しました。もう一度お試しください");
+          }
         } else {
           const added = await addCaseExpense(applicationId, {
             expenseDate: formData.expenseDate,
@@ -249,11 +267,17 @@ export function CaseNotesPanel({ applicationId }: Props) {
             amount: formData.amount ? parseFloat(formData.amount) : undefined,
             remarks: formData.remarks || undefined,
           });
-          setExpenses([...expenses, added]);
+          if (added) {
+            setExpenses([...expenses, added]);
+            resetExpenseForm();
+            setError("");
+          } else {
+            setError("経費の保存に失敗しました。もう一度お試しください");
+          }
         }
-        resetExpenseForm();
       } catch (err: any) {
-        setError(err.message || "操作に失敗しました");
+        console.error("Save expense error:", err);
+        setError("予期しないエラーが発生しました");
       }
     });
   };
@@ -269,16 +293,27 @@ export function CaseNotesPanel({ applicationId }: Props) {
       try {
         if (editingRemarkId) {
           const updated = await updateCaseRemark(applicationId, editingRemarkId, remarkInput);
-          setRemarks(remarks.map((r) => (r.id === editingRemarkId ? updated : r)));
-          setEditingRemarkId(null);
+          if (updated) {
+            setRemarks(remarks.map((r) => (r.id === editingRemarkId ? updated : r)));
+            setEditingRemarkId(null);
+            setRemarkInput("");
+            setError("");
+          } else {
+            setError("備考の更新に失敗しました。もう一度お試しください");
+          }
         } else {
           const added = await addCaseRemark(applicationId, remarkInput);
-          if (added) setRemarks([added, ...remarks]);
+          if (added) {
+            setRemarks([added, ...remarks]);
+            setRemarkInput("");
+            setError("");
+          } else {
+            setError("備考の保存に失敗しました。もう一度お試しください");
+          }
         }
-        setRemarkInput("");
-        setError("");
       } catch (err: any) {
-        setError(err.message || "保存に失敗しました");
+        console.error("Save remark error:", err);
+        setError("予期しないエラーが発生しました");
       }
     });
   };
@@ -298,10 +333,13 @@ export function CaseNotesPanel({ applicationId }: Props) {
         });
         if (updated) {
           setCaseInfo(updated);
+          setError("");
+        } else {
+          setError("見積額の保存に失敗しました。データベーステーブルが準備中です");
         }
-        setError("");
       } catch (err: any) {
-        setError(err.message || "保存に失敗しました");
+        console.error("Save estimate error:", err);
+        setError("予期しないエラーが発生しました");
       }
     });
   };
@@ -443,10 +481,16 @@ export function CaseNotesPanel({ applicationId }: Props) {
                             if (confirm("削除しますか？")) {
                               startTransition(async () => {
                                 try {
-                                  await deleteCaseNote(applicationId, log.id);
-                                  setBusinessLogs(businessLogs.filter((n) => n.id !== log.id));
+                                  const deleted = await deleteCaseNote(applicationId, log.id);
+                                  if (deleted) {
+                                    setBusinessLogs(businessLogs.filter((n) => n.id !== log.id));
+                                    setError("");
+                                  } else {
+                                    setError("削除に失敗しました。もう一度お試しください");
+                                  }
                                 } catch (err: any) {
-                                  setError(err.message);
+                                  console.error("Delete note error:", err);
+                                  setError("予期しないエラーが発生しました");
                                 }
                               });
                             }
@@ -590,10 +634,16 @@ export function CaseNotesPanel({ applicationId }: Props) {
                             if (confirm("削除しますか？")) {
                               startTransition(async () => {
                                 try {
-                                  await deleteCaseExpense(applicationId, exp.id);
-                                  setExpenses(expenses.filter((e) => e.id !== exp.id));
+                                  const deleted = await deleteCaseExpense(applicationId, exp.id);
+                                  if (deleted) {
+                                    setExpenses(expenses.filter((e) => e.id !== exp.id));
+                                    setError("");
+                                  } else {
+                                    setError("削除に失敗しました。もう一度お試しください");
+                                  }
                                 } catch (err: any) {
-                                  setError(err.message);
+                                  console.error("Delete expense error:", err);
+                                  setError("予期しないエラーが発生しました");
                                 }
                               });
                             }
@@ -720,10 +770,16 @@ export function CaseNotesPanel({ applicationId }: Props) {
                           if (confirm("削除しますか？")) {
                             startTransition(async () => {
                               try {
-                                await deleteCaseRemark(applicationId, remark.id);
-                                setRemarks(remarks.filter((r) => r.id !== remark.id));
+                                const deleted = await deleteCaseRemark(applicationId, remark.id);
+                                if (deleted) {
+                                  setRemarks(remarks.filter((r) => r.id !== remark.id));
+                                  setError("");
+                                } else {
+                                  setError("削除に失敗しました。もう一度お試しください");
+                                }
                               } catch (err: any) {
-                                setError(err.message);
+                                console.error("Delete remark error:", err);
+                                setError("予期しないエラーが発生しました");
                               }
                             });
                           }

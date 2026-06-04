@@ -93,8 +93,8 @@ export async function addCaseNote(applicationId: string, data: {
       .returning();
     return result[0];
   } catch (err: any) {
-    console.error("Add case note error:", err);
-    throw err;
+    console.error("Add case note error:", err.message);
+    return null;
   }
 }
 
@@ -145,8 +145,8 @@ export async function updateCaseNote(
       .returning();
     return result[0];
   } catch (err: any) {
-    console.error("Update case note error:", err);
-    throw err;
+    console.error("Update case note error:", err.message);
+    return null;
   }
 }
 
@@ -174,8 +174,8 @@ export async function deleteCaseNote(applicationId: string, caseNoteId: string) 
     await db.delete(caseNotes).where(eq(caseNotes.id, caseNoteId));
     return true;
   } catch (err: any) {
-    console.error("Delete case note error:", err);
-    throw err;
+    console.error("Delete case note error:", err.message);
+    return false;
   }
 }
 
@@ -258,8 +258,8 @@ export async function addCaseExpense(applicationId: string, data: {
       .returning();
     return result[0];
   } catch (err: any) {
-    console.error("Add case expense error:", err);
-    throw err;
+    console.error("Add case expense error:", err.message);
+    return null;
   }
 }
 
@@ -303,8 +303,8 @@ export async function updateCaseExpense(
       .returning();
     return result[0];
   } catch (err: any) {
-    console.error("Update case expense error:", err);
-    throw err;
+    console.error("Update case expense error:", err.message);
+    return null;
   }
 }
 
@@ -327,8 +327,8 @@ export async function deleteCaseExpense(applicationId: string, expenseId: string
       .where(and(eq(caseExpenses.id, expenseId), eq(caseExpenses.applicationId, applicationId)));
     return true;
   } catch (err: any) {
-    console.error("Delete case expense error:", err);
-    throw err;
+    console.error("Delete case expense error:", err.message);
+    return false;
   }
 }
 
@@ -447,7 +447,8 @@ export async function updateCaseInformation(
       code: err.code,
       details: err.detail,
     });
-    throw err;
+    // エラーを throw しないで null を返す（graceful fallback）
+    return null;
   }
 }
 
@@ -534,7 +535,7 @@ export async function addCaseRemark(applicationId: string, content: string) {
     }
   } catch (err: any) {
     console.error("[addCaseRemark] Error:", err.message);
-    throw err;
+    return null;
   }
 }
 
@@ -578,7 +579,7 @@ export async function updateCaseRemark(applicationId: string, remarkId: string, 
     return result[0];
   } catch (err: any) {
     console.error("[updateCaseRemark] Error:", err.message);
-    throw err;
+    return null;
   }
 }
 
@@ -611,6 +612,6 @@ export async function deleteCaseRemark(applicationId: string, remarkId: string) 
     return true;
   } catch (err: any) {
     console.error("[deleteCaseRemark] Error:", err.message);
-    throw err;
+    return false;
   }
 }

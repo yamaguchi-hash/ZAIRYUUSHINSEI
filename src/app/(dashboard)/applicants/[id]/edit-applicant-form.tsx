@@ -36,6 +36,53 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
 
+  // japanAddress から都道府県・市区町村・住所を抽出するヘルパー
+  const extractAddressComponents = () => {
+    const hasSplitFields = !!(applicant.japanPrefecture || applicant.japanCity || applicant.japanAddressLine);
+
+    if (hasSplitFields) {
+      // 既に分割されているデータを使用
+      return {
+        prefix: applicant.japanPrefecture ?? "",
+        city: applicant.japanCity ?? "",
+        addressLine: applicant.japanAddressLine ?? "",
+      };
+    }
+
+    // japanAddress から自動分割（古いデータ形式）
+    const PREFECTURES = [
+      "北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県",
+      "茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県",
+      "新潟県","富山県","石川県","福井県","山梨県","長野県","岐阜県",
+      "静岡県","愛知県","三重県","滋賀県","京都府","大阪府","兵庫県",
+      "奈良県","和歌山県","鳥取県","島根県","岡山県","広島県","山口県",
+      "徳島県","香川県","愛媛県","高知県","福岡県","佐賀県","長崎県",
+      "熊本県","大分県","宮崎県","鹿児島県","沖縄県",
+    ];
+
+    const address = applicant.japanAddress ?? "";
+    const prefMatch = PREFECTURES.find(p => address.startsWith(p));
+
+    if (prefMatch) {
+      const rest = address.substring(prefMatch.length);
+      // 市区町村の判定（簡易的：最初の漢字列）
+      const cityMatch = rest.match(/^[ぁ-ん一-龥々〆〤〥〆ーa-zA-Z0-9゛゜・、。]+[市区町村]/);
+
+      if (cityMatch) {
+        const city = cityMatch[0];
+        const addressLine = rest.substring(city.length);
+        return { prefix: prefMatch, city, addressLine };
+      } else {
+        // 市区町村が判定できない場合
+        return { prefix: prefMatch, city: rest.split(/[、。0-9]/)[0], addressLine: rest };
+      }
+    }
+
+    return { prefix: "", city: "", addressLine: address };
+  };
+
+  const { prefix, city, addressLine } = extractAddressComponents();
+
   const [form, setForm] = useState({
     familyNameEn: applicant.familyNameEn,
     givenNameEn: applicant.givenNameEn,
@@ -52,12 +99,9 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
     phone: applicant.phone ?? "",
     emailAddress: applicant.emailAddress ?? "",
     postalCode: applicant.postalCode ?? "",
-    japanPrefecture: applicant.japanPrefecture ?? "",
-    japanCity: applicant.japanCity ?? "",
-    // 既存データ: 分割フィールドが空なら japanAddress をそのまま addressLine へ
-    japanAddressLine: applicant.japanAddressLine ?? (
-      !applicant.japanPrefecture && !applicant.japanCity ? (applicant.japanAddress ?? "") : ""
-    ),
+    japanPrefecture: prefix,
+    japanCity: city,
+    japanAddressLine: addressLine,
     japanAddress: applicant.japanAddress ?? "",
   });
 

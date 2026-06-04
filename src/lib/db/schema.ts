@@ -396,7 +396,7 @@ export const caseInformation = pgTable("case_information", {
   remarks: text("remarks"), // 備考欄（自由記述）
   estimatedAmount: real("estimated_amount"), // 見積額（円）
   actualAmount: real("actual_amount"), // 実費（円）
-  taxRate: real("tax_rate").default(0.1), // 消費税率（デフォルト10%）
+  taxRate: real("tax_rate").notNull().default(0.1), // 消費税率（デフォルト10%）
   createdBy: uuid("created_by").notNull().references(() => users.id),
   updatedBy: uuid("updated_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),

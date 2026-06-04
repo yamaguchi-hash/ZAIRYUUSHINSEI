@@ -39,6 +39,7 @@ import { RasensXmlPanel } from "@/components/applications/rasens-xml-panel";
 import { SubmissionInfoPanel } from "@/components/applications/submission-info-panel";
 import { PermitResultPanel } from "@/components/applications/permit-result-panel";
 import { SignedDocumentsPanel } from "@/components/applications/signed-documents-panel";
+import { CaseNotesPanel } from "@/components/applications/case-notes-panel";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
 // 8ステップのワークフロー
@@ -486,6 +487,18 @@ export default async function ApplicationDetailPage({
         accentClass="bg-indigo-400"
       >
         <RasensXmlPanel applicationId={application.id} />
+      </CollapsibleSection>
+
+      {/* 事件メモ */}
+      <CollapsibleSection
+        title="事件メモ"
+        defaultOpen={true}
+        accentClass="bg-blue-500"
+      >
+        <CaseNotesPanel
+          applicationId={application.id}
+          initialNotes={(application.draftData as any)?._caseNotes ?? []}
+        />
       </CollapsibleSection>
 
       {/* 必要書類チェックリスト */}

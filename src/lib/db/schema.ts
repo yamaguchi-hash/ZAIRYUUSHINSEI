@@ -289,6 +289,7 @@ export const applicationsRelations = relations(applications, ({ one, many }) => 
   documentChecklist: many(applicationDocumentChecklist),
   questionnaire: many(questionnaireQuestions),
   auditLogs: many(auditLog),
+  caseNotes: many(caseNotes),
 }));
 
 export const applicationDocumentChecklistRelations = relations(applicationDocumentChecklist, ({ one }) => ({
@@ -338,3 +339,29 @@ export const backupSettings = pgTable("backup_settings", {
 export const backupSettingsRelations = relations(backupSettings, ({ one }) => ({
   tenant: one(tenants, { fields: [backupSettings.tenantId], references: [tenants.id] }),
 }));
+
+// ─── Case Notes / 事件メモ ────────────────────────────────────────────────────
+export const caseNotes = pgTable("case_notes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  applicationId: uuid("application_id").notNull().references(() => applications.id),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  entryDate: date("entry_date").notNull(), // 記録日
+  entryTime: text("entry_time"), // 時間（HH:mm形式）
+  content: text("content").notNull(), // 内容
+  name: text("name"), // 関連人物・箇所の名称
+  assignee: text("assignee"), // 担当者名
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const caseNotesRelations = relations(caseNotes, ({ one }) => ({
+  application: one(applications, { fields: [caseNotes.applicationId], references: [applications.id] }),
+  tenant: one(tenants, { fields: [caseNotes.tenantId], references: [tenants.id] }),
+  createdByUser: one(users, { fields: [caseNotes.createdBy], references: [users.id], relationName: "createdBy" }),
+  updatedByUser: one(users, { fields: [caseNotes.updatedBy], references: [users.id], relationName: "updatedBy" }),
+}));
+
+// applications テーブルのリレーションに caseNotes を追加
+// （applicationsRelations を後で更新）

@@ -87,7 +87,7 @@ export async function addCaseNote(applicationId: string, data: {
       .values({
         applicationId,
         tenantId,
-        entryDate: new Date(data.entryDate),
+        entryDate: data.entryDate, // YYYY-MM-DD 文字列
         entryTime: data.entryTime || null,
         content: data.content,
         name: data.name || null,
@@ -162,7 +162,7 @@ export async function updateCaseNote(
     const result = await db
       .update(caseNotes)
       .set({
-        entryDate: new Date(data.entryDate),
+        entryDate: data.entryDate, // YYYY-MM-DD 文字列
         entryTime: data.entryTime || null,
         content: data.content,
         name: data.name || null,

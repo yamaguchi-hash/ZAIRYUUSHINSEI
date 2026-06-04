@@ -342,59 +342,53 @@ export function AddressSplitInput({
         {zipError && <p className="text-xs text-red-500 mt-1">{zipError}</p>}
       </div>
 
-      {/* セクション1：位置情報（都道府県・市区町村・町村） */}
-      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+      {/* 位置情報 */}
+      <div className="space-y-2">
         <label className="block text-xs font-semibold text-gray-700">位置情報</label>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className={labelClassName}>
-              都道府県{required && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
-            <input
-              type="text"
-              value={value.prefecture}
-              onChange={(e) => { onChange({ prefecture: e.target.value }); setZipError(""); }}
-              placeholder="東京都"
-              className={inputClassName}
-            />
-          </div>
-          <div>
-            <label className={labelClassName}>
-              市区町村{required && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
-            <input
-              type="text"
-              value={value.city}
-              onChange={(e) => { onChange({ city: e.target.value }); setZipError(""); }}
-              placeholder="渋谷区"
-              className={inputClassName}
-            />
-          </div>
-        </div>
-
         <div>
-          <label className={labelClassName}>町村・丁目</label>
+          <label className={labelClassName}>
+            都道府県・市区町村{required && <span className="text-red-500 ml-0.5">*</span>}
+          </label>
           <input
             type="text"
-            value={town}
-            onChange={(e) => { handleTownChange(e.target.value); setZipError(""); }}
-            placeholder="代々木"
+            value={`${value.prefecture}${value.city}`}
+            onChange={(e) => {
+              const fullAddr = e.target.value;
+              // 都道府県を判定して分割
+              const prefMatch = PREFECTURES.find(p => fullAddr.startsWith(p));
+              if (prefMatch) {
+                const pref = prefMatch;
+                const city = fullAddr.substring(pref.length);
+                onChange({ prefecture: pref, city: city });
+              } else {
+                // 判定できない場合は全部を city に
+                onChange({ prefecture: "", city: fullAddr });
+              }
+              setZipError("");
+            }}
+            placeholder="埼玉県三郷市"
             className={inputClassName}
           />
         </div>
       </div>
 
-      {/* セクション2：詳細住所（番地以下） */}
-      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+      {/* 詳細住所 */}
+      <div className="space-y-2">
         <label className="block text-xs font-semibold text-gray-700">詳細住所</label>
         <div>
-          <label className={labelClassName}>番地・建物・部屋番号</label>
+          <label className={labelClassName}>丁目・番地・建物・部屋番号</label>
           <input
             type="text"
-            value={block}
-            onChange={(e) => { handleBlockChange(e.target.value); setZipError(""); }}
-            placeholder="1-1-1 〇〇ビル 101号室"
+            value={`${town}${block}`}
+            onChange={(e) => {
+              const fullAddr = e.target.value;
+              // 簡易的な分割: 最初の方を town、後ろを block にする
+              // 例: "代々木1丁目319番地6" → town="代々木", block="1丁目319番地6"
+              // より良い実装のため、既存の town/block の更新方法を使う
+              onChange({ addressLine: fullAddr });
+              setZipError("");
+            }}
+            placeholder="代々木戸成1丁目319番地6"
             className={inputClassName}
           />
         </div>

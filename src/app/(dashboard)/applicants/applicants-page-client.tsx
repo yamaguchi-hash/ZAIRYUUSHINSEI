@@ -20,6 +20,7 @@ type Applicant = {
   currentVisaExpiry: string | null;
   phone: string | null;
   emailAddress: string | null;
+  postalCode: string | null;
   japanPrefecture: string | null;
   japanCity: string | null;
   japanAddressLine: string | null;
@@ -82,6 +83,7 @@ export function ApplicantsPageClient({ applicants }: { applicants: Applicant[] }
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">年齢</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">在留資格</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">在留期限</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">〒</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">住所</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">電話番号</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">メール</th>
@@ -136,6 +138,9 @@ export function ApplicantsPageClient({ applicants }: { applicants: Applicant[] }
                               )}
                             </span>
                           ) : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600 font-mono whitespace-nowrap">
+                          {a.postalCode ? `〒${a.postalCode}` : "—"}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-600 max-w-[200px] truncate" title={address}>
                           {address || "—"}

@@ -41,6 +41,7 @@ import { PermitResultPanel } from "@/components/applications/permit-result-panel
 import { SignedDocumentsPanel } from "@/components/applications/signed-documents-panel";
 import { CaseNotesPanel } from "@/components/applications/case-notes-panel";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { NoufushoPanel } from "@/components/applications/noufusho-panel";
 
 // 8ステップのワークフロー
 const WORKFLOW_STEPS = [
@@ -468,6 +469,24 @@ export default async function ApplicationDetailPage({
           <SubmissionInfoPanel
             applicationId={application.id}
             savedData={(application.draftData as any)?._submission}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 納付書作成（submitted 以降） */}
+      {(application.status === "submitted" || application.status === "completed") && (
+        <CollapsibleSection
+          title="納付書作成"
+          defaultOpen={false}
+          accentClass="bg-amber-500"
+        >
+          <NoufushoPanel
+            applicationId={application.id}
+            applicantName={
+              (applicant.familyNameJa && applicant.givenNameJa)
+                ? `${applicant.familyNameJa} ${applicant.givenNameJa}`
+                : `${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim()
+            }
           />
         </CollapsibleSection>
       )}

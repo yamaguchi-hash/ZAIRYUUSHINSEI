@@ -2290,6 +2290,47 @@ export async function completeWithPermit(
   }
 }
 
+// ─── 預証データ保存 ──────────────────────────────────────────────────────────
+export async function saveAzukariData(
+  applicationId: string,
+  azukariData: {
+    residenceCardFrontUrl?: string;
+    residenceCardBackUrl?: string;
+    passportUrl?: string;
+    includePassport?: boolean;
+    applicationDate?: string;
+    applicationNumber?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    const existing = (app.draftData as Record<string, any>) ?? {};
+
+    await db
+      .update(applications)
+      .set({
+        draftData: { ...existing, _azukari: azukariData },
+        updatedAt: new Date(),
+      })
+      .where(eq(applications.id, applicationId));
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "保存に失敗しました" };
+  }
+}
+
 // ─── 新在留カード画像アップロード（Vercel Blob） ─────────────────────────────
 export async function uploadNewResidenceCard(
   applicationId: string,

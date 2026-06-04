@@ -12,13 +12,26 @@ export async function getCaseNotes(applicationId: string) {
   try {
     console.log("[getCaseNotes] Starting for applicationId:", applicationId);
 
-    const session = await auth();
+    let session;
+    try {
+      session = await auth();
+    } catch (authErr: any) {
+      console.warn("[getCaseNotes] Auth error:", authErr.message);
+      return [];
+    }
+
     console.log("[getCaseNotes] Session:", session?.user?.email);
-    if (!session?.user) throw new Error("認証が必要です");
+    if (!session?.user) {
+      console.warn("[getCaseNotes] No user in session");
+      return [];
+    }
 
     const tenantId = (session.user as any)?.tenantId;
     console.log("[getCaseNotes] TenantId:", tenantId);
-    if (!tenantId) throw new Error("テナントIDが不正です");
+    if (!tenantId) {
+      console.warn("[getCaseNotes] No tenantId");
+      return [];
+    }
 
     const [app] = await db
       .select()
@@ -92,6 +105,7 @@ export async function addCaseNote(applicationId: string, data: {
         createdBy: userId,
       })
       .returning();
+    if (!result[0]) return null;
     return result[0];
   } catch (err: any) {
     console.error("Add case note error:", err.message);
@@ -144,6 +158,7 @@ export async function updateCaseNote(
       })
       .where(eq(caseNotes.id, caseNoteId))
       .returning();
+    if (!result[0]) return null;
     return result[0];
   } catch (err: any) {
     console.error("Update case note error:", err.message);
@@ -188,10 +203,23 @@ export async function getCaseExpenses(applicationId: string) {
   try {
     console.log("[getCaseExpenses] Starting for applicationId:", applicationId);
 
-    const session = await auth();
-    if (!session?.user) throw new Error("認証が必要です");
+    let session;
+    try {
+      session = await auth();
+    } catch (authErr: any) {
+      console.warn("[getCaseExpenses] Auth error:", authErr.message);
+      return [];
+    }
+
+    if (!session?.user) {
+      console.warn("[getCaseExpenses] No user in session");
+      return [];
+    }
     const tenantId = (session.user as any)?.tenantId;
-    if (!tenantId) throw new Error("テナントIDが不正です");
+    if (!tenantId) {
+      console.warn("[getCaseExpenses] No tenantId");
+      return [];
+    }
 
     const [app] = await db
       .select()
@@ -214,7 +242,8 @@ export async function getCaseExpenses(applicationId: string) {
         console.warn("[getCaseExpenses] case_expenses table does not exist yet, returning empty array");
         return [];
       }
-      return null;
+      console.warn("[getCaseExpenses] Database error, returning empty array:", dbErr.message);
+      return [];
     }
   } catch (err: any) {
     console.error("[getCaseExpenses] Error:", err.message);
@@ -257,6 +286,7 @@ export async function addCaseExpense(applicationId: string, data: {
         createdBy: userId,
       })
       .returning();
+    if (!result[0]) return null;
     return result[0];
   } catch (err: any) {
     console.error("Add case expense error:", err.message);
@@ -302,6 +332,7 @@ export async function updateCaseExpense(
       })
       .where(and(eq(caseExpenses.id, expenseId), eq(caseExpenses.applicationId, applicationId)))
       .returning();
+    if (!result[0]) return null;
     return result[0];
   } catch (err: any) {
     console.error("Update case expense error:", err.message);
@@ -341,10 +372,23 @@ export async function getCaseInformation(applicationId: string) {
   try {
     console.log("[getCaseInformation] Starting for applicationId:", applicationId);
 
-    const session = await auth();
-    if (!session?.user) throw new Error("認証が必要です");
+    let session;
+    try {
+      session = await auth();
+    } catch (authErr: any) {
+      console.warn("[getCaseInformation] Auth error:", authErr.message);
+      return null;
+    }
+
+    if (!session?.user) {
+      console.warn("[getCaseInformation] No user in session");
+      return null;
+    }
     const tenantId = (session.user as any)?.tenantId;
-    if (!tenantId) throw new Error("テナントIDが不正です");
+    if (!tenantId) {
+      console.warn("[getCaseInformation] No tenantId");
+      return null;
+    }
 
     const [app] = await db
       .select()
@@ -482,10 +526,23 @@ export async function getCaseRemarks(applicationId: string) {
   try {
     console.log("[getCaseRemarks] Starting for applicationId:", applicationId);
 
-    const session = await auth();
-    if (!session?.user) throw new Error("認証が必要です");
+    let session;
+    try {
+      session = await auth();
+    } catch (authErr: any) {
+      console.warn("[getCaseRemarks] Auth error:", authErr.message);
+      return [];
+    }
+
+    if (!session?.user) {
+      console.warn("[getCaseRemarks] No user in session");
+      return [];
+    }
     const tenantId = (session.user as any)?.tenantId;
-    if (!tenantId) throw new Error("テナントIDが不正です");
+    if (!tenantId) {
+      console.warn("[getCaseRemarks] No tenantId");
+      return [];
+    }
 
     const [app] = await db
       .select()

@@ -17,6 +17,13 @@ type Applicant = {
   dateOfBirth: string | null;
   passportNumber: string | null;
   currentVisaType: string | null;
+  currentVisaExpiry: string | null;
+  phone: string | null;
+  emailAddress: string | null;
+  japanPrefecture: string | null;
+  japanCity: string | null;
+  japanAddressLine: string | null;
+  japanAddress: string | null;
 };
 
 /** 満年齢を計算する */
@@ -66,54 +73,87 @@ export function ApplicantsPageClient({ applicants }: { applicants: Applicant[] }
               <p className="text-xs text-gray-300 mt-1">右上のボタンから登録してください</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
-              {applicants.map((a) => (
-                <Link
-                  key={a.id}
-                  href={`/applicants/${a.id}`}
-                  className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors group"
-                >
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-bold text-blue-700">
-                      {a.familyNameEn.charAt(0)}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
-                      {a.familyNameEn} {a.givenNameEn}
-                      {a.familyNameJa && (
-                        <span className="ml-2 text-gray-500 text-xs">
-                          （{a.familyNameJa} {a.givenNameJa}）
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {a.nationality}
-                      {a.dateOfBirth && (
-                        <>
-                          {` ・ ${formatDate(a.dateOfBirth)}`}
-                          <span className="ml-1 text-gray-400">（{calcAge(a.dateOfBirth)}歳）</span>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    {a.passportNumber && (
-                      <p className="text-xs font-mono text-gray-500">{a.passportNumber}</p>
-                    )}
-                    {a.currentVisaType && (
-                      <p className="text-xs text-gray-400">
-                        {VISA_TYPE_LABELS[a.currentVisaType] ?? a.currentVisaType}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-blue-400 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </Link>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">氏名</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">国籍</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">在留資格</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">在留期限</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">住所</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">電話番号</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">メール</th>
+                    <th className="px-4 py-2.5 w-8"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {applicants.map((a) => {
+                    const address = a.japanPrefecture || a.japanCity || a.japanAddressLine
+                      ? `${a.japanPrefecture ?? ""}${a.japanCity ?? ""}${a.japanAddressLine ?? ""}`
+                      : a.japanAddress ?? "";
+                    const visaDays = a.currentVisaExpiry ? (() => {
+                      const expiry = new Date(a.currentVisaExpiry);
+                      const today = new Date(); today.setHours(0,0,0,0);
+                      return Math.floor((expiry.getTime() - today.getTime()) / (1000*60*60*24));
+                    })() : null;
+
+                    return (
+                      <tr key={a.id} className="hover:bg-gray-50 transition-colors group">
+                        <td className="px-4 py-3">
+                          <Link href={`/applicants/${a.id}`} className="block">
+                            <p className="font-medium text-gray-900">
+                              {a.familyNameEn} {a.givenNameEn}
+                            </p>
+                            {a.familyNameJa && (
+                              <p className="text-xs text-gray-500">
+                                {a.familyNameJa} {a.givenNameJa}
+                              </p>
+                            )}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600">{a.nationality}</td>
+                        <td className="px-4 py-3 text-xs text-gray-600">
+                          {a.currentVisaType ? (VISA_TYPE_LABELS[a.currentVisaType] ?? a.currentVisaType) : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {a.currentVisaExpiry ? (
+                            <span className={
+                              visaDays !== null && visaDays < 0 ? "text-gray-400 line-through" :
+                              visaDays !== null && visaDays <= 30 ? "text-red-600 font-semibold" :
+                              visaDays !== null && visaDays <= 90 ? "text-orange-600 font-medium" :
+                              "text-gray-600"
+                            }>
+                              {formatDate(a.currentVisaExpiry)}
+                              {visaDays !== null && visaDays <= 90 && (
+                                <span className="ml-1">
+                                  {visaDays < 0 ? "（期限切れ）" : `（残${visaDays}日）`}
+                                </span>
+                              )}
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600 max-w-[200px] truncate" title={address}>
+                          {address || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                          {a.phone || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600 max-w-[180px] truncate" title={a.emailAddress ?? ""}>
+                          {a.emailAddress || "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Link href={`/applicants/${a.id}`} className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>

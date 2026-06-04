@@ -57,7 +57,7 @@ interface Props {
   applicationId: string;
 }
 
-type Tab = "business" | "expense" | "remarks";
+type Tab = "business" | "expense" | "remarks" | "estimate";
 
 export function CaseNotesPanel({ applicationId }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("business");
@@ -282,10 +282,10 @@ export function CaseNotesPanel({ applicationId }: Props) {
 
       <div className="p-4">
         {/* タブ */}
-        <div className="flex gap-1 mb-4 border-b border-blue-200">
+        <div className="flex gap-1 mb-4 border-b border-blue-200 overflow-x-auto">
           <button
             onClick={() => setActiveTab("business")}
-            className={`px-3 py-2 text-xs font-medium transition-colors ${
+            className={`px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
               activeTab === "business"
                 ? "text-blue-700 border-b-2 border-blue-600"
                 : "text-gray-600 hover:text-blue-600"
@@ -296,7 +296,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
           </button>
           <button
             onClick={() => setActiveTab("expense")}
-            className={`px-3 py-2 text-xs font-medium transition-colors ${
+            className={`px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
               activeTab === "expense"
                 ? "text-blue-700 border-b-2 border-blue-600"
                 : "text-gray-600 hover:text-blue-600"
@@ -307,14 +307,25 @@ export function CaseNotesPanel({ applicationId }: Props) {
           </button>
           <button
             onClick={() => setActiveTab("remarks")}
-            className={`px-3 py-2 text-xs font-medium transition-colors ${
+            className={`px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
               activeTab === "remarks"
                 ? "text-blue-700 border-b-2 border-blue-600"
                 : "text-gray-600 hover:text-blue-600"
             }`}
           >
             <FileCheck className="w-3.5 h-3.5 inline mr-1" />
-            備考・見積額
+            備考
+          </button>
+          <button
+            onClick={() => setActiveTab("estimate")}
+            className={`px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
+              activeTab === "estimate"
+                ? "text-blue-700 border-b-2 border-blue-600"
+                : "text-gray-600 hover:text-blue-600"
+            }`}
+          >
+            <DollarSign className="w-3.5 h-3.5 inline mr-1" />
+            見積額
           </button>
         </div>
 
@@ -626,7 +637,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
           </div>
         )}
 
-        {/* 備考・見積額タブ */}
+        {/* 備考タブ */}
         {activeTab === "remarks" && (
           <div className="space-y-3">
             <div className="bg-white border border-blue-100 rounded-lg p-3 space-y-3">
@@ -639,12 +650,28 @@ export function CaseNotesPanel({ applicationId }: Props) {
                   onChange={(e) =>
                     setFormData({ ...formData, generalRemarks: e.target.value })
                   }
-                  rows={4}
+                  rows={6}
                   className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
                   placeholder="自由記述"
                 />
               </div>
 
+              <button
+                onClick={handleSaveRemarks}
+                disabled={isPending}
+                className="w-full px-3 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
+              >
+                <Check className="w-3.5 h-3.5 inline mr-1" />
+                保存
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 見積額タブ */}
+        {activeTab === "estimate" && (
+          <div className="space-y-3">
+            <div className="bg-white border border-blue-100 rounded-lg p-3 space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -657,6 +684,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
                       setFormData({ ...formData, estimatedAmount: e.target.value })
                     }
                     className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                    placeholder="0"
                   />
                 </div>
                 <div>
@@ -670,6 +698,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
                       setFormData({ ...formData, actualAmount: e.target.value })
                     }
                     className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                    placeholder="0"
                   />
                 </div>
               </div>
@@ -687,27 +716,38 @@ export function CaseNotesPanel({ applicationId }: Props) {
                   className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
                   min="0"
                   max="100"
+                  placeholder="10"
                 />
               </div>
 
-              {caseInfo?.actualAmount && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-                  <div className="text-xs text-gray-600 space-y-1">
-                    <div>
-                      実費: ¥{(caseInfo.actualAmount || 0).toLocaleString()}
-                    </div>
-                    <div>
-                      消費税: ¥
-                      {(
-                        (caseInfo.actualAmount || 0) * (caseInfo.taxRate || 0.1)
-                      ).toLocaleString()}
-                    </div>
-                    <div className="font-semibold text-blue-700">
-                      総額: ¥{totalAmount.toLocaleString()}
-                    </div>
+              {/* 計算結果 */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                <h4 className="text-xs font-semibold text-blue-900">計算結果</h4>
+                <div className="space-y-1 text-xs text-gray-700">
+                  <div className="flex justify-between">
+                    <span>見積額:</span>
+                    <span className="font-mono">
+                      ¥{(formData.estimatedAmount ? parseFloat(formData.estimatedAmount) : 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>実費:</span>
+                    <span className="font-mono">
+                      ¥{(formData.actualAmount ? parseFloat(formData.actualAmount) : 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>消費税率:</span>
+                    <span className="font-mono">{formData.taxRate}%</span>
+                  </div>
+                  <div className="border-t border-blue-200 pt-1 mt-1 flex justify-between font-semibold text-blue-900">
+                    <span>総額:</span>
+                    <span className="font-mono">
+                      ¥{totalAmount.toLocaleString()}
+                    </span>
                   </div>
                 </div>
-              )}
+              </div>
 
               <button
                 onClick={handleSaveRemarks}

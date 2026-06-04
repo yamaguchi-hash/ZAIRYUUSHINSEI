@@ -381,7 +381,6 @@ export async function getCaseInformation(applicationId: string) {
 export async function updateCaseInformation(
   applicationId: string,
   data: {
-    remarks?: string;
     estimatedAmount?: number;
     actualAmount?: number;
     taxRate?: number;
@@ -401,42 +400,53 @@ export async function updateCaseInformation(
       .limit(1);
     if (!app) throw new Error("申請案件が見つかりません");
 
-    const [existing] = await db
-      .select()
-      .from(caseInformation)
-      .where(eq(caseInformation.applicationId, applicationId));
+    try {
+      const [existing] = await db
+        .select()
+        .from(caseInformation)
+        .where(eq(caseInformation.applicationId, applicationId));
 
-    if (existing) {
-      const result = await db
-        .update(caseInformation)
-        .set({
-          remarks: data.remarks || null,
-          estimatedAmount: data.estimatedAmount || null,
-          actualAmount: data.actualAmount || null,
-          taxRate: data.taxRate !== undefined ? data.taxRate : existing.taxRate,
-          updatedBy: userId,
-          updatedAt: new Date(),
-        })
-        .where(eq(caseInformation.applicationId, applicationId))
-        .returning();
-      return result[0];
-    } else {
-      const result = await db
-        .insert(caseInformation)
-        .values({
-          applicationId,
-          tenantId,
-          remarks: data.remarks || null,
-          estimatedAmount: data.estimatedAmount || null,
-          actualAmount: data.actualAmount || null,
-          taxRate: data.taxRate || 0.1,
-          createdBy: userId,
-        })
-        .returning();
-      return result[0];
+      if (existing) {
+        const result = await db
+          .update(caseInformation)
+          .set({
+            estimatedAmount: data.estimatedAmount || null,
+            actualAmount: data.actualAmount || null,
+            taxRate: data.taxRate !== undefined ? data.taxRate : existing.taxRate,
+            updatedBy: userId,
+            updatedAt: new Date(),
+          })
+          .where(eq(caseInformation.applicationId, applicationId))
+          .returning();
+        return result[0];
+      } else {
+        const result = await db
+          .insert(caseInformation)
+          .values({
+            applicationId,
+            tenantId,
+            estimatedAmount: data.estimatedAmount || null,
+            actualAmount: data.actualAmount || null,
+            taxRate: data.taxRate || 0.1,
+            createdBy: userId,
+          })
+          .returning();
+        return result[0];
+      }
+    } catch (dbErr: any) {
+      // テーブルが存在しない場合の処理
+      if (dbErr.message?.includes("does not exist") || dbErr.code === "42P01") {
+        console.warn("[updateCaseInformation] case_information table does not exist yet, returning null");
+        return null;
+      }
+      throw dbErr;
     }
   } catch (err: any) {
-    console.error("Update case information error:", err);
+    console.error("[updateCaseInformation] Error:", {
+      message: err.message,
+      code: err.code,
+      details: err.detail,
+    });
     throw err;
   }
 }

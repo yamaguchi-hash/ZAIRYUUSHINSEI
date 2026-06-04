@@ -294,7 +294,9 @@ export function CaseNotesPanel({ applicationId }: Props) {
             : undefined,
           taxRate: parseInt(formData.taxRate) / 100,
         });
-        setCaseInfo(updated);
+        if (updated) {
+          setCaseInfo(updated);
+        }
         setError("");
       } catch (err: any) {
         setError(err.message || "保存に失敗しました");

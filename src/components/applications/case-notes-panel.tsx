@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import React, { useState, useTransition, useEffect } from "react";
 import {
   Calendar,
   Clock,
@@ -118,7 +118,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
   };
 
   // 初期読み込み
-  React.useEffect(() => {
+  useEffect(() => {
     loadData();
   }, [applicationId]);
 

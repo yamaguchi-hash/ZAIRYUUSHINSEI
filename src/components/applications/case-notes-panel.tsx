@@ -23,6 +23,10 @@ import {
   addCaseExpense,
   updateCaseExpense,
   deleteCaseExpense,
+  getCaseRemarks,
+  addCaseRemark,
+  updateCaseRemark,
+  deleteCaseRemark,
   getCaseInformation,
   updateCaseInformation,
 } from "@/actions/case-notes";
@@ -45,9 +49,15 @@ interface CaseExpense {
   remarks: string | null;
 }
 
+interface CaseRemark {
+  id: string;
+  content: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
 interface CaseInfo {
   id: string;
-  remarks: string | null;
   estimatedAmount: number | null;
   actualAmount: number | null;
   taxRate: number;
@@ -63,6 +73,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("business");
   const [businessLogs, setBusinessLogs] = useState<CaseNote[]>([]);
   const [expenses, setExpenses] = useState<CaseExpense[]>([]);
+  const [remarks, setRemarks] = useState<CaseRemark[]>([]);
   const [caseInfo, setCaseInfo] = useState<CaseInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -71,6 +82,8 @@ export function CaseNotesPanel({ applicationId }: Props) {
   // フォーム状態
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [remarkInput, setRemarkInput] = useState("");
+  const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     entryDate: "",
     entryTime: "",
@@ -82,7 +95,6 @@ export function CaseNotesPanel({ applicationId }: Props) {
     item2: "",
     amount: "",
     remarks: "",
-    generalRemarks: "",
     estimatedAmount: "",
     actualAmount: "",
     taxRate: "10",
@@ -95,13 +107,17 @@ export function CaseNotesPanel({ applicationId }: Props) {
       setError("");
       console.log("[CaseNotesPanel] Loading data for application:", applicationId);
 
-      const [notesData, expensesData, infoData] = await Promise.all([
+      const [notesData, expensesData, remarksData, infoData] = await Promise.all([
         getCaseNotes(applicationId).catch(err => {
           console.error("[CaseNotesPanel] Error loading notes:", err);
           throw err;
         }),
         getCaseExpenses(applicationId).catch(err => {
           console.error("[CaseNotesPanel] Error loading expenses:", err);
+          throw err;
+        }),
+        getCaseRemarks(applicationId).catch(err => {
+          console.error("[CaseNotesPanel] Error loading remarks:", err);
           throw err;
         }),
         getCaseInformation(applicationId).catch(err => {
@@ -113,17 +129,18 @@ export function CaseNotesPanel({ applicationId }: Props) {
       console.log("[CaseNotesPanel] Data loaded successfully:", {
         notesCount: notesData?.length,
         expensesCount: expensesData?.length,
+        remarksCount: remarksData?.length,
         hasInfo: !!infoData,
       });
 
       setBusinessLogs(notesData || []);
       setExpenses(expensesData || []);
+      setRemarks(remarksData || []);
       setCaseInfo(infoData || null);
 
       if (infoData) {
         setFormData((prev) => ({
           ...prev,
-          generalRemarks: infoData.remarks || "",
           estimatedAmount: infoData.estimatedAmount?.toString() || "",
           actualAmount: infoData.actualAmount?.toString() || "",
           taxRate: (infoData.taxRate * 100).toString(),
@@ -239,11 +256,36 @@ export function CaseNotesPanel({ applicationId }: Props) {
     });
   };
 
-  const handleSaveRemarks = () => {
+  // 備考の保存
+  const handleSaveRemark = () => {
+    if (!remarkInput.trim()) {
+      setError("備考を入力してください");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        if (editingRemarkId) {
+          const updated = await updateCaseRemark(applicationId, editingRemarkId, remarkInput);
+          setRemarks(remarks.map((r) => (r.id === editingRemarkId ? updated : r)));
+          setEditingRemarkId(null);
+        } else {
+          const added = await addCaseRemark(applicationId, remarkInput);
+          if (added) setRemarks([added, ...remarks]);
+        }
+        setRemarkInput("");
+        setError("");
+      } catch (err: any) {
+        setError(err.message || "保存に失敗しました");
+      }
+    });
+  };
+
+  // 見積額の保存
+  const handleSaveEstimate = () => {
     startTransition(async () => {
       try {
         const updated = await updateCaseInformation(applicationId, {
-          remarks: formData.generalRemarks || undefined,
           estimatedAmount: formData.estimatedAmount
             ? parseFloat(formData.estimatedAmount)
             : undefined,
@@ -640,31 +682,92 @@ export function CaseNotesPanel({ applicationId }: Props) {
         {/* 備考タブ */}
         {activeTab === "remarks" && (
           <div className="space-y-3">
-            <div className="bg-white border border-blue-100 rounded-lg p-3 space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  備考欄
-                </label>
-                <textarea
-                  value={formData.generalRemarks}
-                  onChange={(e) =>
-                    setFormData({ ...formData, generalRemarks: e.target.value })
-                  }
-                  rows={6}
-                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
-                  placeholder="自由記述"
-                />
-              </div>
-
-              <button
-                onClick={handleSaveRemarks}
-                disabled={isPending}
-                className="w-full px-3 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
-              >
-                <Check className="w-3.5 h-3.5 inline mr-1" />
-                保存
-              </button>
+            {/* 備考一覧 */}
+            <div className="space-y-2 max-h-[350px] overflow-y-auto">
+              {remarks.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-6">備考がありません</p>
+              ) : (
+                remarks.map((remark) => (
+                  <div
+                    key={remark.id}
+                    className="bg-white border border-blue-100 rounded-lg p-2.5 hover:bg-blue-50 cursor-pointer transition-colors"
+                    onClick={() => {
+                      setRemarkInput(remark.content);
+                      setEditingRemarkId(remark.id);
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs text-gray-700 flex-1 break-words">{remark.content}</p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm("削除しますか？")) {
+                            startTransition(async () => {
+                              try {
+                                await deleteCaseRemark(applicationId, remark.id);
+                                setRemarks(remarks.filter((r) => r.id !== remark.id));
+                              } catch (err: any) {
+                                setError(err.message);
+                              }
+                            });
+                          }
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-600 flex-shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {typeof remark.createdAt === "string"
+                        ? new Date(remark.createdAt).toLocaleString("ja-JP")
+                        : remark.createdAt.toLocaleString("ja-JP")}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
+
+            {/* 備考入力 */}
+            {editingRemarkId || remarkInput ? (
+              <div className="bg-white border border-blue-100 rounded-lg p-3 space-y-2">
+                <textarea
+                  value={remarkInput}
+                  onChange={(e) => setRemarkInput(e.target.value)}
+                  rows={4}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  placeholder="備考を入力"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveRemark}
+                    disabled={isPending || !remarkInput.trim()}
+                    className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
+                  >
+                    <Check className="w-3.5 h-3.5 inline mr-1" />
+                    {editingRemarkId ? "更新" : "追加"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRemarkInput("");
+                      setEditingRemarkId(null);
+                    }}
+                    className="flex-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
+                  >
+                    <X className="w-3.5 h-3.5 inline mr-1" />
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setRemarkInput("")}
+                className="w-full px-3 py-2 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded"
+              >
+                <Plus className="w-3.5 h-3.5 inline mr-1" />
+                新しい備考を追加
+              </button>
+            )}
           </div>
         )}
 
@@ -750,7 +853,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
               </div>
 
               <button
-                onClick={handleSaveRemarks}
+                onClick={handleSaveEstimate}
                 disabled={isPending}
                 className="w-full px-3 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
               >

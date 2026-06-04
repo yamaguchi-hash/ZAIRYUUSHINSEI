@@ -1,8 +1,8 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { db, caseNotes, caseExpenses, caseInformation, applications } from "@/lib/db";
-import { eq, and } from "drizzle-orm";
+import { db, caseNotes, caseExpenses, caseRemarks, caseInformation, applications } from "@/lib/db";
+import { eq, and, desc } from "drizzle-orm";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 業務履歴（Case Notes）
@@ -437,6 +437,170 @@ export async function updateCaseInformation(
     }
   } catch (err: any) {
     console.error("Update case information error:", err);
+    throw err;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 備考（Case Remarks）
+// ═══════════════════════════════════════════════════════════════════════════
+
+export async function getCaseRemarks(applicationId: string) {
+  try {
+    console.log("[getCaseRemarks] Starting for applicationId:", applicationId);
+
+    const session = await auth();
+    if (!session?.user) throw new Error("認証が必要です");
+    const tenantId = (session.user as any)?.tenantId;
+    if (!tenantId) throw new Error("テナントIDが不正です");
+
+    const [app] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) throw new Error("申請案件が見つかりません");
+
+    try {
+      const remarks = await db
+        .select()
+        .from(caseRemarks)
+        .where(eq(caseRemarks.applicationId, applicationId))
+        .orderBy(desc(caseRemarks.createdAt));
+
+      console.log("[getCaseRemarks] Remarks retrieved:", remarks.length);
+      return remarks;
+    } catch (dbErr: any) {
+      if (dbErr.message?.includes("does not exist") || dbErr.code === "42P01") {
+        console.warn("[getCaseRemarks] case_remarks table does not exist yet, returning empty array");
+        return [];
+      }
+      throw dbErr;
+    }
+  } catch (err: any) {
+    console.error("[getCaseRemarks] Error:", err.message);
+    return [];
+  }
+}
+
+export async function addCaseRemark(applicationId: string, content: string) {
+  try {
+    console.log("[addCaseRemark] Starting for applicationId:", applicationId);
+
+    if (!content.trim()) throw new Error("備考内容が入力されていません");
+
+    const session = await auth();
+    if (!session?.user) throw new Error("認証が必要です");
+    const userId = (session.user as any)?.id;
+    const tenantId = (session.user as any)?.tenantId;
+    if (!tenantId || !userId) throw new Error("認証情報が不正です");
+
+    const [app] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) throw new Error("申請案件が見つかりません");
+
+    try {
+      const result = await db
+        .insert(caseRemarks)
+        .values({
+          applicationId,
+          tenantId,
+          content: content.trim(),
+          createdBy: userId,
+        })
+        .returning();
+
+      console.log("[addCaseRemark] Remark added successfully");
+      return result[0];
+    } catch (dbErr: any) {
+      if (dbErr.code === "42P01") {
+        console.warn("[addCaseRemark] case_remarks table does not exist yet");
+        return null;
+      }
+      throw dbErr;
+    }
+  } catch (err: any) {
+    console.error("[addCaseRemark] Error:", err.message);
+    throw err;
+  }
+}
+
+export async function updateCaseRemark(applicationId: string, remarkId: string, content: string) {
+  try {
+    console.log("[updateCaseRemark] Starting for remarkId:", remarkId);
+
+    if (!content.trim()) throw new Error("備考内容が入力されていません");
+
+    const session = await auth();
+    if (!session?.user) throw new Error("認証が必要です");
+    const userId = (session.user as any)?.id;
+    const tenantId = (session.user as any)?.tenantId;
+    if (!tenantId || !userId) throw new Error("認証情報が不正です");
+
+    const [app] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) throw new Error("申請案件が見つかりません");
+
+    const [remark] = await db
+      .select()
+      .from(caseRemarks)
+      .where(and(eq(caseRemarks.id, remarkId), eq(caseRemarks.applicationId, applicationId)))
+      .limit(1);
+    if (!remark) throw new Error("備考が見つかりません");
+
+    const result = await db
+      .update(caseRemarks)
+      .set({
+        content: content.trim(),
+        updatedBy: userId,
+        updatedAt: new Date(),
+      })
+      .where(eq(caseRemarks.id, remarkId))
+      .returning();
+
+    console.log("[updateCaseRemark] Remark updated successfully");
+    return result[0];
+  } catch (err: any) {
+    console.error("[updateCaseRemark] Error:", err.message);
+    throw err;
+  }
+}
+
+export async function deleteCaseRemark(applicationId: string, remarkId: string) {
+  try {
+    console.log("[deleteCaseRemark] Starting for remarkId:", remarkId);
+
+    const session = await auth();
+    if (!session?.user) throw new Error("認証が必要です");
+    const tenantId = (session.user as any)?.tenantId;
+    if (!tenantId) throw new Error("認証情報が不正です");
+
+    const [app] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) throw new Error("申請案件が見つかりません");
+
+    const [remark] = await db
+      .select()
+      .from(caseRemarks)
+      .where(and(eq(caseRemarks.id, remarkId), eq(caseRemarks.applicationId, applicationId)))
+      .limit(1);
+    if (!remark) throw new Error("備考が見つかりません");
+
+    await db.delete(caseRemarks).where(eq(caseRemarks.id, remarkId));
+
+    console.log("[deleteCaseRemark] Remark deleted successfully");
+    return true;
+  } catch (err: any) {
+    console.error("[deleteCaseRemark] Error:", err.message);
     throw err;
   }
 }

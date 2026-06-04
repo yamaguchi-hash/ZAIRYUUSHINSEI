@@ -291,6 +291,7 @@ export const applicationsRelations = relations(applications, ({ one, many }) => 
   auditLogs: many(auditLog),
   caseNotes: many(caseNotes),
   caseExpenses: many(caseExpenses),
+  caseRemarks: many(caseRemarks),
   caseInformation: one(caseInformation),
 }));
 
@@ -388,12 +389,30 @@ export const caseExpensesRelations = relations(caseExpenses, ({ one }) => ({
   updatedByUser: one(users, { fields: [caseExpenses.updatedBy], references: [users.id], relationName: "updatedBy" }),
 }));
 
-// ─── Case Information / 事件メモ（備考・見積額） ────────────────────────────
+// ─── Case Remarks / 事件メモ（備考） ──────────────────────────────────────
+export const caseRemarks = pgTable("case_remarks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  applicationId: uuid("application_id").notNull().references(() => applications.id),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  content: text("content").notNull(), // 備考内容
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  updatedBy: uuid("updated_by").references(() => users.id),
+});
+
+export const caseRemarksRelations = relations(caseRemarks, ({ one }) => ({
+  application: one(applications, { fields: [caseRemarks.applicationId], references: [applications.id] }),
+  tenant: one(tenants, { fields: [caseRemarks.tenantId], references: [tenants.id] }),
+  createdByUser: one(users, { fields: [caseRemarks.createdBy], references: [users.id], relationName: "createdBy" }),
+  updatedByUser: one(users, { fields: [caseRemarks.updatedBy], references: [users.id], relationName: "updatedBy" }),
+}));
+
+// ─── Case Information / 事件メモ（見積額） ────────────────────────────────
 export const caseInformation = pgTable("case_information", {
   id: uuid("id").defaultRandom().primaryKey(),
   applicationId: uuid("application_id").notNull().unique().references(() => applications.id),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
-  remarks: text("remarks"), // 備考欄（自由記述）
   estimatedAmount: real("estimated_amount"), // 見積額（円）
   actualAmount: real("actual_amount"), // 実費（円）
   taxRate: real("tax_rate").notNull().default(0.1), // 消費税率（デフォルト10%）

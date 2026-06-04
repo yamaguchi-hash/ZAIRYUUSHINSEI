@@ -107,24 +107,26 @@ export function CaseNotesPanel({ applicationId }: Props) {
       setError("");
       console.log("[CaseNotesPanel] Loading data for application:", applicationId);
 
-      const [notesData, expensesData, remarksData, infoData] = await Promise.all([
-        getCaseNotes(applicationId).catch(err => {
-          console.error("[CaseNotesPanel] Error loading notes:", err);
-          throw err;
-        }),
-        getCaseExpenses(applicationId).catch(err => {
-          console.error("[CaseNotesPanel] Error loading expenses:", err);
-          throw err;
-        }),
-        getCaseRemarks(applicationId).catch(err => {
-          console.error("[CaseNotesPanel] Error loading remarks:", err);
-          throw err;
-        }),
-        getCaseInformation(applicationId).catch(err => {
-          console.error("[CaseNotesPanel] Error loading information:", err);
-          throw err;
-        }),
+      // エラーが発生しても続行するようにPromise.allSettledを使用
+      const results = await Promise.allSettled([
+        getCaseNotes(applicationId),
+        getCaseExpenses(applicationId),
+        getCaseRemarks(applicationId),
+        getCaseInformation(applicationId),
       ]);
+
+      const notesData = results[0].status === "fulfilled" ? results[0].value : [];
+      const expensesData = results[1].status === "fulfilled" ? results[1].value : [];
+      const remarksData = results[2].status === "fulfilled" ? results[2].value : [];
+      const infoData = results[3].status === "fulfilled" ? results[3].value : null;
+
+      // エラーログ
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          const names = ["notes", "expenses", "remarks", "information"];
+          console.warn(`[CaseNotesPanel] Failed to load ${names[index]}:`, result.reason);
+        }
+      });
 
       console.log("[CaseNotesPanel] Data loaded successfully:", {
         notesCount: notesData?.length,
@@ -305,10 +307,19 @@ export function CaseNotesPanel({ applicationId }: Props) {
   };
 
   // 計算（フォーム入力値に基づく）
-  const estimatedAmountValue = formData.estimatedAmount ? parseFloat(formData.estimatedAmount) : 0;
-  const actualAmountValue = formData.actualAmount ? parseFloat(formData.actualAmount) : 0;
-  const taxRateValue = parseInt(formData.taxRate) / 100;
-  const totalAmount = actualAmountValue * (1 + taxRateValue);
+  const estimatedAmountValue = formData.estimatedAmount && !isNaN(parseFloat(formData.estimatedAmount))
+    ? parseFloat(formData.estimatedAmount)
+    : 0;
+  const actualAmountValue = formData.actualAmount && !isNaN(parseFloat(formData.actualAmount))
+    ? parseFloat(formData.actualAmount)
+    : 0;
+  const taxRateNum = formData.taxRate && !isNaN(parseInt(formData.taxRate))
+    ? parseInt(formData.taxRate)
+    : 10;
+  const taxRateValue = taxRateNum / 100;
+  const totalAmount = actualAmountValue > 0 && taxRateValue >= 0
+    ? Number((actualAmountValue * (1 + taxRateValue)).toFixed(0))
+    : 0;
 
   if (isLoading) {
     return (
@@ -851,7 +862,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
                   <div className="border-t border-blue-200 pt-1 mt-1 flex justify-between font-semibold text-blue-900">
                     <span>総額:</span>
                     <span className="font-mono">
-                      ¥{totalAmount.toLocaleString()}
+                      ¥{isNaN(totalAmount) ? "0" : totalAmount.toLocaleString()}
                     </span>
                   </div>
                 </div>

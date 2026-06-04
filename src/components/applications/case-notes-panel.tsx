@@ -145,7 +145,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
           ...prev,
           estimatedAmount: infoData.estimatedAmount?.toString() || "",
           actualAmount: infoData.actualAmount?.toString() || "",
-          taxRate: (infoData.taxRate * 100).toString(),
+          taxRate: infoData.taxRate ? (infoData.taxRate * 100).toString() : "10",
         }));
       }
     } catch (err: any) {

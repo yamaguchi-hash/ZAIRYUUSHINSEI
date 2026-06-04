@@ -43,7 +43,8 @@ export async function getCaseNotes(applicationId: string) {
         console.warn("[getCaseNotes] case_notes table does not exist yet, returning empty array");
         return [];
       }
-      throw dbErr;
+      console.warn("[getCaseNotes] Database error, returning empty array:", dbErr.message);
+      return [];
     }
   } catch (err: any) {
     console.error("[getCaseNotes] Error:", {
@@ -213,7 +214,7 @@ export async function getCaseExpenses(applicationId: string) {
         console.warn("[getCaseExpenses] case_expenses table does not exist yet, returning empty array");
         return [];
       }
-      throw dbErr;
+      return null;
     }
   } catch (err: any) {
     console.error("[getCaseExpenses] Error:", err.message);
@@ -360,13 +361,20 @@ export async function getCaseInformation(applicationId: string) {
         .where(eq(caseInformation.applicationId, applicationId));
 
       console.log("[getCaseInformation] Result:", !!info);
-      return info || null;
+      if (!info) return null;
+      // Date オブジェクトを ISO 文字列に変換
+      return {
+        ...info,
+        createdAt: info.createdAt instanceof Date ? info.createdAt.toISOString() : info.createdAt,
+        updatedAt: info.updatedAt instanceof Date ? info.updatedAt.toISOString() : info.updatedAt,
+      };
     } catch (dbErr: any) {
       if (dbErr.message?.includes("does not exist") || dbErr.code === "42P01") {
         console.warn("[getCaseInformation] case_information table does not exist yet, returning null");
         return null;
       }
-      throw dbErr;
+      console.warn("[getCaseInformation] Database error:", dbErr.message);
+      return null;
     }
   } catch (err: any) {
     console.error("[getCaseInformation] Error:", {
@@ -418,7 +426,14 @@ export async function updateCaseInformation(
           })
           .where(eq(caseInformation.applicationId, applicationId))
           .returning();
-        return result[0];
+        const info = result[0];
+        if (!info) return null;
+        // Date オブジェクトを ISO 文字列に変換
+        return {
+          ...info,
+          createdAt: info.createdAt instanceof Date ? info.createdAt.toISOString() : info.createdAt,
+          updatedAt: info.updatedAt instanceof Date ? info.updatedAt.toISOString() : info.updatedAt,
+        };
       } else {
         const result = await db
           .insert(caseInformation)
@@ -431,7 +446,14 @@ export async function updateCaseInformation(
             createdBy: userId,
           })
           .returning();
-        return result[0];
+        const info = result[0];
+        if (!info) return null;
+        // Date オブジェクトを ISO 文字列に変換
+        return {
+          ...info,
+          createdAt: info.createdAt instanceof Date ? info.createdAt.toISOString() : info.createdAt,
+          updatedAt: info.updatedAt instanceof Date ? info.updatedAt.toISOString() : info.updatedAt,
+        };
       }
     } catch (dbErr: any) {
       // テーブルが存在しない場合の処理
@@ -439,7 +461,7 @@ export async function updateCaseInformation(
         console.warn("[updateCaseInformation] case_information table does not exist yet, returning null");
         return null;
       }
-      throw dbErr;
+      return null;
     }
   } catch (err: any) {
     console.error("[updateCaseInformation] Error:", {
@@ -480,13 +502,19 @@ export async function getCaseRemarks(applicationId: string) {
         .orderBy(desc(caseRemarks.createdAt));
 
       console.log("[getCaseRemarks] Remarks retrieved:", remarks.length);
-      return remarks;
+      // Date オブジェクトを ISO 文字列に変換
+      return remarks.map(r => ({
+        ...r,
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+        updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt,
+      }));
     } catch (dbErr: any) {
       if (dbErr.message?.includes("does not exist") || dbErr.code === "42P01") {
         console.warn("[getCaseRemarks] case_remarks table does not exist yet, returning empty array");
         return [];
       }
-      throw dbErr;
+      console.warn("[getCaseRemarks] Database error, returning empty array:", dbErr.message);
+      return [];
     }
   } catch (err: any) {
     console.error("[getCaseRemarks] Error:", err.message);
@@ -525,13 +553,21 @@ export async function addCaseRemark(applicationId: string, content: string) {
         .returning();
 
       console.log("[addCaseRemark] Remark added successfully");
-      return result[0];
+      const remark = result[0];
+      if (!remark) return null;
+      // Date オブジェクトを ISO 文字列に変換
+      return {
+        ...remark,
+        createdAt: remark.createdAt instanceof Date ? remark.createdAt.toISOString() : remark.createdAt,
+        updatedAt: remark.updatedAt instanceof Date ? remark.updatedAt.toISOString() : remark.updatedAt,
+      };
     } catch (dbErr: any) {
       if (dbErr.code === "42P01") {
         console.warn("[addCaseRemark] case_remarks table does not exist yet");
         return null;
       }
-      throw dbErr;
+      console.warn("[addCaseRemark] Database error:", dbErr.message);
+      return null;
     }
   } catch (err: any) {
     console.error("[addCaseRemark] Error:", err.message);
@@ -558,12 +594,12 @@ export async function updateCaseRemark(applicationId: string, remarkId: string, 
       .limit(1);
     if (!app) throw new Error("申請案件が見つかりません");
 
-    const [remark] = await db
+    const [existingRemark] = await db
       .select()
       .from(caseRemarks)
       .where(and(eq(caseRemarks.id, remarkId), eq(caseRemarks.applicationId, applicationId)))
       .limit(1);
-    if (!remark) throw new Error("備考が見つかりません");
+    if (!existingRemark) throw new Error("備考が見つかりません");
 
     const result = await db
       .update(caseRemarks)
@@ -576,7 +612,14 @@ export async function updateCaseRemark(applicationId: string, remarkId: string, 
       .returning();
 
     console.log("[updateCaseRemark] Remark updated successfully");
-    return result[0];
+    const remark = result[0];
+    if (!remark) return null;
+    // Date オブジェクトを ISO 文字列に変換
+    return {
+      ...remark,
+      createdAt: remark.createdAt instanceof Date ? remark.createdAt.toISOString() : remark.createdAt,
+      updatedAt: remark.updatedAt instanceof Date ? remark.updatedAt.toISOString() : remark.updatedAt,
+    };
   } catch (err: any) {
     console.error("[updateCaseRemark] Error:", err.message);
     return null;

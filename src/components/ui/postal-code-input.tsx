@@ -342,9 +342,9 @@ export function AddressSplitInput({
         {zipError && <p className="text-xs text-red-500 mt-1">{zipError}</p>}
       </div>
 
-      {/* 位置情報 */}
+      {/* 住所 */}
       <div className="space-y-2">
-        <label className="block text-xs font-semibold text-gray-700">位置情報</label>
+        <label className="block text-xs font-semibold text-gray-700">住所</label>
         <div>
           <label className={labelClassName}>
             都道府県・市区町村{required && <span className="text-red-500 ml-0.5">*</span>}
@@ -572,9 +572,9 @@ export function AddressSplitSimple({
         {zipError && <p className="text-xs text-red-500 mt-1">{zipError}</p>}
       </div>
 
-      {/* 位置情報 */}
+      {/* 住所 */}
       <div className="space-y-2">
-        <label className="block text-xs font-semibold text-gray-700">{labelPrefix}位置情報</label>
+        <label className="block text-xs font-semibold text-gray-700">{labelPrefix}住所</label>
 
         <div className="flex gap-2">
           {/* 都道府県（ドロップダウン） */}

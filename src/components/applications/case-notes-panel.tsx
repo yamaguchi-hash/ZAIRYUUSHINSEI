@@ -302,8 +302,11 @@ export function CaseNotesPanel({ applicationId }: Props) {
     });
   };
 
-  // 計算
-  const totalAmount = (caseInfo?.actualAmount || 0) * (1 + (caseInfo?.taxRate || 0.1));
+  // 計算（フォーム入力値に基づく）
+  const estimatedAmountValue = formData.estimatedAmount ? parseFloat(formData.estimatedAmount) : 0;
+  const actualAmountValue = formData.actualAmount ? parseFloat(formData.actualAmount) : 0;
+  const taxRateValue = parseInt(formData.taxRate) / 100;
+  const totalAmount = actualAmountValue * (1 + taxRateValue);
 
   if (isLoading) {
     return (

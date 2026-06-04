@@ -407,6 +407,18 @@ export default async function ApplicationDetailPage({
         </CollapsibleSection>
       )}
 
+      {/* 事件メモ（全ステータスで表示） */}
+      <CollapsibleSection
+        title="事件メモ"
+        defaultOpen={true}
+        accentClass="bg-blue-500"
+      >
+        <CaseNotesPanel
+          applicationId={application.id}
+          initialNotes={(application.draftData as any)?._caseNotes ?? []}
+        />
+      </CollapsibleSection>
+
       {/* ⑤ 質問書（ステップ5以降） */}
       {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted" || application.status === "completed") && (
         <CollapsibleSection
@@ -487,18 +499,6 @@ export default async function ApplicationDetailPage({
         accentClass="bg-indigo-400"
       >
         <RasensXmlPanel applicationId={application.id} />
-      </CollapsibleSection>
-
-      {/* 事件メモ */}
-      <CollapsibleSection
-        title="事件メモ"
-        defaultOpen={true}
-        accentClass="bg-blue-500"
-      >
-        <CaseNotesPanel
-          applicationId={application.id}
-          initialNotes={(application.draftData as any)?._caseNotes ?? []}
-        />
       </CollapsibleSection>
 
       {/* 必要書類チェックリスト */}

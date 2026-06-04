@@ -93,14 +93,33 @@ export function CaseNotesPanel({ applicationId }: Props) {
     try {
       setIsLoading(true);
       setError("");
+      console.log("[CaseNotesPanel] Loading data for application:", applicationId);
+
       const [notesData, expensesData, infoData] = await Promise.all([
-        getCaseNotes(applicationId),
-        getCaseExpenses(applicationId),
-        getCaseInformation(applicationId),
+        getCaseNotes(applicationId).catch(err => {
+          console.error("[CaseNotesPanel] Error loading notes:", err);
+          throw err;
+        }),
+        getCaseExpenses(applicationId).catch(err => {
+          console.error("[CaseNotesPanel] Error loading expenses:", err);
+          throw err;
+        }),
+        getCaseInformation(applicationId).catch(err => {
+          console.error("[CaseNotesPanel] Error loading information:", err);
+          throw err;
+        }),
       ]);
+
+      console.log("[CaseNotesPanel] Data loaded successfully:", {
+        notesCount: notesData?.length,
+        expensesCount: expensesData?.length,
+        hasInfo: !!infoData,
+      });
+
       setBusinessLogs(notesData || []);
       setExpenses(expensesData || []);
       setCaseInfo(infoData || null);
+
       if (infoData) {
         setFormData((prev) => ({
           ...prev,
@@ -111,7 +130,9 @@ export function CaseNotesPanel({ applicationId }: Props) {
         }));
       }
     } catch (err: any) {
-      setError(err.message || "データ読み込みエラー");
+      const errorMsg = err.message || "データ読み込みエラー";
+      console.error("[CaseNotesPanel] Fatal error:", errorMsg, err);
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }

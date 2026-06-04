@@ -10,9 +10,14 @@ import { eq, and } from "drizzle-orm";
 
 export async function getCaseNotes(applicationId: string) {
   try {
+    console.log("[getCaseNotes] Starting for applicationId:", applicationId);
+
     const session = await auth();
+    console.log("[getCaseNotes] Session:", session?.user?.email);
     if (!session?.user) throw new Error("認証が必要です");
+
     const tenantId = (session.user as any)?.tenantId;
+    console.log("[getCaseNotes] TenantId:", tenantId);
     if (!tenantId) throw new Error("テナントIDが不正です");
 
     const [app] = await db
@@ -20,6 +25,7 @@ export async function getCaseNotes(applicationId: string) {
       .from(applications)
       .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
       .limit(1);
+    console.log("[getCaseNotes] Application found:", !!app);
     if (!app) throw new Error("申請案件が見つかりません");
 
     const notes = await db
@@ -27,9 +33,15 @@ export async function getCaseNotes(applicationId: string) {
       .from(caseNotes)
       .where(eq(caseNotes.applicationId, applicationId))
       .orderBy(caseNotes.entryDate);
+
+    console.log("[getCaseNotes] Notes retrieved:", notes.length);
     return notes;
   } catch (err: any) {
-    console.error("Get case notes error:", err);
+    console.error("[getCaseNotes] Error:", {
+      message: err.message,
+      code: err.code,
+      stack: err.stack,
+    });
     throw err;
   }
 }
@@ -162,6 +174,8 @@ export async function deleteCaseNote(applicationId: string, caseNoteId: string) 
 
 export async function getCaseExpenses(applicationId: string) {
   try {
+    console.log("[getCaseExpenses] Starting for applicationId:", applicationId);
+
     const session = await auth();
     if (!session?.user) throw new Error("認証が必要です");
     const tenantId = (session.user as any)?.tenantId;
@@ -179,9 +193,11 @@ export async function getCaseExpenses(applicationId: string) {
       .from(caseExpenses)
       .where(eq(caseExpenses.applicationId, applicationId))
       .orderBy(caseExpenses.expenseDate);
+
+    console.log("[getCaseExpenses] Expenses retrieved:", expenses.length);
     return expenses;
   } catch (err: any) {
-    console.error("Get case expenses error:", err);
+    console.error("[getCaseExpenses] Error:", err.message);
     throw err;
   }
 }
@@ -302,6 +318,8 @@ export async function deleteCaseExpense(applicationId: string, expenseId: string
 
 export async function getCaseInformation(applicationId: string) {
   try {
+    console.log("[getCaseInformation] Starting for applicationId:", applicationId);
+
     const session = await auth();
     if (!session?.user) throw new Error("認証が必要です");
     const tenantId = (session.user as any)?.tenantId;
@@ -314,13 +332,19 @@ export async function getCaseInformation(applicationId: string) {
       .limit(1);
     if (!app) throw new Error("申請案件が見つかりません");
 
+    console.log("[getCaseInformation] Querying case information...");
     const [info] = await db
       .select()
       .from(caseInformation)
       .where(eq(caseInformation.applicationId, applicationId));
+
+    console.log("[getCaseInformation] Result:", !!info);
     return info || null;
   } catch (err: any) {
-    console.error("Get case information error:", err);
+    console.error("[getCaseInformation] Error:", {
+      message: err.message,
+      code: err.code,
+    });
     throw err;
   }
 }

@@ -342,56 +342,52 @@ export function AddressSplitInput({
         {zipError && <p className="text-xs text-red-500 mt-1">{zipError}</p>}
       </div>
 
-      {/* 住所 */}
-      <div className="space-y-2">
-        <label className="block text-xs font-semibold text-gray-700">住所</label>
-        <div>
-          <label className={labelClassName}>
-            都道府県・市区町村{required && <span className="text-red-500 ml-0.5">*</span>}
-          </label>
-          <input
-            type="text"
-            value={`${value.prefecture}${value.city}`}
-            onChange={(e) => {
-              const fullAddr = e.target.value;
-              // 都道府県を判定して分割
-              const prefMatch = PREFECTURES.find(p => fullAddr.startsWith(p));
-              if (prefMatch) {
-                const pref = prefMatch;
-                const city = fullAddr.substring(pref.length);
-                onChange({ prefecture: pref, city: city });
+      {/* 住所（都道府県・市区町村・町名） */}
+      <div>
+        <label className={labelClassName}>
+          都道府県・市区町村・町名{required && <span className="text-red-500 ml-0.5">*</span>}
+        </label>
+        <input
+          type="text"
+          value={`${value.prefecture}${value.city}${town}`}
+          onChange={(e) => {
+            const fullAddr = e.target.value;
+            // 都道府県を判定して分割
+            const prefMatch = PREFECTURES.find(p => fullAddr.startsWith(p));
+            if (prefMatch) {
+              const afterPref = fullAddr.substring(prefMatch.length);
+              // 市区町村を判定（市・区・町・村・郡で終わる部分）
+              const cityMatch = afterPref.match(/^(.+?[市区町村郡])/);
+              if (cityMatch) {
+                const cityVal = cityMatch[1];
+                const townVal = afterPref.substring(cityVal.length);
+                onChange({ prefecture: prefMatch, city: cityVal, addressLine: townVal + block });
               } else {
-                // 判定できない場合は全部を city に
-                onChange({ prefecture: "", city: fullAddr });
+                onChange({ prefecture: prefMatch, city: afterPref, addressLine: block });
               }
-              setZipError("");
-            }}
-            placeholder="埼玉県三郷市"
-            className={inputClassName}
-          />
-        </div>
+            } else {
+              onChange({ prefecture: "", city: "", addressLine: fullAddr + block });
+            }
+            setZipError("");
+          }}
+          placeholder="埼玉県三郷市彦成"
+          className={inputClassName}
+        />
       </div>
 
-      {/* 詳細住所 */}
-      <div className="space-y-2">
-        <label className="block text-xs font-semibold text-gray-700">詳細住所</label>
-        <div>
-          <label className={labelClassName}>丁目・番地・建物・部屋番号</label>
-          <input
-            type="text"
-            value={`${town}${block}`}
-            onChange={(e) => {
-              const fullAddr = e.target.value;
-              // 簡易的な分割: 最初の方を town、後ろを block にする
-              // 例: "代々木1丁目319番地6" → town="代々木", block="1丁目319番地6"
-              // より良い実装のため、既存の town/block の更新方法を使う
-              onChange({ addressLine: fullAddr });
-              setZipError("");
-            }}
-            placeholder="代々木戸成1丁目319番地6"
-            className={inputClassName}
-          />
-        </div>
+      {/* 丁目・番地・建物・部屋番号 */}
+      <div>
+        <label className={labelClassName}>丁目・番地・建物・部屋番号</label>
+        <input
+          type="text"
+          value={block}
+          onChange={(e) => {
+            handleBlockChange(e.target.value);
+            setZipError("");
+          }}
+          placeholder="1丁目319番地6"
+          className={inputClassName}
+        />
       </div>
     </div>
   );
@@ -441,20 +437,17 @@ function extractCity(rest: string): { city: string; addressLine: string } {
   return { city: "", addressLine: rest };
 }
 
-/** addressLine から町村+丁目部分を抽出（数字部分の直前まで） */
+/** addressLine から町名と丁目以降を分割（最初の数字の直前で分割）
+ *  例: "彦成1丁目319番地6" → town: "彦成", block: "1丁目319番地6"
+ *  例: "代々木1-1-1"       → town: "代々木", block: "1-1-1"
+ *  例: "売布4-3-30"        → town: "売布", block: "4-3-30"
+ */
 function extractTown(addressLine: string): { town: string; block: string } {
-  // 「町」「村」「丁目」「丁」で始まる部分を抽出
-  // 例: 売布4-3-30 → town: 売布, block: 4-3-30
-  // 例: 3丁目1-1 → town: 3丁目, block: 1-1
-  const townMatch = addressLine.match(/^([^0-9]*?(?:町|村|丁目|丁))/);
-  if (townMatch) {
-    const town = townMatch[1];
-    const block = addressLine.slice(town.length);
-    return { town, block };
-  }
-
-  // 丁目が見つからない場合、全て block とする
-  return { town: "", block: addressLine };
+  // 最初の数字（半角・全角）の直前で分割
+  const match = addressLine.match(/^([^0-9０-９]*)/);
+  const town = match ? match[1] : "";
+  const block = addressLine.slice(town.length);
+  return { town, block };
 }
 
 interface AddressSplitSimpleProps {
@@ -572,45 +565,46 @@ export function AddressSplitSimple({
         {zipError && <p className="text-xs text-red-500 mt-1">{zipError}</p>}
       </div>
 
-      {/* 住所 */}
-      <div className="space-y-2">
-        <label className="block text-xs font-semibold text-gray-700">{labelPrefix}住所</label>
-
-        <div className="flex gap-2">
-          {/* 都道府県（ドロップダウン） */}
-          <select
-            value={prefecture}
-            onChange={(e) => { handleChange(e.target.value, city, town, block); setZipError(""); }}
-            className={inputClassName + " flex-shrink-0 w-32"}
-          >
-            <option value="">選択</option>
-            {PREFECTURES.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-
-          {/* 市区町村（テキスト） */}
-          <input
-            type="text"
-            value={city}
-            onChange={(e) => { handleChange(prefecture, e.target.value, town, block); setZipError(""); }}
-            placeholder="三郷市"
-            className={inputClassName + " flex-1"}
-          />
-        </div>
-      </div>
-
-      {/* 詳細住所 */}
-      <div className="space-y-2">
-        <label className="block text-xs font-semibold text-gray-700">{labelPrefix}詳細住所</label>
+      {/* 都道府県・市区町村・町名 */}
+      <div>
+        <label className={labelClassName}>{labelPrefix}都道府県・市区町村・町名</label>
         <input
           type="text"
-          value={town + block}
+          value={`${prefecture}${city}${town}`}
           onChange={(e) => {
             const fullAddr = e.target.value;
-            // town と block を分割することは難しいため、全体を town に格納
-            handleChange(prefecture, city, fullAddr, "");
+            const prefMatch = PREFECTURES.find(p => fullAddr.startsWith(p));
+            if (prefMatch) {
+              const afterPref = fullAddr.substring(prefMatch.length);
+              const cityMatch = afterPref.match(/^(.+?[市区町村郡])/);
+              if (cityMatch) {
+                const cityVal = cityMatch[1];
+                const townVal = afterPref.substring(cityVal.length);
+                handleChange(prefMatch, cityVal, townVal, block);
+              } else {
+                handleChange(prefMatch, afterPref, "", block);
+              }
+            } else {
+              handleChange("", "", fullAddr, block);
+            }
             setZipError("");
           }}
-          placeholder="代々木1-1-1 〇〇ビル101号室"
+          placeholder="埼玉県三郷市彦成"
+          className={inputClassName}
+        />
+      </div>
+
+      {/* 丁目・番地・建物・部屋番号 */}
+      <div>
+        <label className={labelClassName}>{labelPrefix}丁目・番地・建物・部屋番号</label>
+        <input
+          type="text"
+          value={block}
+          onChange={(e) => {
+            handleChange(prefecture, city, town, e.target.value);
+            setZipError("");
+          }}
+          placeholder="1丁目319番地6"
           className={inputClassName}
         />
       </div>

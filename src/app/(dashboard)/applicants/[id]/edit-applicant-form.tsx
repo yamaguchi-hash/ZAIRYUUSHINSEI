@@ -151,25 +151,40 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">姓（英）<span className="text-red-500">*</span></label>
-          <input name="familyNameEn" value={form.familyNameEn} onChange={handleChange} required className="input-field text-sm py-1.5" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">名（英）<span className="text-red-500">*</span></label>
-          <input name="givenNameEn" value={form.givenNameEn} onChange={handleChange} required className="input-field text-sm py-1.5" />
-        </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">氏名（英）<span className="text-red-500">*</span></label>
+        <input
+          value={`${form.familyNameEn} ${form.givenNameEn}`.trim()}
+          onChange={(e) => {
+            const parts = e.target.value.split(/\s+/);
+            setForm(prev => ({
+              ...prev,
+              familyNameEn: parts[0] || "",
+              givenNameEn: parts.slice(1).join(" ") || "",
+            }));
+            setStatus("idle");
+          }}
+          required
+          placeholder="YAMADA TARO"
+          className="input-field text-sm py-1.5"
+        />
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">姓（日）</label>
-          <input name="familyNameJa" value={form.familyNameJa} onChange={handleChange} className="input-field text-sm py-1.5" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">名（日）</label>
-          <input name="givenNameJa" value={form.givenNameJa} onChange={handleChange} className="input-field text-sm py-1.5" />
-        </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">氏名（日）</label>
+        <input
+          value={`${form.familyNameJa} ${form.givenNameJa}`.trim()}
+          onChange={(e) => {
+            const parts = e.target.value.split(/\s+/);
+            setForm(prev => ({
+              ...prev,
+              familyNameJa: parts[0] || "",
+              givenNameJa: parts.slice(1).join(" ") || "",
+            }));
+            setStatus("idle");
+          }}
+          placeholder="山田 太郎"
+          className="input-field text-sm py-1.5"
+        />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>

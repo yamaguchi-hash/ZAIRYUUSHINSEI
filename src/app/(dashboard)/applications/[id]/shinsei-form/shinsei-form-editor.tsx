@@ -421,17 +421,27 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
               <Field label="2. 生年月日" required>
                 <input className={inputCls} type="date" value={form.dateOfBirth} onChange={e => set("dateOfBirth", e.target.value)} />
               </Field>
-              <Field label="3. 氏名 — Family Name（ローマ字）" required>
-                <input className={inputCls} value={form.familyNameEn} onChange={e => set("familyNameEn", e.target.value)} placeholder="YAMADA" />
+              <Field label="3. 氏名（ローマ字）" required>
+                <input className={inputCls}
+                  value={`${form.familyNameEn} ${form.givenNameEn}`.trim()}
+                  onChange={e => {
+                    const parts = e.target.value.split(/\s+/);
+                    set("familyNameEn", parts[0] || "");
+                    set("givenNameEn", parts.slice(1).join(" ") || "");
+                  }}
+                  placeholder="YAMADA TARO"
+                />
               </Field>
-              <Field label="3. 氏名 — Given Name（ローマ字）" required>
-                <input className={inputCls} value={form.givenNameEn} onChange={e => set("givenNameEn", e.target.value)} placeholder="TARO" />
-              </Field>
-              <Field label="3. 氏名（漢字・姓）">
-                <input className={inputCls} value={form.familyNameJa} onChange={e => set("familyNameJa", e.target.value)} placeholder="山田" />
-              </Field>
-              <Field label="3. 氏名（漢字・名）">
-                <input className={inputCls} value={form.givenNameJa} onChange={e => set("givenNameJa", e.target.value)} placeholder="太郎" />
+              <Field label="3. 氏名（漢字）">
+                <input className={inputCls}
+                  value={`${form.familyNameJa} ${form.givenNameJa}`.trim()}
+                  onChange={e => {
+                    const parts = e.target.value.split(/\s+/);
+                    set("familyNameJa", parts[0] || "");
+                    set("givenNameJa", parts.slice(1).join(" ") || "");
+                  }}
+                  placeholder="山田 太郎"
+                />
               </Field>
               <Field label="4. 性別" required>
                 <RadioGroup value={form.sex} onChange={v => set("sex", v)} options={["男", "女"]} />

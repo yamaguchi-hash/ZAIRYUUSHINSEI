@@ -413,10 +413,7 @@ export default async function ApplicationDetailPage({
         defaultOpen={true}
         accentClass="bg-blue-500"
       >
-        <CaseNotesPanel
-          applicationId={application.id}
-          initialNotes={(application.draftData as any)?._caseNotes ?? []}
-        />
+        <CaseNotesPanel applicationId={application.id} />
       </CollapsibleSection>
 
       {/* ⑤ 質問書（ステップ5以降） */}

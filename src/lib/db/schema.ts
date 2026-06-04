@@ -290,6 +290,8 @@ export const applicationsRelations = relations(applications, ({ one, many }) => 
   questionnaire: many(questionnaireQuestions),
   auditLogs: many(auditLog),
   caseNotes: many(caseNotes),
+  caseExpenses: many(caseExpenses),
+  caseInformation: one(caseInformation),
 }));
 
 export const applicationDocumentChecklistRelations = relations(applicationDocumentChecklist, ({ one }) => ({
@@ -340,7 +342,7 @@ export const backupSettingsRelations = relations(backupSettings, ({ one }) => ({
   tenant: one(tenants, { fields: [backupSettings.tenantId], references: [tenants.id] }),
 }));
 
-// ─── Case Notes / 事件メモ ────────────────────────────────────────────────────
+// ─── Case Notes / 事件メモ（業務履歴） ──────────────────────────────────────
 export const caseNotes = pgTable("case_notes", {
   id: uuid("id").defaultRandom().primaryKey(),
   applicationId: uuid("application_id").notNull().references(() => applications.id),
@@ -363,5 +365,47 @@ export const caseNotesRelations = relations(caseNotes, ({ one }) => ({
   updatedByUser: one(users, { fields: [caseNotes.updatedBy], references: [users.id], relationName: "updatedBy" }),
 }));
 
-// applications テーブルのリレーションに caseNotes を追加
-// （applicationsRelations を後で更新）
+// ─── Case Expenses / 事件メモ（収入経費明細） ────────────────────────────────
+export const caseExpenses = pgTable("case_expenses", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  applicationId: uuid("application_id").notNull().references(() => applications.id),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  expenseDate: date("expense_date").notNull(), // 日付
+  item1: text("item1"), // 項目1
+  item2: text("item2"), // 項目2
+  amount: real("amount"), // 金額（円）
+  remarks: text("remarks"), // 備考
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const caseExpensesRelations = relations(caseExpenses, ({ one }) => ({
+  application: one(applications, { fields: [caseExpenses.applicationId], references: [applications.id] }),
+  tenant: one(tenants, { fields: [caseExpenses.tenantId], references: [tenants.id] }),
+  createdByUser: one(users, { fields: [caseExpenses.createdBy], references: [users.id], relationName: "createdBy" }),
+  updatedByUser: one(users, { fields: [caseExpenses.updatedBy], references: [users.id], relationName: "updatedBy" }),
+}));
+
+// ─── Case Information / 事件メモ（備考・見積額） ────────────────────────────
+export const caseInformation = pgTable("case_information", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  applicationId: uuid("application_id").notNull().unique().references(() => applications.id),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  remarks: text("remarks"), // 備考欄（自由記述）
+  estimatedAmount: real("estimated_amount"), // 見積額（円）
+  actualAmount: real("actual_amount"), // 実費（円）
+  taxRate: real("tax_rate").default(0.1), // 消費税率（デフォルト10%）
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const caseInformationRelations = relations(caseInformation, ({ one }) => ({
+  application: one(applications, { fields: [caseInformation.applicationId], references: [applications.id] }),
+  tenant: one(tenants, { fields: [caseInformation.tenantId], references: [tenants.id] }),
+  createdByUser: one(users, { fields: [caseInformation.createdBy], references: [users.id], relationName: "createdBy" }),
+  updatedByUser: one(users, { fields: [caseInformation.updatedBy], references: [users.id], relationName: "updatedBy" }),
+}));

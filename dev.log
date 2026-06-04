@@ -2,18 +2,19 @@
 > zairyu-shinsei-system@0.1.0 dev
 > next dev
 
-⚠ Port 3000 is in use by process 36540, using available port 3001 instead.
+⚠ Port 3000 is in use by process 36540, using available port 3002 instead.
 ▲ Next.js 16.2.6 (Turbopack)
-- Local:         http://localhost:3001
-- Network:       http://192.168.0.231:3001
+- Local:         http://localhost:3002
+- Network:       http://192.168.0.231:3002
 - Environments: .env.local
-✓ Ready in 704ms
+✓ Ready in 1155ms
 ⨯ Another next dev server is already running.
 
-- Local:        http://localhost:3000
-- PID:          36540
+- Local:        http://localho[?25h
+
+- PID:          15740
 - Dir:          C:\Users\tadas\OneDrive\デスクトップ\Claude プロジェクト\在留申請システム開発\zairyu-shinsei-system
 - Log:          .next\dev\logs\next-development.log
 
-Run taskkill /PID 36540 /F to stop it.
+Run taskkill /PID 15740 /F to stop it.
 [?25h

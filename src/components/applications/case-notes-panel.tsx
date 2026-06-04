@@ -1,308 +1,703 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Calendar, Clock, Plus, Edit2, Trash2, Loader2, Check, X } from "lucide-react";
-import { getCaseNotes, addCaseNote, updateCaseNote, deleteCaseNote } from "@/actions/case-notes";
+import {
+  Calendar,
+  Clock,
+  Plus,
+  Edit2,
+  Trash2,
+  Loader2,
+  Check,
+  X,
+  FileText,
+  DollarSign,
+  FileCheck,
+} from "lucide-react";
+import {
+  getCaseNotes,
+  addCaseNote,
+  updateCaseNote,
+  deleteCaseNote,
+  getCaseExpenses,
+  addCaseExpense,
+  updateCaseExpense,
+  deleteCaseExpense,
+  getCaseInformation,
+  updateCaseInformation,
+} from "@/actions/case-notes";
 
 interface CaseNote {
   id: string;
-  applicationId: string;
-  entryDate: Date | string;
+  entryDate: string | Date;
   entryTime: string | null;
   content: string;
   name: string | null;
   assignee: string | null;
-  createdAt: Date | string;
-  updatedAt: Date | string;
+}
+
+interface CaseExpense {
+  id: string;
+  expenseDate: string | Date;
+  item1: string | null;
+  item2: string | null;
+  amount: number | null;
+  remarks: string | null;
+}
+
+interface CaseInfo {
+  id: string;
+  remarks: string | null;
+  estimatedAmount: number | null;
+  actualAmount: number | null;
+  taxRate: number;
 }
 
 interface Props {
   applicationId: string;
-  initialNotes: CaseNote[];
 }
 
-export function CaseNotesPanel({ applicationId, initialNotes }: Props) {
-  const [notes, setNotes] = useState<CaseNote[]>(initialNotes);
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+type Tab = "business" | "expense" | "remarks";
+
+export function CaseNotesPanel({ applicationId }: Props) {
+  const [activeTab, setActiveTab] = useState<Tab>("business");
+  const [businessLogs, setBusinessLogs] = useState<CaseNote[]>([]);
+  const [expenses, setExpenses] = useState<CaseExpense[]>([]);
+  const [caseInfo, setCaseInfo] = useState<CaseInfo | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
   // フォーム状態
+  const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     entryDate: "",
     entryTime: "",
     content: "",
     name: "",
     assignee: "",
+    expenseDate: "",
+    item1: "",
+    item2: "",
+    amount: "",
+    remarks: "",
+    generalRemarks: "",
+    estimatedAmount: "",
+    actualAmount: "",
+    taxRate: "10",
   });
 
-  function resetForm() {
-    setFormData({
+  // データ読み込み
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      setError("");
+      const [notesData, expensesData, infoData] = await Promise.all([
+        getCaseNotes(applicationId),
+        getCaseExpenses(applicationId),
+        getCaseInformation(applicationId),
+      ]);
+      setBusinessLogs(notesData || []);
+      setExpenses(expensesData || []);
+      setCaseInfo(infoData || null);
+      if (infoData) {
+        setFormData((prev) => ({
+          ...prev,
+          generalRemarks: infoData.remarks || "",
+          estimatedAmount: infoData.estimatedAmount?.toString() || "",
+          actualAmount: infoData.actualAmount?.toString() || "",
+          taxRate: (infoData.taxRate * 100).toString(),
+        }));
+      }
+    } catch (err: any) {
+      setError(err.message || "データ読み込みエラー");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 初期読み込み
+  React.useEffect(() => {
+    loadData();
+  }, [applicationId]);
+
+  // 業務履歴操作
+  const resetBusinessForm = () => {
+    setFormData((prev) => ({
+      ...prev,
       entryDate: "",
       entryTime: "",
       content: "",
       name: "",
       assignee: "",
-    });
+    }));
     setIsAdding(false);
     setEditingId(null);
-    setError("");
-  }
+  };
 
-  function startAdd() {
-    setFormData({
-      entryDate: new Date().toISOString().split("T")[0],
-      entryTime: new Date().toTimeString().slice(0, 5),
-      content: "",
-      name: "",
-      assignee: "",
-    });
-    setIsAdding(true);
-    setEditingId(null);
-  }
-
-  function startEdit(note: CaseNote) {
-    const dateStr = typeof note.entryDate === "string"
-      ? note.entryDate.split("T")[0]
-      : new Date(note.entryDate).toISOString().split("T")[0];
-
-    setFormData({
-      entryDate: dateStr,
-      entryTime: note.entryTime || "",
-      content: note.content,
-      name: note.name || "",
-      assignee: note.assignee || "",
-    });
-    setEditingId(note.id);
-    setIsAdding(false);
-    setError("");
-  }
-
-  function handleSave() {
-    if (!formData.entryDate.trim()) {
-      setError("記録日は必須です");
-      return;
-    }
-    if (!formData.content.trim()) {
-      setError("内容は必須です");
+  const handleSaveBusinessLog = () => {
+    if (!formData.entryDate.trim() || !formData.content.trim()) {
+      setError("記録日と内容は必須です");
       return;
     }
 
     startTransition(async () => {
       try {
         if (editingId) {
-          // 更新
-          const updated = await updateCaseNote(applicationId, editingId, formData);
-          setNotes(notes.map((n) => (n.id === editingId ? updated : n)));
+          const updated = await updateCaseNote(applicationId, editingId, {
+            entryDate: formData.entryDate,
+            entryTime: formData.entryTime || undefined,
+            content: formData.content,
+            name: formData.name || undefined,
+            assignee: formData.assignee || undefined,
+          });
+          setBusinessLogs(businessLogs.map((n) => (n.id === editingId ? updated : n)));
         } else {
-          // 追加
-          const added = await addCaseNote(applicationId, formData);
-          setNotes([...notes, added]);
+          const added = await addCaseNote(applicationId, {
+            entryDate: formData.entryDate,
+            entryTime: formData.entryTime || undefined,
+            content: formData.content,
+            name: formData.name || undefined,
+            assignee: formData.assignee || undefined,
+          });
+          setBusinessLogs([...businessLogs, added]);
         }
-        resetForm();
+        resetBusinessForm();
       } catch (err: any) {
         setError(err.message || "操作に失敗しました");
       }
     });
-  }
+  };
 
-  function handleDelete(noteId: string) {
-    if (!confirm("この事件メモを削除しますか？")) return;
+  // 経費操作
+  const resetExpenseForm = () => {
+    setFormData((prev) => ({
+      ...prev,
+      expenseDate: "",
+      item1: "",
+      item2: "",
+      amount: "",
+      remarks: "",
+    }));
+    setIsAdding(false);
+    setEditingId(null);
+  };
+
+  const handleSaveExpense = () => {
+    if (!formData.expenseDate.trim()) {
+      setError("日付は必須です");
+      return;
+    }
 
     startTransition(async () => {
       try {
-        await deleteCaseNote(applicationId, noteId);
-        setNotes(notes.filter((n) => n.id !== noteId));
+        if (editingId) {
+          const updated = await updateCaseExpense(applicationId, editingId, {
+            expenseDate: formData.expenseDate,
+            item1: formData.item1 || undefined,
+            item2: formData.item2 || undefined,
+            amount: formData.amount ? parseFloat(formData.amount) : undefined,
+            remarks: formData.remarks || undefined,
+          });
+          setExpenses(expenses.map((e) => (e.id === editingId ? updated : e)));
+        } else {
+          const added = await addCaseExpense(applicationId, {
+            expenseDate: formData.expenseDate,
+            item1: formData.item1 || undefined,
+            item2: formData.item2 || undefined,
+            amount: formData.amount ? parseFloat(formData.amount) : undefined,
+            remarks: formData.remarks || undefined,
+          });
+          setExpenses([...expenses, added]);
+        }
+        resetExpenseForm();
       } catch (err: any) {
-        setError(err.message || "削除に失敗しました");
+        setError(err.message || "操作に失敗しました");
       }
     });
+  };
+
+  const handleSaveRemarks = () => {
+    startTransition(async () => {
+      try {
+        const updated = await updateCaseInformation(applicationId, {
+          remarks: formData.generalRemarks || undefined,
+          estimatedAmount: formData.estimatedAmount
+            ? parseFloat(formData.estimatedAmount)
+            : undefined,
+          actualAmount: formData.actualAmount
+            ? parseFloat(formData.actualAmount)
+            : undefined,
+          taxRate: parseInt(formData.taxRate) / 100,
+        });
+        setCaseInfo(updated);
+        setError("");
+      } catch (err: any) {
+        setError(err.message || "保存に失敗しました");
+      }
+    });
+  };
+
+  // 計算
+  const totalAmount = (caseInfo?.actualAmount || 0) * (1 + (caseInfo?.taxRate || 0.1));
+
+  if (isLoading) {
+    return (
+      <div className="border border-blue-200 rounded-xl bg-blue-50 p-4 text-center">
+        <Loader2 className="w-5 h-5 animate-spin inline mr-2" />
+        データ読み込み中...
+      </div>
+    );
   }
 
   return (
     <div className="border border-blue-200 rounded-xl bg-blue-50 overflow-hidden">
       {/* ヘッダー */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-blue-200 bg-blue-100">
-        <Calendar className="w-4 h-4 text-blue-700" />
+        <FileText className="w-4 h-4 text-blue-700" />
         <span className="text-sm font-semibold text-blue-800">事件メモ</span>
-        {notes.length > 0 && (
-          <span className="ml-auto text-xs text-blue-600">{notes.length}件</span>
-        )}
       </div>
 
-      <div className="p-4 space-y-4">
-        <p className="text-xs text-blue-600">
-          申請案件に関連した業務記録・メモを時系列で管理します。
-        </p>
-
-        {/* メモ一覧 */}
-        <div className="space-y-2">
-          {notes.length === 0 ? (
-            <p className="text-xs text-gray-400 py-4 text-center">
-              事件メモはまだありません
-            </p>
-          ) : (
-            notes.map((note) => (
-              <div
-                key={note.id}
-                className="bg-white border border-blue-100 rounded-lg p-3 space-y-2"
-              >
-                {/* 日付と操作ボタン */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {typeof note.entryDate === "string"
-                      ? note.entryDate.split("T")[0]
-                      : new Date(note.entryDate).toLocaleDateString("ja-JP")}
-                    {note.entryTime && (
-                      <>
-                        <Clock className="w-3.5 h-3.5 ml-1" />
-                        {note.entryTime}
-                      </>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => startEdit(note)}
-                      disabled={isPending || isAdding || editingId !== null}
-                      className="p-1 text-gray-400 hover:text-blue-600 disabled:opacity-50"
-                      title="編集"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(note.id)}
-                      disabled={isPending || isAdding || editingId !== null}
-                      className="p-1 text-gray-400 hover:text-red-600 disabled:opacity-50"
-                      title="削除"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* 内容 */}
-                <p className="text-xs text-gray-700 whitespace-pre-wrap">
-                  {note.content}
-                </p>
-
-                {/* 名称と担当者 */}
-                <div className="flex gap-3 text-xs text-gray-500">
-                  {note.name && <span>対象: {note.name}</span>}
-                  {note.assignee && <span>担当: {note.assignee}</span>}
-                </div>
-              </div>
-            ))
-          )}
+      <div className="p-4">
+        {/* タブ */}
+        <div className="flex gap-1 mb-4 border-b border-blue-200">
+          <button
+            onClick={() => setActiveTab("business")}
+            className={`px-3 py-2 text-xs font-medium transition-colors ${
+              activeTab === "business"
+                ? "text-blue-700 border-b-2 border-blue-600"
+                : "text-gray-600 hover:text-blue-600"
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5 inline mr-1" />
+            業務履歴
+          </button>
+          <button
+            onClick={() => setActiveTab("expense")}
+            className={`px-3 py-2 text-xs font-medium transition-colors ${
+              activeTab === "expense"
+                ? "text-blue-700 border-b-2 border-blue-600"
+                : "text-gray-600 hover:text-blue-600"
+            }`}
+          >
+            <DollarSign className="w-3.5 h-3.5 inline mr-1" />
+            経費明細
+          </button>
+          <button
+            onClick={() => setActiveTab("remarks")}
+            className={`px-3 py-2 text-xs font-medium transition-colors ${
+              activeTab === "remarks"
+                ? "text-blue-700 border-b-2 border-blue-600"
+                : "text-gray-600 hover:text-blue-600"
+            }`}
+          >
+            <FileCheck className="w-3.5 h-3.5 inline mr-1" />
+            備考・見積額
+          </button>
         </div>
 
-        {/* エラー表示 */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-600">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-600 mb-3">
             {error}
           </div>
         )}
 
-        {/* フォーム */}
-        {isAdding || editingId ? (
-          <div className="bg-white border border-blue-100 rounded-lg p-3 space-y-2">
-            <label className="block text-xs font-medium text-gray-700">
-              記録日 *
-            </label>
-            <input
-              type="date"
-              value={formData.entryDate}
-              onChange={(e) =>
-                setFormData({ ...formData, entryDate: e.target.value })
-              }
-              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg"
-            />
+        {/* 業務履歴タブ */}
+        {activeTab === "business" && (
+          <div className="space-y-3">
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {businessLogs.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">業務履歴がありません</p>
+              ) : (
+                businessLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="bg-white border border-blue-100 rounded-lg p-2 space-y-1"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {typeof log.entryDate === "string"
+                          ? log.entryDate
+                          : new Date(log.entryDate).toLocaleDateString("ja-JP")}
+                        {log.entryTime && (
+                          <>
+                            <Clock className="w-3.5 h-3.5" />
+                            {log.entryTime}
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              entryDate: typeof log.entryDate === "string"
+                                ? log.entryDate
+                                : new Date(log.entryDate).toISOString().split("T")[0],
+                              entryTime: log.entryTime || "",
+                              content: log.content,
+                              name: log.name || "",
+                              assignee: log.assignee || "",
+                            }));
+                            setEditingId(log.id);
+                            setIsAdding(false);
+                          }}
+                          className="p-1 text-gray-400 hover:text-blue-600"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm("削除しますか？")) {
+                              startTransition(async () => {
+                                try {
+                                  await deleteCaseNote(applicationId, log.id);
+                                  setBusinessLogs(businessLogs.filter((n) => n.id !== log.id));
+                                } catch (err: any) {
+                                  setError(err.message);
+                                }
+                              });
+                            }
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-600"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-700">{log.content}</p>
+                    {(log.name || log.assignee) && (
+                      <div className="flex gap-3 text-xs text-gray-500">
+                        {log.name && <span>対象: {log.name}</span>}
+                        {log.assignee && <span>担当: {log.assignee}</span>}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
 
-            <label className="block text-xs font-medium text-gray-700">
-              時間
-            </label>
-            <input
-              type="time"
-              value={formData.entryTime}
-              onChange={(e) =>
-                setFormData({ ...formData, entryTime: e.target.value })
-              }
-              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg"
-            />
-
-            <label className="block text-xs font-medium text-gray-700">
-              内容 *
-            </label>
-            <textarea
-              value={formData.content}
-              onChange={(e) =>
-                setFormData({ ...formData, content: e.target.value })
-              }
-              placeholder="業務内容、メモ、進捗などを記入"
-              rows={3}
-              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg"
-            />
-
-            <label className="block text-xs font-medium text-gray-700">
-              対象（人物・箇所）
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              placeholder="例: 申請人、雇用主、入管職員など"
-              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg"
-            />
-
-            <label className="block text-xs font-medium text-gray-700">
-              担当者
-            </label>
-            <input
-              type="text"
-              value={formData.assignee}
-              onChange={(e) =>
-                setFormData({ ...formData, assignee: e.target.value })
-              }
-              placeholder="担当者名"
-              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg"
-            />
-
-            {/* 操作ボタン */}
-            <div className="flex gap-2 pt-1">
+            {isAdding || editingId ? (
+              <div className="bg-white border border-blue-100 rounded-lg p-3 space-y-2">
+                <input
+                  type="date"
+                  value={formData.entryDate}
+                  onChange={(e) =>
+                    setFormData({ ...formData, entryDate: e.target.value })
+                  }
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                />
+                <input
+                  type="time"
+                  value={formData.entryTime}
+                  onChange={(e) =>
+                    setFormData({ ...formData, entryTime: e.target.value })
+                  }
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                />
+                <textarea
+                  value={formData.content}
+                  onChange={(e) =>
+                    setFormData({ ...formData, content: e.target.value })
+                  }
+                  rows={2}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  placeholder="内容を入力"
+                />
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  placeholder="対象の名称"
+                />
+                <input
+                  type="text"
+                  value={formData.assignee}
+                  onChange={(e) =>
+                    setFormData({ ...formData, assignee: e.target.value })
+                  }
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  placeholder="担当者"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveBusinessLog}
+                    disabled={isPending}
+                    className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
+                  >
+                    {editingId ? "更新" : "保存"}
+                  </button>
+                  <button
+                    onClick={resetBusinessForm}
+                    className="flex-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            ) : (
               <button
-                onClick={handleSave}
-                disabled={isPending}
-                className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors"
+                onClick={() => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    entryDate: new Date().toISOString().split("T")[0],
+                  }));
+                  setIsAdding(true);
+                }}
+                className="w-full px-3 py-2 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded"
               >
-                {isPending ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Check className="w-3.5 h-3.5" />
-                )}
-                {editingId ? "更新" : "保存"}
+                <Plus className="w-3.5 h-3.5 inline mr-1" />
+                追加
               </button>
+            )}
+          </div>
+        )}
+
+        {/* 経費明細タブ */}
+        {activeTab === "expense" && (
+          <div className="space-y-3">
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {expenses.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">経費がありません</p>
+              ) : (
+                expenses.map((exp) => (
+                  <div
+                    key={exp.id}
+                    className="bg-white border border-blue-100 rounded-lg p-2"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-600">
+                        {typeof exp.expenseDate === "string"
+                          ? exp.expenseDate
+                          : new Date(exp.expenseDate).toLocaleDateString("ja-JP")}
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              expenseDate: typeof exp.expenseDate === "string"
+                                ? exp.expenseDate
+                                : new Date(exp.expenseDate).toISOString().split("T")[0],
+                              item1: exp.item1 || "",
+                              item2: exp.item2 || "",
+                              amount: exp.amount?.toString() || "",
+                              remarks: exp.remarks || "",
+                            }));
+                            setEditingId(exp.id);
+                          }}
+                          className="p-1 text-gray-400 hover:text-blue-600"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm("削除しますか？")) {
+                              startTransition(async () => {
+                                try {
+                                  await deleteCaseExpense(applicationId, exp.id);
+                                  setExpenses(expenses.filter((e) => e.id !== exp.id));
+                                } catch (err: any) {
+                                  setError(err.message);
+                                }
+                              });
+                            }
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-600"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-700 space-y-1">
+                      {exp.item1 && <div>{exp.item1}</div>}
+                      {exp.item2 && <div>{exp.item2}</div>}
+                      {exp.amount && <div className="font-semibold">¥{exp.amount.toLocaleString()}</div>}
+                      {exp.remarks && <div className="text-gray-500">{exp.remarks}</div>}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {isAdding || editingId ? (
+              <div className="bg-white border border-blue-100 rounded-lg p-3 space-y-2">
+                <input
+                  type="date"
+                  value={formData.expenseDate}
+                  onChange={(e) =>
+                    setFormData({ ...formData, expenseDate: e.target.value })
+                  }
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                />
+                <input
+                  type="text"
+                  value={formData.item1}
+                  onChange={(e) =>
+                    setFormData({ ...formData, item1: e.target.value })
+                  }
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  placeholder="項目1"
+                />
+                <input
+                  type="text"
+                  value={formData.item2}
+                  onChange={(e) =>
+                    setFormData({ ...formData, item2: e.target.value })
+                  }
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  placeholder="項目2"
+                />
+                <input
+                  type="number"
+                  value={formData.amount}
+                  onChange={(e) =>
+                    setFormData({ ...formData, amount: e.target.value })
+                  }
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  placeholder="金額（円）"
+                />
+                <textarea
+                  value={formData.remarks}
+                  onChange={(e) =>
+                    setFormData({ ...formData, remarks: e.target.value })
+                  }
+                  rows={1}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  placeholder="備考"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveExpense}
+                    disabled={isPending}
+                    className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
+                  >
+                    {editingId ? "更新" : "保存"}
+                  </button>
+                  <button
+                    onClick={resetExpenseForm}
+                    className="flex-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            ) : (
               <button
-                onClick={resetForm}
-                disabled={isPending}
-                className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 rounded-lg transition-colors"
+                onClick={() => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    expenseDate: new Date().toISOString().split("T")[0],
+                  }));
+                  setIsAdding(true);
+                }}
+                className="w-full px-3 py-2 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded"
               >
-                <X className="w-3.5 h-3.5" />
-                キャンセル
+                <Plus className="w-3.5 h-3.5 inline mr-1" />
+                追加
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* 備考・見積額タブ */}
+        {activeTab === "remarks" && (
+          <div className="space-y-3">
+            <div className="bg-white border border-blue-100 rounded-lg p-3 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  備考欄
+                </label>
+                <textarea
+                  value={formData.generalRemarks}
+                  onChange={(e) =>
+                    setFormData({ ...formData, generalRemarks: e.target.value })
+                  }
+                  rows={4}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  placeholder="自由記述"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    見積額（円）
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.estimatedAmount}
+                    onChange={(e) =>
+                      setFormData({ ...formData, estimatedAmount: e.target.value })
+                    }
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    実費（円）
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.actualAmount}
+                    onChange={(e) =>
+                      setFormData({ ...formData, actualAmount: e.target.value })
+                    }
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  消費税率（%）
+                </label>
+                <input
+                  type="number"
+                  value={formData.taxRate}
+                  onChange={(e) =>
+                    setFormData({ ...formData, taxRate: e.target.value })
+                  }
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                  min="0"
+                  max="100"
+                />
+              </div>
+
+              {caseInfo?.actualAmount && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>
+                      実費: ¥{(caseInfo.actualAmount || 0).toLocaleString()}
+                    </div>
+                    <div>
+                      消費税: ¥
+                      {(
+                        (caseInfo.actualAmount || 0) * (caseInfo.taxRate || 0.1)
+                      ).toLocaleString()}
+                    </div>
+                    <div className="font-semibold text-blue-700">
+                      総額: ¥{totalAmount.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={handleSaveRemarks}
+                disabled={isPending}
+                className="w-full px-3 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded"
+              >
+                <Check className="w-3.5 h-3.5 inline mr-1" />
+                保存
               </button>
             </div>
           </div>
-        ) : (
-          <button
-            onClick={startAdd}
-            disabled={isPending || editingId !== null}
-            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 disabled:opacity-50 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            メモを追加
-          </button>
         )}
       </div>
     </div>

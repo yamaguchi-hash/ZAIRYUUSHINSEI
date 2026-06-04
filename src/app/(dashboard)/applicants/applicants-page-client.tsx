@@ -79,6 +79,7 @@ export function ApplicantsPageClient({ applicants }: { applicants: Applicant[] }
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">氏名</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">国籍</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">年齢</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">在留資格</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">在留期限</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">住所</th>
@@ -113,6 +114,9 @@ export function ApplicantsPageClient({ applicants }: { applicants: Applicant[] }
                           </Link>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-600">{a.nationality}</td>
+                        <td className="px-4 py-3 text-xs text-gray-600">
+                          {a.dateOfBirth ? `${calcAge(a.dateOfBirth)}歳` : "—"}
+                        </td>
                         <td className="px-4 py-3 text-xs text-gray-600">
                           {a.currentVisaType ? (VISA_TYPE_LABELS[a.currentVisaType] ?? a.currentVisaType) : "—"}
                         </td>

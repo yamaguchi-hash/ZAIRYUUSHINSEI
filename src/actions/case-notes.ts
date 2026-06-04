@@ -28,21 +28,32 @@ export async function getCaseNotes(applicationId: string) {
     console.log("[getCaseNotes] Application found:", !!app);
     if (!app) throw new Error("申請案件が見つかりません");
 
-    const notes = await db
-      .select()
-      .from(caseNotes)
-      .where(eq(caseNotes.applicationId, applicationId))
-      .orderBy(caseNotes.entryDate);
+    try {
+      const notes = await db
+        .select()
+        .from(caseNotes)
+        .where(eq(caseNotes.applicationId, applicationId))
+        .orderBy(caseNotes.entryDate);
 
-    console.log("[getCaseNotes] Notes retrieved:", notes.length);
-    return notes;
+      console.log("[getCaseNotes] Notes retrieved:", notes.length);
+      return notes;
+    } catch (dbErr: any) {
+      // テーブルが存在しない場合の処理
+      if (dbErr.message?.includes("does not exist") || dbErr.code === "42P01") {
+        console.warn("[getCaseNotes] case_notes table does not exist yet, returning empty array");
+        return [];
+      }
+      throw dbErr;
+    }
   } catch (err: any) {
     console.error("[getCaseNotes] Error:", {
       message: err.message,
       code: err.code,
-      stack: err.stack,
+      details: err.detail,
     });
-    throw err;
+    // エラーをスローせず、空配列を返す（フォールバック）
+    console.warn("[getCaseNotes] Returning empty array due to error");
+    return [];
   }
 }
 
@@ -188,17 +199,26 @@ export async function getCaseExpenses(applicationId: string) {
       .limit(1);
     if (!app) throw new Error("申請案件が見つかりません");
 
-    const expenses = await db
-      .select()
-      .from(caseExpenses)
-      .where(eq(caseExpenses.applicationId, applicationId))
-      .orderBy(caseExpenses.expenseDate);
+    try {
+      const expenses = await db
+        .select()
+        .from(caseExpenses)
+        .where(eq(caseExpenses.applicationId, applicationId))
+        .orderBy(caseExpenses.expenseDate);
 
-    console.log("[getCaseExpenses] Expenses retrieved:", expenses.length);
-    return expenses;
+      console.log("[getCaseExpenses] Expenses retrieved:", expenses.length);
+      return expenses;
+    } catch (dbErr: any) {
+      if (dbErr.message?.includes("does not exist") || dbErr.code === "42P01") {
+        console.warn("[getCaseExpenses] case_expenses table does not exist yet, returning empty array");
+        return [];
+      }
+      throw dbErr;
+    }
   } catch (err: any) {
     console.error("[getCaseExpenses] Error:", err.message);
-    throw err;
+    console.warn("[getCaseExpenses] Returning empty array due to error");
+    return [];
   }
 }
 
@@ -332,20 +352,29 @@ export async function getCaseInformation(applicationId: string) {
       .limit(1);
     if (!app) throw new Error("申請案件が見つかりません");
 
-    console.log("[getCaseInformation] Querying case information...");
-    const [info] = await db
-      .select()
-      .from(caseInformation)
-      .where(eq(caseInformation.applicationId, applicationId));
+    try {
+      console.log("[getCaseInformation] Querying case information...");
+      const [info] = await db
+        .select()
+        .from(caseInformation)
+        .where(eq(caseInformation.applicationId, applicationId));
 
-    console.log("[getCaseInformation] Result:", !!info);
-    return info || null;
+      console.log("[getCaseInformation] Result:", !!info);
+      return info || null;
+    } catch (dbErr: any) {
+      if (dbErr.message?.includes("does not exist") || dbErr.code === "42P01") {
+        console.warn("[getCaseInformation] case_information table does not exist yet, returning null");
+        return null;
+      }
+      throw dbErr;
+    }
   } catch (err: any) {
     console.error("[getCaseInformation] Error:", {
       message: err.message,
       code: err.code,
     });
-    throw err;
+    console.warn("[getCaseInformation] Returning null due to error");
+    return null;
   }
 }
 

@@ -788,6 +788,19 @@ export function DocumentChecklist({
                         </button>
                       </div>
                     )}
+
+                    {/* 削除ボタン */}
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`「${item.documentName}」をチェックリストから削除しますか？`)) return;
+                        await removeDocumentFromChecklist(item.id);
+                        setLocalChecklist(prev => prev.filter(i => i.id !== item.id));
+                      }}
+                      className="flex-shrink-0 p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      title="チェックリストから削除"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 )}
 

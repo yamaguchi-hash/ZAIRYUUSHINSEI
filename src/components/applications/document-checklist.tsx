@@ -719,7 +719,7 @@ export function DocumentChecklist({
                           ℹ {item.masterDescription}
                         </p>
                       )}
-                      {/* 備考（専門家インライン編集） */}
+                      {/* 備考欄（全ユーザー編集可能） */}
                       {editingNotesId === item.id ? (
                         <div className="flex items-center gap-1 mt-1">
                           <input
@@ -730,7 +730,7 @@ export function DocumentChecklist({
                               if (e.key === "Enter") saveNotes(item.id);
                               if (e.key === "Escape") cancelEditNotes();
                             }}
-                            placeholder="例：結婚証明書、出生証明書 など"
+                            placeholder="備考を入力（PDFにも反映されます）"
                             autoFocus
                             className="flex-1 text-xs border border-orange-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50"
                           />
@@ -742,21 +742,18 @@ export function DocumentChecklist({
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1 mt-0.5 group/notes">
+                        <div className="flex items-center gap-1 mt-0.5 group/notes cursor-pointer" onClick={() => startEditNotes(item)}>
                           {item.expertNotes ? (
                             <p className="text-xs text-orange-600">📝 {item.expertNotes}</p>
                           ) : (
-                            <p className="text-xs text-gray-300 hidden group-hover/notes:block">備考を追加...</p>
+                            <p className="text-xs text-gray-300 group-hover/notes:text-gray-400">+ 備考を追加</p>
                           )}
-                          {isExpert && (
-                            <button
-                              onClick={() => startEditNotes(item)}
-                              className="p-0.5 text-gray-300 hover:text-orange-400 rounded opacity-0 group-hover/notes:opacity-100 transition-opacity"
-                              title="備考を編集"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                          )}
+                          <button
+                            className="p-0.5 text-gray-300 hover:text-orange-400 rounded opacity-0 group-hover/notes:opacity-100 transition-opacity"
+                            title="備考を編集"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
                         </div>
                       )}
                     </div>

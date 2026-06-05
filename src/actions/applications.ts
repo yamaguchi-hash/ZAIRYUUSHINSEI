@@ -203,8 +203,7 @@ export async function createApplication(data: {
 
     const caseNumber = `APP-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-    // 基本情報入力＋必須書類リスト自動生成が完了するので、
-    // 初期ステータスは「③書類収集中」(documents_collecting) から開始
+    // 初期ステータスは「①基本設定」(draft) から開始
     const [newApp] = await db
       .insert(applications)
       .values({
@@ -214,7 +213,7 @@ export async function createApplication(data: {
         applicationType: data.applicationType as any,
         visaType: data.visaType as any,
         caseNumber,
-        status: "documents_collecting" as any,
+        status: "draft" as any,
       })
       .returning();
 
@@ -259,7 +258,7 @@ export async function createApplication(data: {
       action: "create",
       entityType: "application",
       entityId: newApp.id,
-      newValue: JSON.stringify({ caseNumber, status: "documents_collecting" }),
+      newValue: JSON.stringify({ caseNumber, status: "draft" }),
     });
 
     revalidatePath("/applications");

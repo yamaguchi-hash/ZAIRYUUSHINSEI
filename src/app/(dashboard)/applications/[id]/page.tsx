@@ -43,6 +43,8 @@ import { CaseNotesPanel } from "@/components/applications/case-notes-panel";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { NoufushoPanel } from "@/components/applications/noufusho-panel";
 import { AzukariPanel } from "@/components/applications/azukari-panel";
+import { db, applicantDocuments } from "@/lib/db";
+import { eq } from "drizzle-orm";
 
 // 8ステップのワークフロー
 const WORKFLOW_STEPS = [
@@ -122,6 +124,24 @@ export default async function ApplicationDetailPage({
     console.error("[ApplicationDetailPage] getDocumentRequirements failed:", e);
   }
   const issues = checkResult?.issues ?? [];
+
+  // 申請人マスターのアップロード書類を取得（預証用）
+  let azukariImages: { residenceCardFrontUrl?: string; residenceCardBackUrl?: string; passportUrl?: string } = {};
+  try {
+    const appDocs = await db
+      .select({ documentType: applicantDocuments.documentType, fileUrl: applicantDocuments.fileUrl })
+      .from(applicantDocuments)
+      .where(eq(applicantDocuments.applicantId, application.applicantId));
+    for (const doc of appDocs) {
+      if (doc.documentType === "residence_card_front") azukariImages.residenceCardFrontUrl = doc.fileUrl;
+      if (doc.documentType === "residence_card_back") azukariImages.residenceCardBackUrl = doc.fileUrl;
+      if (doc.documentType === "passport_data_page" || doc.documentType === "passport_front") {
+        azukariImages.passportUrl = doc.fileUrl;
+      }
+    }
+  } catch (e) {
+    console.error("[ApplicationDetailPage] applicantDocuments fetch failed:", e);
+  }
 
   const currentStepIndex = WORKFLOW_STEPS.findIndex((s) => s.key === application.status);
 
@@ -489,6 +509,8 @@ export default async function ApplicationDetailPage({
                 ? `${applicant.familyNameJa} ${applicant.givenNameJa}`
                 : `${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim()
             }
+            existingImages={azukariImages}
+            submissionInfo={(application.draftData as any)?._submission}
             savedData={(application.draftData as any)?._azukari}
           />
         </CollapsibleSection>

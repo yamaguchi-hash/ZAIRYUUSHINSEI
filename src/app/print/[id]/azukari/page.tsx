@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { db, applications, applicantMaster } from "@/lib/db";
+import { db, applications, applicantMaster, applicantDocuments } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { APPLICATION_TYPE_LABELS } from "@/lib/utils";
@@ -43,14 +43,32 @@ export default async function AzukariPrintPage({
 
   const draftData = (application.draftData as Record<string, any>) ?? {};
   const azukari = draftData._azukari ?? {};
+  const submission = draftData._submission ?? {};
 
-  const cardFrontUrl = azukari.residenceCardFrontUrl ?? "";
-  const cardBackUrl = azukari.residenceCardBackUrl ?? "";
-  const passportUrl = azukari.passportUrl ?? "";
+  // 申請人マスターのアップロード書類から画像URLを取得
+  let cardFrontUrl = "";
+  let cardBackUrl = "";
+  let passportUrl = "";
+  try {
+    const appDocs = await db
+      .select({ documentType: applicantDocuments.documentType, fileUrl: applicantDocuments.fileUrl })
+      .from(applicantDocuments)
+      .where(eq(applicantDocuments.applicantId, application.applicantId));
+    for (const doc of appDocs) {
+      if (doc.documentType === "residence_card_front") cardFrontUrl = doc.fileUrl;
+      if (doc.documentType === "residence_card_back") cardBackUrl = doc.fileUrl;
+      if (doc.documentType === "passport_data_page" || doc.documentType === "passport_front") {
+        passportUrl = doc.fileUrl;
+      }
+    }
+  } catch (e) {
+    console.error("[AzukariPrintPage] applicantDocuments fetch failed:", e);
+  }
+
   const includePassport = azukari.includePassport ?? false;
-  const applicationDate = azukari.applicationDate ?? "";
-  const applicationNumber = azukari.applicationNumber
-    ?? draftData._submission?.applicationNumber
+  // 申請日・申請番号は⑦の記録から自動引用
+  const applicationDate = submission.applicationDate ?? "";
+  const applicationNumber = submission.applicationNumber
     ?? application.caseNumber
     ?? "";
 

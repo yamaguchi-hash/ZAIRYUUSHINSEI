@@ -2290,16 +2290,11 @@ export async function completeWithPermit(
   }
 }
 
-// ─── 預証データ保存 ──────────────────────────────────────────────────────────
+// ─── 預証データ保存（パスポート含めるトグルのみ保存） ─────────────────────────
 export async function saveAzukariData(
   applicationId: string,
   azukariData: {
-    residenceCardFrontUrl?: string;
-    residenceCardBackUrl?: string;
-    passportUrl?: string;
     includePassport?: boolean;
-    applicationDate?: string;
-    applicationNumber?: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {

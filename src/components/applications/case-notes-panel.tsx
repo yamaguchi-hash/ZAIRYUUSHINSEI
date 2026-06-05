@@ -60,7 +60,6 @@ interface CaseInfo {
   id: string;
   estimatedAmount: number | null;
   actualAmount: number | null;
-  taxRate: number;
 }
 
 interface Props {
@@ -97,7 +96,6 @@ export function CaseNotesPanel({ applicationId }: Props) {
     remarks: "",
     estimatedAmount: "",
     actualAmount: "",
-    taxRate: "10",
   });
 
   // データ読み込み
@@ -145,7 +143,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
           ...prev,
           estimatedAmount: infoData.estimatedAmount?.toString() || "",
           actualAmount: infoData.actualAmount?.toString() || "",
-          taxRate: infoData.taxRate ? (infoData.taxRate * 100).toString() : "10",
+          // taxRate removed
         }));
       }
     } catch (err: any) {
@@ -329,7 +327,6 @@ export function CaseNotesPanel({ applicationId }: Props) {
           actualAmount: formData.actualAmount
             ? parseFloat(formData.actualAmount)
             : undefined,
-          taxRate: parseInt(formData.taxRate) / 100,
         });
         if (updated) {
           setCaseInfo(updated);
@@ -351,13 +348,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
   const actualAmountValue = formData.actualAmount && !isNaN(parseFloat(formData.actualAmount))
     ? parseFloat(formData.actualAmount)
     : 0;
-  const taxRateNum = formData.taxRate && !isNaN(parseInt(formData.taxRate))
-    ? parseInt(formData.taxRate)
-    : 10;
-  const taxRateValue = taxRateNum / 100;
-  const totalAmount = actualAmountValue > 0 && taxRateValue >= 0
-    ? Number((actualAmountValue * (1 + taxRateValue)).toFixed(0))
-    : 0;
+  const totalAmount = estimatedAmountValue + actualAmountValue;
 
   if (isLoading) {
     return (
@@ -878,23 +869,6 @@ export function CaseNotesPanel({ applicationId }: Props) {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  消費税率（%）
-                </label>
-                <input
-                  type="number"
-                  value={formData.taxRate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, taxRate: e.target.value })
-                  }
-                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
-                  min="0"
-                  max="100"
-                  placeholder="10"
-                />
-              </div>
-
               {/* 計算結果 */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
                 <h4 className="text-xs font-semibold text-blue-900">計算結果</h4>
@@ -910,10 +884,6 @@ export function CaseNotesPanel({ applicationId }: Props) {
                     <span className="font-mono">
                       ¥{(formData.actualAmount ? parseFloat(formData.actualAmount) : 0).toLocaleString()}
                     </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>消費税率:</span>
-                    <span className="font-mono">{formData.taxRate}%</span>
                   </div>
                   <div className="border-t border-blue-200 pt-1 mt-1 flex justify-between font-semibold text-blue-900">
                     <span>総額:</span>

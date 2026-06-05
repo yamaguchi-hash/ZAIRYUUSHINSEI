@@ -217,39 +217,7 @@ export async function createApplication(data: {
       })
       .returning();
 
-    // 必須書類（isAlwaysRequired=true）を自動追加
-    const visaTypeStr = String(data.visaType);
-    const appTypeStr  = String(data.applicationType);
-    const requiredDocs = await db
-      .select()
-      .from(documentRequirementMaster)
-      .where(
-        and(
-          or(
-            eq(documentRequirementMaster.visaType, visaTypeStr),
-            eq(documentRequirementMaster.visaType, "common")
-          ),
-          or(
-            eq(documentRequirementMaster.applicationType, appTypeStr),
-            eq(documentRequirementMaster.applicationType, "all")
-          ),
-          eq(documentRequirementMaster.isAlwaysRequired, true),
-          eq(documentRequirementMaster.isActive, true)
-        )
-      )
-      .orderBy(documentRequirementMaster.sortOrder);
-
-    if (requiredDocs.length > 0) {
-      await db.insert(applicationDocumentChecklist).values(
-        requiredDocs.map((doc) => ({
-          applicationId: newApp.id,
-          documentRequirementId: doc.id,
-          documentName: doc.documentName,
-          isRequiredByExpert: true,
-          status: "not_submitted" as const,
-        }))
-      );
-    }
+    // チェックリストは空の状態でスタート（書類選択画面から追加する）
 
     await db.insert(auditLog).values({
       tenantId,

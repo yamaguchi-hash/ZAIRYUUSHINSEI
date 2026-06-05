@@ -5,47 +5,8 @@ import { eq, and } from "drizzle-orm";
 import path from "path";
 import ExcelJS from "exceljs";
 
-// ── 金額を漢数字に変換 ──────────────────────────────────────────────────────────
-function amountToKanji(amount: number): string {
-  if (amount === 0) return "零";
-
-  const kanjiNums = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
-  const smallUnits = ["", "十", "百", "千"];
-  const largeUnits = ["", "万", "億"];
-
-  // 4桁以下のブロックを漢字に変換
-  function blockToKanji(n: number): string {
-    if (n === 0) return "";
-    let result = "";
-    const digits = String(n).padStart(4, "0").split("").map(Number);
-    for (let i = 0; i < 4; i++) {
-      const d = digits[i];
-      const unitIndex = 3 - i; // 千=3, 百=2, 十=1, 一=0
-      if (d === 0) continue;
-      if (d === 1 && unitIndex > 0) {
-        // 十、百、千は「一」を省略
-        result += smallUnits[unitIndex];
-      } else {
-        result += kanjiNums[d] + smallUnits[unitIndex];
-      }
-    }
-    return result;
-  }
-
-  let result = "";
-  // 億、万、一 のブロックに分解
-  const oku = Math.floor(amount / 100000000);
-  const man = Math.floor((amount % 100000000) / 10000);
-  const ichi = amount % 10000;
-
-  if (oku > 0) result += blockToKanji(oku) + "億";
-  if (man > 0) result += blockToKanji(man) + "万";
-  if (ichi > 0) result += blockToKanji(ichi);
-
-  return result;
-}
-
-// ── 手数料種別に対応する行番号（テンプレートの "溶け込み" シート） ──────────────
+// ── 手数料種別 → ○を付ける番号セルの行 ──────────────────────────────────────
+// テンプレート「溶け込み」シートの I列(column 9)に番号がある行
 const FEE_TYPE_ROWS: Record<number, number> = {
   1: 32, // 在留資格の変更許可
   2: 35, // 在留期間の更新許可
@@ -69,7 +30,6 @@ export async function POST(
     return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
   }
 
-  // 申請案件の存在確認
   const [app] = await db
     .select()
     .from(applications)
@@ -79,7 +39,6 @@ export async function POST(
     return NextResponse.json({ error: "案件が見つかりません" }, { status: 404 });
   }
 
-  // リクエストボディ解析
   const body = await req.json().catch(() => ({}));
   const {
     feeType,
@@ -120,33 +79,19 @@ export async function POST(
     );
   }
 
-  // ── 日付を記入（今日の日付） ──────────────────────────────────────────────
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth() + 1;
-  const day = today.getDate();
-
-  // Z9:AC9 (merged) - 年
-  ws.getCell("Z9").value = year;
-  // AF9:AG9 (merged) - 月
-  ws.getCell("AF9").value = month;
-  // AJ9:AK9 (merged) - 日
-  ws.getCell("AJ9").value = day;
-
-  // ── 申請番号 ──────────────────────────────────────────────────────────────
+  // ── 申請番号を記入（AA4:AC4 merged） ──────────────────────────────────
   if (applicationNumber) {
     ws.getCell("AA4").value = applicationNumber;
   }
 
-  // ── 金額（漢字）を T22:Y22 に記入 ────────────────────────────────────────
-  const kanjiAmount = amountToKanji(amount);
-  ws.getCell("T22").value = kanjiAmount;
-
-  // ── 金額（数字）を AF22:AJ22 に記入 ──────────────────────────────────────
+  // ── 金額を記入 ─────────────────────────────────────────────────────────
+  // T22:Y22 (merged) - 金額数値
+  ws.getCell("T22").value = amount.toLocaleString("ja-JP");
+  // AF22:AJ22 (merged) - ￥の後の金額
   ws.getCell("AF22").value = amount.toLocaleString("ja-JP");
 
-  // ── 手数料種別を○で選択 ──────────────────────────────────────────────────
-  // 選択された種別の行の H 列に "○" を記入
+  // ── 手数料種別を○で選択 ───────────────────────────────────────────────
+  // 選択された種別の行の H 列 (column 8) に "○"
   const targetRow = FEE_TYPE_ROWS[feeType];
   const markerCell = ws.getCell(targetRow, 8); // column H
   markerCell.value = "○";
@@ -160,10 +105,15 @@ export async function POST(
     vertical: "middle",
   };
 
-  // ── 納付者氏名 AD61:AM61 ────────────────────────────────────────────────
+  // ── 納付者氏名 AD61:AM61 (merged) ─────────────────────────────────────
   ws.getCell("AD61").value = payerName;
+  ws.getCell("AD61").font = {
+    name: "ＭＳ Ｐ明朝",
+    size: 12,
+    bold: true,
+  };
 
-  // ── Excel をバッファに書き出し ────────────────────────────────────────────
+  // ── Excel をバッファに書き出し ──────────────────────────────────────────
   const buffer = await wb.xlsx.writeBuffer();
   const uint8 = new Uint8Array(buffer as ArrayBuffer);
 

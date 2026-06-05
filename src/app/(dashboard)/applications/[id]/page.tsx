@@ -530,6 +530,7 @@ export default async function ApplicationDetailPage({
                 ? `${applicant.familyNameJa} ${applicant.givenNameJa}`
                 : `${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim()
             }
+            submissionApplicationNumber={(application.draftData as any)?._submission?.applicationNumber}
           />
         </CollapsibleSection>
       )}

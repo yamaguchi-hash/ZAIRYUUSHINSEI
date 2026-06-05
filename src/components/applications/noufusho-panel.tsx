@@ -19,14 +19,16 @@ const FEE_TYPES = [
 interface NoufushoPanelProps {
   applicationId: string;
   applicantName?: string;
+  /** ⑦申請日・申請番号の記録から引用 */
+  submissionApplicationNumber?: string;
 }
 
-export function NoufushoPanel({ applicationId, applicantName }: NoufushoPanelProps) {
+export function NoufushoPanel({ applicationId, applicantName, submissionApplicationNumber }: NoufushoPanelProps) {
   const [feeType, setFeeType] = useState<number>(1);
   const [amount, setAmount] = useState<number>(4000);
   const [amountOverride, setAmountOverride] = useState<string>("");
   const [payerName, setPayerName] = useState(applicantName ?? "");
-  const [applicationNumber, setApplicationNumber] = useState("");
+  const [applicationNumber, setApplicationNumber] = useState(submissionApplicationNumber ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 

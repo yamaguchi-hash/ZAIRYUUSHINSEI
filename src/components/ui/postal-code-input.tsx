@@ -248,20 +248,22 @@ export function AddressSplitInput({
   const [reverseLoading, setReverseLoading] = useState(false);
   const [zipError, setZipError] = useState("");
 
-  // addressLine を town + block に分割
+  // addressLine を town(町名) + block(丁目以降) に分割
   const { town, block } = extractTown(value.addressLine);
+
+  // フィールド1（都道府県・市区町村・町名）の表示値
+  const field1Value = `${value.prefecture}${value.city}${town}`;
 
   function cleanZip(v: string) {
     return v.replace(/[-ー−\s]/g, "");
   }
 
-  /** 郵便番号 → 都道府県・市区町村・町村を自動入力 */
+  /** 郵便番号 → 都道府県・市区町村・町名を自動入力 */
   async function zipToAddress(zipValue: string) {
     setZipLoading(true);
     setZipError("");
     const result = await fetchAddressFromZip(zipValue);
     if (result) {
-      // city + town を結合して city に、town は別に設定
       onChange({ prefecture: result.prefecture, city: result.city, addressLine: result.town + block });
     } else {
       setZipError("該当する住所が見つかりませんでした");
@@ -291,14 +293,6 @@ export function AddressSplitInput({
       setZipError("郵便番号が見つかりませんでした（都道府県・市区町村まで入力後に検索してください）");
     }
     setReverseLoading(false);
-  }
-
-  function handleTownChange(newTown: string) {
-    onChange({ addressLine: newTown + block });
-  }
-
-  function handleBlockChange(newBlock: string) {
-    onChange({ addressLine: town + newBlock });
   }
 
   return (
@@ -349,24 +343,24 @@ export function AddressSplitInput({
         </label>
         <input
           type="text"
-          value={`${value.prefecture}${value.city}${town}`}
+          value={field1Value}
           onChange={(e) => {
             const fullAddr = e.target.value;
-            // 都道府県を判定して分割
             const prefMatch = PREFECTURES.find(p => fullAddr.startsWith(p));
             if (prefMatch) {
               const afterPref = fullAddr.substring(prefMatch.length);
-              // 市区町村を判定（市・区・町・村・郡で終わる部分）
               const cityMatch = afterPref.match(/^(.+?[市区町村郡])/);
               if (cityMatch) {
                 const cityVal = cityMatch[1];
                 const townVal = afterPref.substring(cityVal.length);
                 onChange({ prefecture: prefMatch, city: cityVal, addressLine: townVal + block });
               } else {
+                // 市区町村をまだ入力中 → city に入れ、addressLine は丁目以降のみ保持
                 onChange({ prefecture: prefMatch, city: afterPref, addressLine: block });
               }
             } else {
-              onChange({ prefecture: "", city: "", addressLine: fullAddr + block });
+              // 都道府県なし → 全体を prefecture に仮置き、addressLine は丁目以降のみ保持
+              onChange({ prefecture: fullAddr, city: "", addressLine: block });
             }
             setZipError("");
           }}
@@ -382,7 +376,8 @@ export function AddressSplitInput({
           type="text"
           value={block}
           onChange={(e) => {
-            handleBlockChange(e.target.value);
+            // 丁目・番地の変更 → addressLine = 現在のtown + 新しいblock
+            onChange({ addressLine: town + e.target.value });
             setZipError("");
           }}
           placeholder="1丁目319番地6"

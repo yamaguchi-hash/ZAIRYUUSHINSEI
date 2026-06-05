@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { db, applications, applicantMaster, organizationMaster, applicationDocumentChecklist } from "@/lib/db";
+import { db, applications, applicantMaster, organizationMaster, applicationDocumentChecklist, documentRequirementMaster } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
@@ -40,12 +40,36 @@ export default async function ChecklistPrintPage({
         .limit(1).then(r => r[0])
     : null;
 
-  const checklist = await db
-    .select()
+  // チェックリストを masterSortOrder → createdAt の順でソート（画面と同じ順番）
+  const rawChecklist = await db
+    .select({
+      id: applicationDocumentChecklist.id,
+      documentName: applicationDocumentChecklist.documentName,
+      documentRequirementId: applicationDocumentChecklist.documentRequirementId,
+      isRequiredByExpert: applicationDocumentChecklist.isRequiredByExpert,
+      status: applicationDocumentChecklist.status,
+      expertNotes: applicationDocumentChecklist.expertNotes,
+      createdAt: applicationDocumentChecklist.createdAt,
+      masterSortOrder: documentRequirementMaster.sortOrder,
+    })
     .from(applicationDocumentChecklist)
+    .leftJoin(
+      documentRequirementMaster,
+      eq(applicationDocumentChecklist.documentRequirementId, documentRequirementMaster.id)
+    )
     .where(eq(applicationDocumentChecklist.applicationId, id));
 
-  const requiredItems = checklist.filter(c => c.isRequiredByExpert);
+  // masterSortOrder → createdAt でソート
+  rawChecklist.sort((a, b) => {
+    const sortA = a.masterSortOrder ?? 9999;
+    const sortB = b.masterSortOrder ?? 9999;
+    if (sortA !== sortB) return sortA - sortB;
+    const ca = a.createdAt ? (a.createdAt instanceof Date ? a.createdAt.toISOString() : String(a.createdAt)) : "";
+    const cb = b.createdAt ? (b.createdAt instanceof Date ? b.createdAt.toISOString() : String(b.createdAt)) : "";
+    return ca.localeCompare(cb);
+  });
+
+  const requiredItems = rawChecklist.filter(c => c.isRequiredByExpert);
 
   // 写真を含む書類は番号なし
   let docNum = 0;

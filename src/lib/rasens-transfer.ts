@@ -124,9 +124,6 @@ export function buildRasensFields(
     { label: "国籍・地域",        value: nationality },
     { label: "生年月日",          value: formatDate(dob),    note: "YYYYMMDD" },
     { label: "氏名（ローマ字）",  value: `${familyNameEn}　${givenNameEn}`.trim(), note: "姓　名" },
-    ...(familyNameJa || givenNameJa
-      ? [{ label: "氏名（漢字等）", value: `${familyNameJa}　${givenNameJa}`.trim() }]
-      : []),
     { label: "性別",              value: sex },
     { label: "配偶者の有無",      value: f.maritalStatus || "" },
     { label: "職業",              value: occupation },
@@ -170,10 +167,6 @@ export function buildRasensFields(
     ...((f.supporterNameEn || f.supporterFamilyNameEn) ? [
       { label: "扶養者　氏名（ローマ字）",
         value: f.supporterNameEn || `${f.supporterFamilyNameEn ?? ""}　${f.supporterGivenNameEn ?? ""}`.trim() },
-      ...(f.supporterFamilyNameJa
-        ? [{ label: "扶養者　氏名（漢字等）",
-             value: `${f.supporterFamilyNameJa ?? ""}　${f.supporterGivenNameJa ?? ""}`.trim() }]
-        : []),
       { label: "扶養者　生年月日",        value: formatDate(f.supporterDob || ""),  note: "YYYYMMDD" },
       { label: "扶養者　国籍・地域",      value: f.supporterNationality || "" },
       { label: "扶養者　在留資格",        value: f.supporterStatusOfResidence || "" },

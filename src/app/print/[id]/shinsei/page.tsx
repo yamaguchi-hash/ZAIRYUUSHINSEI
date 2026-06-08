@@ -166,10 +166,6 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 <td colSpan={3}>{fmt(form.familyNameEn)}　{fmt(form.givenNameEn)}</td>
               </tr>
               <tr>
-                <td className="lbl">　 氏名（漢字・カナ）</td>
-                <td colSpan={3}>{(form.familyNameJa || form.givenNameJa) ? `${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}` : "　"}</td>
-              </tr>
-              <tr>
                 <td className="lbl">4. 性別</td><td>{fmtSex(form.sex)}</td>
                 {hasBirthplace
                   ? <><td className="lbl">5. 出生地</td><td>{fmt(form.placeOfBirth)}</td></>
@@ -442,9 +438,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 <tbody>
                   <tr>
                     <td className="lbl">氏名（ローマ字）</td>
-                    <td>{fmt(form.spouseFamilyNameEn)}　{fmt(form.spouseGivenNameEn)}</td>
-                    <td className="lbl">氏名（漢字）</td>
-                    <td>{fmt(form.spouseFamilyNameJa)}　{fmt(form.spouseGivenNameJa)}</td>
+                    <td colSpan={3}>{fmt(form.spouseFamilyNameEn)}　{fmt(form.spouseGivenNameEn)}</td>
                   </tr>
                   <tr>
                     <td className="lbl">生年月日</td><td>{fmtDate(form.spouseDob)}</td>
@@ -633,11 +627,9 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   <tr>
                     <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "50px" }}>
                       <div style={{ fontSize: "10.5px", fontWeight: "bold" }}>申請人（法定代理人）の署名</div>
-                      {(form.familyNameJa || form.givenNameJa || form.familyNameEn || form.givenNameEn) && (
+                      {(form.familyNameEn || form.givenNameEn) && (
                         <div style={{ fontSize: "9.5px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
-                          氏名：{form.familyNameJa
-                            ? `${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}`
-                            : `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}`}
+                          氏名：{fmt(form.familyNameEn)} {fmt(form.givenNameEn)}
                         </div>
                       )}
                     </td>
@@ -660,7 +652,6 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     <td className="lbl" style={{width:'30%'}}>(1) 氏名</td>
                     <td colSpan={3}>
                       {form.familyNameEn ? `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}` : '　'}
-                      {(form.familyNameJa || form.givenNameJa) ? `　${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}` : ''}
                     </td>
                   </tr>
                   <tr>
@@ -677,9 +668,6 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     <td className="lbl" style={{width:'30%'}}>(1) 氏名（ローマ字）</td>
                     <td colSpan={3}>
                       {fmt(form.supporterNameEn || [form.supporterFamilyNameEn, form.supporterGivenNameEn].filter(Boolean).join(' '))}
-                      {(form.supporterFamilyNameJa || form.supporterGivenNameJa)
-                        ? `　（${fmt(form.supporterFamilyNameJa)}　${fmt(form.supporterGivenNameJa)}）`
-                        : ''}
                     </td>
                   </tr>
                   <tr>
@@ -753,11 +741,9 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   <tr>
                     <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "50px" }}>
                       <div style={{ fontSize: "10.5px", fontWeight: "bold" }}>扶養者の署名</div>
-                      {(form.supporterFamilyNameJa || form.supporterGivenNameJa || form.supporterNameEn || form.supporterFamilyNameEn || form.supporterGivenNameEn) && (
+                      {(form.supporterNameEn || form.supporterFamilyNameEn || form.supporterGivenNameEn) && (
                         <div style={{ fontSize: "9.5px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
-                          氏名：{form.supporterFamilyNameJa
-                            ? `${fmt(form.supporterFamilyNameJa)}　${fmt(form.supporterGivenNameJa)}`
-                            : fmt(form.supporterNameEn || [form.supporterFamilyNameEn, form.supporterGivenNameEn].filter(Boolean).join(' '))}
+                          氏名：{fmt(form.supporterNameEn || [form.supporterFamilyNameEn, form.supporterGivenNameEn].filter(Boolean).join(' '))}
                         </div>
                       )}
                     </td>
@@ -899,7 +885,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
 
               <div className="section3">1. 雇用する外国人の氏名</div>
               <table><tbody>
-                <tr><td colSpan={4}>{form.familyNameEn} {form.givenNameEn}{(form.familyNameJa || form.givenNameJa) ? `　${form.familyNameJa}　${form.givenNameJa}` : ''}</td></tr>
+                <tr><td colSpan={4}>{form.familyNameEn} {form.givenNameEn}</td></tr>
               </tbody></table>
 
               <div className="section3">2. 特定技能雇用契約</div>
@@ -962,11 +948,9 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   <tr>
                     <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "50px" }}>
                       <div style={{ fontSize: "10.5px", fontWeight: "bold" }}>申請人（法定代理人）の署名</div>
-                      {(form.familyNameJa || form.givenNameJa || form.familyNameEn || form.givenNameEn) && (
+                      {(form.familyNameEn || form.givenNameEn) && (
                         <div style={{ fontSize: "9.5px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
-                          氏名：{form.familyNameJa
-                            ? `${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}`
-                            : `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}`}
+                          氏名：{fmt(form.familyNameEn)} {fmt(form.givenNameEn)}
                         </div>
                       )}
                     </td>
@@ -1389,11 +1373,9 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   <tr>
                     <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "50px" }}>
                       <div style={{ fontSize: "10.5px", fontWeight: "bold" }}>申請人（法定代理人）の署名</div>
-                      {(form.familyNameJa || form.givenNameJa || form.familyNameEn || form.givenNameEn) && (
+                      {(form.familyNameEn || form.givenNameEn) && (
                         <div style={{ fontSize: "9.5px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
-                          氏名：{form.familyNameJa
-                            ? `${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}`
-                            : `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}`}
+                          氏名：{fmt(form.familyNameEn)} {fmt(form.givenNameEn)}
                         </div>
                       )}
                     </td>
@@ -1442,11 +1424,9 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 <tr>
                   <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "50px" }}>
                     <div style={{ fontSize: "10.5px", fontWeight: "bold" }}>申請人（法定代理人）の署名</div>
-                    {(form.familyNameJa || form.givenNameJa || form.familyNameEn || form.givenNameEn) && (
+                    {(form.familyNameEn || form.givenNameEn) && (
                       <div style={{ fontSize: "9.5px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
-                        氏名：{form.familyNameJa
-                          ? `${fmt(form.familyNameJa)}　${fmt(form.givenNameJa)}`
-                          : `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}`}
+                        氏名：{fmt(form.familyNameEn)} {fmt(form.givenNameEn)}
                       </div>
                     )}
                   </td>

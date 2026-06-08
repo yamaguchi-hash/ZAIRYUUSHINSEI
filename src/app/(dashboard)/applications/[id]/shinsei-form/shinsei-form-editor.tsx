@@ -432,17 +432,6 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   placeholder="YAMADA TARO"
                 />
               </Field>
-              <Field label="3. 氏名（漢字）">
-                <input className={inputCls}
-                  value={`${form.familyNameJa} ${form.givenNameJa}`.trim()}
-                  onChange={e => {
-                    const parts = e.target.value.split(/\s+/);
-                    set("familyNameJa", parts[0] || "");
-                    set("givenNameJa", parts.slice(1).join(" ") || "");
-                  }}
-                  placeholder="山田 太郎"
-                />
-              </Field>
               <Field label="4. 性別" required>
                 <RadioGroup value={form.sex} onChange={v => set("sex", v)} options={["男", "女"]} />
               </Field>
@@ -920,17 +909,6 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   <Field label="氏名 Given Name（ローマ字）">
                     <input className={inputCls} value={form.spouseGivenNameEn} onChange={e => set("spouseGivenNameEn", e.target.value)} placeholder="HANAKO" />
                   </Field>
-                  <Field label="氏名（漢字）">
-                    <input className={inputCls}
-                      value={[form.spouseFamilyNameJa, form.spouseGivenNameJa].filter(Boolean).join(' ')}
-                      onChange={e => {
-                        const parts = e.target.value.split(/\s+/);
-                        set("spouseFamilyNameJa", parts[0] || "");
-                        set("spouseGivenNameJa", parts.slice(1).join(" ") || "");
-                      }}
-                      placeholder="山田 花子"
-                    />
-                  </Field>
                   <Field label="生年月日">
                     <input className={inputCls} type="date" value={form.spouseDob} onChange={e => set("spouseDob", e.target.value)} />
                   </Field>
@@ -1121,17 +1099,6 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="(1) 氏名（ローマ字）">
                     <input className={inputCls} value={form.supporterNameEn || [form.supporterFamilyNameEn, form.supporterGivenNameEn].filter(Boolean).join(' ')} onChange={e => set("supporterNameEn", e.target.value)} placeholder="例: YAMADA Taro" />
-                  </Field>
-                  <Field label="    氏名（漢字）">
-                    <input className={inputCls}
-                      value={[form.supporterFamilyNameJa, form.supporterGivenNameJa].filter(Boolean).join(' ')}
-                      onChange={e => {
-                        const parts = e.target.value.split(/\s+/);
-                        set("supporterFamilyNameJa", parts[0] || "");
-                        set("supporterGivenNameJa", parts.slice(1).join(" ") || "");
-                      }}
-                      placeholder="例: ファム ティ トム"
-                    />
                   </Field>
                   <Field label="(2) 生年月日">
                     <input className={inputCls} type="date" value={form.supporterDob} onChange={e => set("supporterDob", e.target.value)} />
@@ -1721,7 +1688,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <p className="text-xs font-semibold text-gray-600">1. 雇用している外国人の氏名</p>
-                      <p className="text-sm text-gray-700">{form.familyNameEn} {form.givenNameEn}（{form.familyNameJa} {form.givenNameJa}）</p>
+                      <p className="text-sm text-gray-700">{form.familyNameEn} {form.givenNameEn}</p>
                     </CardContent>
                   </Card>
 

@@ -287,7 +287,6 @@ ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[o
   "partTimeWorkExistsR": "資格外活動の有無（有 または 無）",
 
   "supporterNameEn": "扶養者 氏名（ローマ字。姓名を半角スペース区切りで。例：YAMADA Taro）",
-  "supporterFamilyNameJa": "扶養者 氏名（漢字。姓名を半角スペース区切りで。例：ファム ティ トム）",
   "supporterDob": "扶養者 生年月日（YYYY-MM-DD）",
   "supporterNationality": "扶養者 国籍・地域",
   "supporterResidenceCard": "扶養者 在留カード番号（英数字12桁）",
@@ -370,8 +369,7 @@ ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[o
 
     // ── 7-b. 家族滞在（認定・更新・変更すべて）の場合、扶養者情報を在日親族に自動反映 ──
     if (app.visaType === 'dependent') {
-      const supporterName = [merged.supporterFamilyNameJa, merged.supporterGivenNameJa].filter(Boolean).join(' ')
-        || merged.supporterNameEn
+      const supporterName = merged.supporterNameEn
         || [merged.supporterFamilyNameEn, merged.supporterGivenNameEn].filter(Boolean).join(' ');
       if (supporterName) {
         const familyList = (merged.familyInJapan ?? []) as any[];

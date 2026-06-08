@@ -32,8 +32,6 @@ const SECTION_CONFIG: Record<
   "dateOfBirth": "生年月日（YYYY-MM-DD）",
   "familyNameEn": "姓（ローマ字・パスポート記載の大文字）",
   "givenNameEn": "名（ローマ字・パスポート記載の大文字）",
-  "familyNameJa": "姓（漢字・ない場合は空文字）",
-  "givenNameJa": "名（漢字・ない場合は空文字）",
   "sex": "性別（男 または 女）",
   "placeOfBirth": "出生地（都市・国名）",
   "maritalStatus": "配偶者の有無（有 または 無）",
@@ -133,7 +131,6 @@ const SECTION_CONFIG: Record<
     sources: "扶養者のパスポート・在留カード・在職証明書・源泉徴収票・雇用契約書・登記簿謄本",
     jsonTemplate: `{
   "supporterNameEn": "扶養者（申請人の配偶者や親）の氏名（ローマ字。姓名を半角スペース区切りで。例：YAMADA Taro）",
-  "supporterFamilyNameJa": "扶養者の氏名（漢字。姓名を半角スペース区切りで。例：ファム ティ トム）",
   "supporterDob": "扶養者の生年月日（YYYY-MM-DD）",
   "supporterNationality": "扶養者の国籍・地域",
   "supporterResidenceCard": "扶養者の在留カード番号（英数字12桁）",
@@ -156,8 +153,6 @@ const SECTION_CONFIG: Record<
     jsonTemplate: `{
   "spouseFamilyNameEn": "配偶者 姓（ローマ字）",
   "spouseGivenNameEn": "配偶者 名（ローマ字）",
-  "spouseFamilyNameJa": "配偶者 姓（漢字）",
-  "spouseGivenNameJa": "配偶者 名（漢字）",
   "spouseDob": "配偶者 生年月日（YYYY-MM-DD）",
   "spouseNationality": "配偶者 国籍（例：日本）",
   "spouseResidenceStatus": "配偶者 身分（日本国籍/永住者/特別永住者）",

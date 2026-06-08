@@ -499,12 +499,6 @@ export const ALL_QUESTIONS: QQuestion[] = [
     categories: ["T"],
   },
   {
-    key: "spouseFamilyNameJa",
-    section: "12. 配偶者・身元保証人の情報（T型 Part 2）",
-    label: "配偶者 — 氏名（漢字）（例: 山田 花子）",
-    categories: ["T"],
-  },
-  {
     key: "spouseDob",
     section: "12. 配偶者・身元保証人の情報（T型 Part 2）",
     label: "配偶者の生年月日",
@@ -659,12 +653,6 @@ export const ALL_QUESTIONS: QQuestion[] = [
     key: "supporterNameEn",
     section: "16. 扶養者の情報（R型 — 扶養者用Part 1）",
     label: "扶養者 — 氏名（ローマ字）（例: YAMADA Taro）",
-    categories: ["R"],
-  },
-  {
-    key: "supporterFamilyNameJa",
-    section: "16. 扶養者の情報（R型 — 扶養者用Part 1）",
-    label: "扶養者 — 氏名（漢字）（例: ファム ティ トム）",
     categories: ["R"],
   },
   {

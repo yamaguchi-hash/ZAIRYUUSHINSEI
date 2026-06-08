@@ -920,11 +920,16 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   <Field label="氏名 Given Name（ローマ字）">
                     <input className={inputCls} value={form.spouseGivenNameEn} onChange={e => set("spouseGivenNameEn", e.target.value)} placeholder="HANAKO" />
                   </Field>
-                  <Field label="氏名（漢字・姓）">
-                    <input className={inputCls} value={form.spouseFamilyNameJa} onChange={e => set("spouseFamilyNameJa", e.target.value)} placeholder="山田" />
-                  </Field>
-                  <Field label="氏名（漢字・名）">
-                    <input className={inputCls} value={form.spouseGivenNameJa} onChange={e => set("spouseGivenNameJa", e.target.value)} placeholder="花子" />
+                  <Field label="氏名（漢字）">
+                    <input className={inputCls}
+                      value={[form.spouseFamilyNameJa, form.spouseGivenNameJa].filter(Boolean).join(' ')}
+                      onChange={e => {
+                        const parts = e.target.value.split(/\s+/);
+                        set("spouseFamilyNameJa", parts[0] || "");
+                        set("spouseGivenNameJa", parts.slice(1).join(" ") || "");
+                      }}
+                      placeholder="山田 花子"
+                    />
                   </Field>
                   <Field label="生年月日">
                     <input className={inputCls} type="date" value={form.spouseDob} onChange={e => set("spouseDob", e.target.value)} />
@@ -1117,11 +1122,16 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   <Field label="(1) 氏名（ローマ字）">
                     <input className={inputCls} value={form.supporterNameEn || [form.supporterFamilyNameEn, form.supporterGivenNameEn].filter(Boolean).join(' ')} onChange={e => set("supporterNameEn", e.target.value)} placeholder="例: YAMADA Taro" />
                   </Field>
-                  <Field label="    氏名（漢字・姓）">
-                    <input className={inputCls} value={form.supporterFamilyNameJa} onChange={e => set("supporterFamilyNameJa", e.target.value)} />
-                  </Field>
-                  <Field label="    氏名（漢字・名）">
-                    <input className={inputCls} value={form.supporterGivenNameJa} onChange={e => set("supporterGivenNameJa", e.target.value)} />
+                  <Field label="    氏名（漢字）">
+                    <input className={inputCls}
+                      value={[form.supporterFamilyNameJa, form.supporterGivenNameJa].filter(Boolean).join(' ')}
+                      onChange={e => {
+                        const parts = e.target.value.split(/\s+/);
+                        set("supporterFamilyNameJa", parts[0] || "");
+                        set("supporterGivenNameJa", parts.slice(1).join(" ") || "");
+                      }}
+                      placeholder="例: ファム ティ トム"
+                    />
                   </Field>
                   <Field label="(2) 生年月日">
                     <input className={inputCls} type="date" value={form.supporterDob} onChange={e => set("supporterDob", e.target.value)} />

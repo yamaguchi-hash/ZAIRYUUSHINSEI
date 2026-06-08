@@ -1818,8 +1818,7 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
   "fundingMethod": "滞在費支弁方法（親族負担/外国からの送金/身元保証人負担/その他）",
 
   "supporterNameEn": "扶養者 氏名（ローマ字。姓名を半角スペース区切りで。例：YAMADA Taro）",
-  "supporterFamilyNameJa": "扶養者 姓（漢字）",
-  "supporterGivenNameJa": "扶養者 名（漢字）",
+  "supporterFamilyNameJa": "扶養者 氏名（漢字。姓名を半角スペース区切りで。例：ファム ティ トム）",
   "supporterDob": "扶養者 生年月日（YYYY-MM-DD）",
   "supporterNationality": "扶養者 国籍・地域",
   "supporterResidenceCard": "扶養者 在留カード番号",

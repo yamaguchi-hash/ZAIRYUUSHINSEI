@@ -133,8 +133,7 @@ const SECTION_CONFIG: Record<
     sources: "扶養者のパスポート・在留カード・在職証明書・源泉徴収票・雇用契約書・登記簿謄本",
     jsonTemplate: `{
   "supporterNameEn": "扶養者（申請人の配偶者や親）の氏名（ローマ字。姓名を半角スペース区切りで。例：YAMADA Taro）",
-  "supporterFamilyNameJa": "扶養者の姓（漢字）",
-  "supporterGivenNameJa": "扶養者の名（漢字）",
+  "supporterFamilyNameJa": "扶養者の氏名（漢字。姓名を半角スペース区切りで。例：ファム ティ トム）",
   "supporterDob": "扶養者の生年月日（YYYY-MM-DD）",
   "supporterNationality": "扶養者の国籍・地域",
   "supporterResidenceCard": "扶養者の在留カード番号（英数字12桁）",

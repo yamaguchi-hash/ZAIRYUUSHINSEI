@@ -676,7 +676,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   <tr>
                     <td className="lbl" style={{width:'30%'}}>(1) 氏名（ローマ字）</td>
                     <td colSpan={3}>
-                      {fmt(form.supporterFamilyNameEn)}　{fmt(form.supporterGivenNameEn)}
+                      {fmt(form.supporterNameEn || [form.supporterFamilyNameEn, form.supporterGivenNameEn].filter(Boolean).join(' '))}
                       {(form.supporterFamilyNameJa || form.supporterGivenNameJa)
                         ? `　（${fmt(form.supporterFamilyNameJa)}　${fmt(form.supporterGivenNameJa)}）`
                         : ''}
@@ -753,11 +753,11 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   <tr>
                     <td className="lbl" style={{ width: "28%", verticalAlign: "top", paddingTop: "5px", height: "50px" }}>
                       <div style={{ fontSize: "10.5px", fontWeight: "bold" }}>扶養者の署名</div>
-                      {(form.supporterFamilyNameJa || form.supporterGivenNameJa || form.supporterFamilyNameEn || form.supporterGivenNameEn) && (
+                      {(form.supporterFamilyNameJa || form.supporterGivenNameJa || form.supporterNameEn || form.supporterFamilyNameEn || form.supporterGivenNameEn) && (
                         <div style={{ fontSize: "9.5px", marginTop: "3px", fontWeight: "normal", color: "#333" }}>
                           氏名：{form.supporterFamilyNameJa
                             ? `${fmt(form.supporterFamilyNameJa)}　${fmt(form.supporterGivenNameJa)}`
-                            : `${fmt(form.supporterFamilyNameEn)} ${fmt(form.supporterGivenNameEn)}`}
+                            : fmt(form.supporterNameEn || [form.supporterFamilyNameEn, form.supporterGivenNameEn].filter(Boolean).join(' '))}
                         </div>
                       )}
                     </td>

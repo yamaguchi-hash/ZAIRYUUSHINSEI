@@ -1114,11 +1114,8 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="(1) 氏名 Family Name（ローマ字）">
-                    <input className={inputCls} value={form.supporterFamilyNameEn} onChange={e => set("supporterFamilyNameEn", e.target.value)} />
-                  </Field>
-                  <Field label="    氏名 Given Name（ローマ字）">
-                    <input className={inputCls} value={form.supporterGivenNameEn} onChange={e => set("supporterGivenNameEn", e.target.value)} />
+                  <Field label="(1) 氏名（ローマ字）">
+                    <input className={inputCls} value={form.supporterNameEn || [form.supporterFamilyNameEn, form.supporterGivenNameEn].filter(Boolean).join(' ')} onChange={e => set("supporterNameEn", e.target.value)} placeholder="例: YAMADA Taro" />
                   </Field>
                   <Field label="    氏名（漢字・姓）">
                     <input className={inputCls} value={form.supporterFamilyNameJa} onChange={e => set("supporterFamilyNameJa", e.target.value)} />

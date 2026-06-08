@@ -286,8 +286,7 @@ ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[o
   "fundingMethod": "滞在費支弁方法（親族負担/外国からの送金/身元保証人負担/その他）",
   "partTimeWorkExistsR": "資格外活動の有無（有 または 無）",
 
-  "supporterFamilyNameEn": "扶養者 姓（ローマ字）",
-  "supporterGivenNameEn": "扶養者 名（ローマ字）",
+  "supporterNameEn": "扶養者 氏名（ローマ字。姓名を半角スペース区切りで。例：YAMADA Taro）",
   "supporterFamilyNameJa": "扶養者 姓（漢字）",
   "supporterGivenNameJa": "扶養者 名（漢字）",
   "supporterDob": "扶養者 生年月日（YYYY-MM-DD）",
@@ -370,9 +369,10 @@ ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[o
     // マスター確定値を最後に上書き（変更不可フィールド）
     Object.assign(merged, masterBase);
 
-    // ── 7-b. 家族滞在の場合、扶養者情報を在日親族に自動反映 ───────────────────
+    // ── 7-b. 家族滞在（認定・更新・変更すべて）の場合、扶養者情報を在日親族に自動反映 ──
     if (app.visaType === 'dependent') {
       const supporterName = [merged.supporterFamilyNameJa, merged.supporterGivenNameJa].filter(Boolean).join(' ')
+        || merged.supporterNameEn
         || [merged.supporterFamilyNameEn, merged.supporterGivenNameEn].filter(Boolean).join(' ');
       if (supporterName) {
         const familyList = (merged.familyInJapan ?? []) as any[];

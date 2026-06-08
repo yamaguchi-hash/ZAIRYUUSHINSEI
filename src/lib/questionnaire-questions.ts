@@ -662,15 +662,9 @@ export const ALL_QUESTIONS: QQuestion[] = [
 
   // 扶養者情報（R型）
   {
-    key: "supporterFamilyNameEn",
+    key: "supporterNameEn",
     section: "16. 扶養者の情報（R型 — 扶養者用Part 1）",
-    label: "扶養者 — 姓（ローマ字 / Family Name）",
-    categories: ["R"],
-  },
-  {
-    key: "supporterGivenNameEn",
-    section: "16. 扶養者の情報（R型 — 扶養者用Part 1）",
-    label: "扶養者 — 名（ローマ字 / Given Name）",
+    label: "扶養者 — 氏名（ローマ字）（例: YAMADA Taro）",
     categories: ["R"],
   },
   {

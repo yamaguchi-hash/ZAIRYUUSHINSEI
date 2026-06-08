@@ -1817,8 +1817,7 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
   "marriageNotificationDateForeign": "本国等への届出年月日（YYYY-MM-DD。外国の証明書に記載の登録日）",
   "fundingMethod": "滞在費支弁方法（親族負担/外国からの送金/身元保証人負担/その他）",
 
-  "supporterFamilyNameEn": "扶養者 姓（ローマ字）",
-  "supporterGivenNameEn": "扶養者 名（ローマ字）",
+  "supporterNameEn": "扶養者 氏名（ローマ字。姓名を半角スペース区切りで。例：YAMADA Taro）",
   "supporterFamilyNameJa": "扶養者 姓（漢字）",
   "supporterGivenNameJa": "扶養者 名（漢字）",
   "supporterDob": "扶養者 生年月日（YYYY-MM-DD）",
@@ -1998,9 +1997,10 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
       }
     }
 
-    // ── 9-b. 家族滞在の場合、扶養者情報を在日親族に自動反映 ────────────────────
+    // ── 9-b. 家族滞在（認定・更新・変更すべて）の場合、扶養者情報を在日親族に自動反映 ──
     if (app.visaType === 'dependent') {
       const supporterName = [prefilled.supporterFamilyNameJa, prefilled.supporterGivenNameJa].filter(Boolean).join(' ')
+        || prefilled.supporterNameEn
         || [prefilled.supporterFamilyNameEn, prefilled.supporterGivenNameEn].filter(Boolean).join(' ');
       if (supporterName) {
         const familyList = (prefilled.familyInJapan ?? []) as any[];

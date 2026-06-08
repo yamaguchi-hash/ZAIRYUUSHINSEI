@@ -132,8 +132,7 @@ const SECTION_CONFIG: Record<
     label: "扶養者情報（R型）",
     sources: "扶養者のパスポート・在留カード・在職証明書・源泉徴収票・雇用契約書・登記簿謄本",
     jsonTemplate: `{
-  "supporterFamilyNameEn": "扶養者（申請人の配偶者や親）の姓（ローマ字）",
-  "supporterGivenNameEn": "扶養者の名（ローマ字）",
+  "supporterNameEn": "扶養者（申請人の配偶者や親）の氏名（ローマ字。姓名を半角スペース区切りで。例：YAMADA Taro）",
   "supporterFamilyNameJa": "扶養者の姓（漢字）",
   "supporterGivenNameJa": "扶養者の名（漢字）",
   "supporterDob": "扶養者の生年月日（YYYY-MM-DD）",

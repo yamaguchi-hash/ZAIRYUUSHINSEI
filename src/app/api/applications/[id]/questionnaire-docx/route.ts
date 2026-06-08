@@ -59,8 +59,7 @@ const ALL_QUESTIONS: Question[] = [
   { key: "marriageNotificationPlaceForeign", section: "婚姻・出生届出（R型）", label: "本国等届出先", note: "例：中国民政局", categories: ["R"] },
   { key: "marriageNotificationDateForeign",  section: "婚姻・出生届出（R型）", label: "本国等届出年月日", categories: ["R"] },
 
-  { key: "supporterFamilyNameEn", section: "扶養者の情報（R型）", label: "扶養者 氏名（ローマ字・姓）", categories: ["R"] },
-  { key: "supporterGivenNameEn",  section: "扶養者の情報（R型）", label: "扶養者 氏名（ローマ字・名）", categories: ["R"] },
+  { key: "supporterNameEn", section: "扶養者の情報（R型）", label: "扶養者 氏名（ローマ字）", note: "例：YAMADA Taro", categories: ["R"] },
   { key: "supporterFamilyNameJa", section: "扶養者の情報（R型）", label: "扶養者 氏名（漢字・姓）", categories: ["R"] },
   { key: "supporterGivenNameJa",  section: "扶養者の情報（R型）", label: "扶養者 氏名（漢字・名）", categories: ["R"] },
   { key: "supporterDob",          section: "扶養者の情報（R型）", label: "扶養者 生年月日", categories: ["R"] },

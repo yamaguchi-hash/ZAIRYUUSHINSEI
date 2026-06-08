@@ -243,8 +243,9 @@ export interface ApplicationFormData {
   partTimeWorkSalaryTypeR: string;   // 月額 / 日額
   // ── 扶養者用Ｒ（扶養者等作成用 Part 1 R）─────────────────────────────────
   // 2. 扶養者
-  supporterFamilyNameEn: string;
-  supporterGivenNameEn: string;
+  supporterNameEn: string;          // (1) 氏名（ローマ字）統合フィールド
+  supporterFamilyNameEn: string;    // レガシー（後方互換用）
+  supporterGivenNameEn: string;     // レガシー（後方互換用）
   supporterFamilyNameJa: string;
   supporterGivenNameJa: string;
   supporterDob: string;
@@ -601,7 +602,7 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   partTimeWorkTypeR: '', partTimeWorkOrgNameR: '', partTimeWorkBranchNameR: '',
   partTimeWorkPhoneR: '', partTimeWorkHoursR: '', partTimeWorkSalaryR: '', partTimeWorkSalaryTypeR: '月額',
   // Part 2 R — 扶養者
-  supporterFamilyNameEn: '', supporterGivenNameEn: '',
+  supporterNameEn: '', supporterFamilyNameEn: '', supporterGivenNameEn: '',
   supporterFamilyNameJa: '', supporterGivenNameJa: '',
   supporterDob: '', supporterNationality: '',
   supporterAddress: '', supporterStatusOfResidence: '',

@@ -167,9 +167,9 @@ export function buildRasensFields(
     ...buildNotificationFields(f),
 
     // ── 扶養者情報（家族滞在） ────────────────────────────────────────
-    ...(f.supporterFamilyNameEn ? [
+    ...((f.supporterNameEn || f.supporterFamilyNameEn) ? [
       { label: "扶養者　氏名（ローマ字）",
-        value: `${f.supporterFamilyNameEn ?? ""}　${f.supporterGivenNameEn ?? ""}`.trim() },
+        value: f.supporterNameEn || `${f.supporterFamilyNameEn ?? ""}　${f.supporterGivenNameEn ?? ""}`.trim() },
       ...(f.supporterFamilyNameJa
         ? [{ label: "扶養者　氏名（漢字等）",
              value: `${f.supporterFamilyNameJa ?? ""}　${f.supporterGivenNameJa ?? ""}`.trim() }]

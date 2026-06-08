@@ -369,6 +369,32 @@ ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[o
     // マスター確定値を最後に上書き（変更不可フィールド）
     Object.assign(merged, masterBase);
 
+    // ── 7-b. 家族滞在の場合、扶養者情報を在日親族に自動反映 ───────────────────
+    if (app.visaType === 'dependent') {
+      const supporterName = [merged.supporterFamilyNameJa, merged.supporterGivenNameJa].filter(Boolean).join(' ')
+        || [merged.supporterFamilyNameEn, merged.supporterGivenNameEn].filter(Boolean).join(' ');
+      if (supporterName) {
+        const familyList = (merged.familyInJapan ?? []) as any[];
+        // 既に同名の扶養者が登録されていなければ追加
+        const alreadyExists = familyList.some((m: any) =>
+          m.name && supporterName && m.name.replace(/\s/g, '') === supporterName.replace(/\s/g, '')
+        );
+        if (!alreadyExists) {
+          familyList.unshift({
+            relationship: merged.supporterRelationship || '',
+            name: supporterName,
+            dateOfBirth: merged.supporterDob || '',
+            nationality: merged.supporterNationality || '',
+            placeOfEmployment: merged.supporterEmployer || '',
+            residingTogether: true,
+            residenceCardNumber: merged.supporterResidenceCard || '',
+          });
+          merged.familyInJapan = familyList;
+          merged.familyInJapanExists = '有';
+        }
+      }
+    }
+
     // ── 8. DBに保存 ───────────────────────────────────────────────────────────
     await db.update(applications)
       .set({ formData: merged, updatedAt: new Date() })

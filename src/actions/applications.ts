@@ -1997,6 +1997,32 @@ ${org ? `機関名: ${org.nameJa ?? ''} / 法人番号: ${org.corporateNumber ??
       }
     }
 
+    // ── 9-b. 家族滞在の場合、扶養者情報を在日親族に自動反映 ────────────────────
+    if (app.visaType === 'dependent') {
+      const supporterName = [prefilled.supporterFamilyNameJa, prefilled.supporterGivenNameJa].filter(Boolean).join(' ')
+        || [prefilled.supporterFamilyNameEn, prefilled.supporterGivenNameEn].filter(Boolean).join(' ');
+      if (supporterName) {
+        const familyList = (prefilled.familyInJapan ?? []) as any[];
+        // 既に同名の扶養者が登録されていなければ追加
+        const alreadyExists = familyList.some((m: any) =>
+          m.name && supporterName && m.name.replace(/\s/g, '') === supporterName.replace(/\s/g, '')
+        );
+        if (!alreadyExists) {
+          familyList.unshift({
+            relationship: prefilled.supporterRelationship || '',
+            name: supporterName,
+            dateOfBirth: prefilled.supporterDob || '',
+            nationality: prefilled.supporterNationality || '',
+            placeOfEmployment: prefilled.supporterEmployer || '',
+            residingTogether: true,
+            residenceCardNumber: prefilled.supporterResidenceCard || '',
+          });
+          prefilled.familyInJapan = familyList;
+          prefilled.familyInJapanExists = '有';
+        }
+      }
+    }
+
     // ── 9. 保存・返却 ────────────────────────────────────────────────────────
     await db.update(applications)
       .set({ formData: prefilled, updatedAt: new Date() })

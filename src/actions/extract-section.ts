@@ -146,7 +146,8 @@ const SECTION_CONFIG: Record<
   "supporterEmployer": "扶養者の勤務先名称",
   "supporterCorporateNumber": "扶養者の勤務先法人番号（13桁）",
   "supporterBranchName": "扶養者の支店・事業所名",
-  "supporterAddress": "扶養者の勤務先所在地",
+  "supporterEmployerAddress": "扶養者の勤務先所在地（フル住所）",
+  "supporterEmployerPhone": "扶養者の勤務先電話番号",
   "supporterAnnualIncome": "扶養者の年収（数値のみ・円）"
 }`,
   },

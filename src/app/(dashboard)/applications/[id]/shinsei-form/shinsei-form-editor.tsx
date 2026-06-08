@@ -1171,9 +1171,12 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   </Field>
                   <div className="sm:col-span-2">
                     <Field label="(12) 勤務先所在地">
-                      <AddressSplitSimple value={form.supporterAddress} onChange={v => set("supporterAddress", v)} inputClassName={inputCls} />
+                      <AddressSplitSimple value={form.supporterEmployerAddress || form.supporterAddress} onChange={v => { set("supporterEmployerAddress", v); set("supporterAddress", v); }} inputClassName={inputCls} />
                     </Field>
                   </div>
+                  <Field label="    電話番号">
+                    <input className={inputCls} value={form.supporterEmployerPhone} onChange={e => set("supporterEmployerPhone", e.target.value)} placeholder="例: 06-0000-0000" />
+                  </Field>
                   <Field label="(13) 年収（円）">
                     <input className={inputCls} value={form.supporterAnnualIncome} onChange={e => set("supporterAnnualIncome", e.target.value)} placeholder="例: 5000000" />
                   </Field>
@@ -1550,7 +1553,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
 
           {/* ── 共通：代理人・取次者 ─────────────────────────────────────────── */}
           <Card>
-            <CardHeader><CardTitle className="text-base">{isCoe ? "27." : "22."} 代理人（法定代理人による申請の場合）</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">{isCoe ? "27." : isRtype ? "20." : "22."} 代理人（法定代理人による申請の場合）</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="(1) 氏名"><input className={inputCls} value={form.representativeName} onChange={e => set("representativeName", e.target.value)} /></Field>
               <Field label="(2) 本人との関係"><input className={inputCls} value={form.representativeRelationship} onChange={e => set("representativeRelationship", e.target.value)} placeholder="例: 法定代理人（親）" /></Field>

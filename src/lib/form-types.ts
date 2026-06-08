@@ -259,6 +259,8 @@ export interface ApplicationFormData {
   supporterEmployer: string;         // (9) 勤務先名称（留学生を除く）
   supporterCorporateNumber: string;  // (10) 法人番号（13桁）
   supporterBranchName: string;       // (11) 支店・事業所名
+  supporterEmployerAddress: string;   // (12) 勤務先所在地
+  supporterEmployerPhone: string;    // (12) 勤務先電話番号
   supporterAnnualIncome: string;     // (13) 年収（円）
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -606,7 +608,8 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   supporterPeriodOfStay: '', supporterPeriodExpiry: '',
   supporterRelationship: '夫', supporterRelationshipOther: '',
   supporterResidenceCard: '', supporterEmployer: '',
-  supporterCorporateNumber: '', supporterBranchName: '', supporterAnnualIncome: '',
+  supporterCorporateNumber: '', supporterBranchName: '',
+  supporterEmployerAddress: '', supporterEmployerPhone: '', supporterAnnualIncome: '',
   // Part 2 P
   schoolName: '', schoolType: '', schoolAddress: '', schoolPhone: '',
   enrollmentDate: '', expectedGraduationDate: '', courseOfStudy: '',

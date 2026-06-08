@@ -300,7 +300,8 @@ ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[o
   "supporterEmployer": "扶養者 勤務先名称",
   "supporterCorporateNumber": "扶養者 法人番号（13桁）",
   "supporterBranchName": "扶養者 支店・事業所名",
-  "supporterAddress": "扶養者 勤務先所在地",
+  "supporterEmployerAddress": "扶養者 勤務先所在地（フル住所）",
+  "supporterEmployerPhone": "扶養者 勤務先電話番号",
   "supporterAnnualIncome": "扶養者 年収（数値のみ・円）",
 
   "spouseFamilyNameEn": "配偶者 姓（ローマ字）",

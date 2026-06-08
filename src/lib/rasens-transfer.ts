@@ -182,6 +182,18 @@ export function buildRasensFields(
       { label: "扶養者　在留カード番号",  value: f.supporterResidenceCard || "" },
       { label: "申請人との関係",          value: f.supporterRelationship || "" },
       { label: "扶養者　勤務先名称",      value: f.supporterEmployer || "" },
+      ...(f.supporterCorporateNumber
+        ? [{ label: "扶養者　法人番号", value: f.supporterCorporateNumber }]
+        : []),
+      ...(f.supporterBranchName
+        ? [{ label: "扶養者　支店・事業所名", value: f.supporterBranchName }]
+        : []),
+      ...(f.supporterEmployerAddress || f.supporterAddress
+        ? [{ label: "扶養者　勤務先所在地", value: f.supporterEmployerAddress || f.supporterAddress || "" }]
+        : []),
+      ...(f.supporterEmployerPhone
+        ? [{ label: "扶養者　勤務先電話番号", value: f.supporterEmployerPhone }]
+        : []),
       ...(f.supporterAnnualIncome
         ? [{ label: "扶養者　年収", value: `${Number(f.supporterAnnualIncome).toLocaleString()} 円` }]
         : []),

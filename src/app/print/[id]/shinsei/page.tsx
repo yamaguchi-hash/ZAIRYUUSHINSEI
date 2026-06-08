@@ -494,7 +494,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           {isRtype && (
             <>
               <div className="section page-break">
-                申請人等作成用　２　Ｒ　—「家族滞在」在留期間更新用　（項目 17〜20）
+                申請人等作成用　２　Ｒ　—「家族滞在」{isChange ? '在留資格変更用' : '在留期間更新用'}　（項目 17〜20）
               </div>
 
               <div className="section3">17. 婚姻・出生又は縁組の届出先及び届出年月日</div>
@@ -650,7 +650,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
 
               {/* ── 扶養者用Ｒ（別ページ） ─────────────────────────────────────── */}
               <div className="section page-break">
-                扶養者等作成用　１　Ｒ　—「家族滞在」在留期間更新用
+                扶養者等作成用　１　Ｒ　—「家族滞在」{isChange ? '在留資格変更用' : '在留期間更新用'}
               </div>
 
               <div className="section3">1. 扶養している家族（申請人）の氏名及び在留カード番号</div>
@@ -729,7 +729,11 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   </tr>
                   <tr>
                     <td className="lbl">(12) 勤務先所在地</td>
-                    <td colSpan={3}>{fmt(form.supporterAddress)}</td>
+                    <td colSpan={3}>{fmt(form.supporterEmployerAddress || form.supporterAddress)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">　　 電話番号</td>
+                    <td colSpan={3}>{fmt(form.supporterEmployerPhone)}</td>
                   </tr>
                   <tr>
                     <td className="lbl">(13) 年収</td>

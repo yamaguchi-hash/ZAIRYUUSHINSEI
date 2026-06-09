@@ -115,6 +115,7 @@ export async function updateApplicant(
     passportExpiry: string;
     residenceCardNumber: string;
     phone: string;
+    mobilePhone: string;
     emailAddress: string;
     postalCode: string;
     japanPrefecture: string;

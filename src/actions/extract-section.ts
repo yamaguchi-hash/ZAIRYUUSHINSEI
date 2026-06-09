@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { db, applications, applicationDocumentChecklist, applicantMaster } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
+import { Type } from "@google/genai";
 
 // ─── セクションキー定義 ───────────────────────────────────────────────────────
 export type SectionKey =
@@ -20,9 +21,12 @@ export type SectionKey =
   | "org";        // 所属機関情報
 
 // ─── セクション別プロンプト定義 ───────────────────────────────────────────────
+/** 文字列型nullable のショートカット */
+const S = (desc: string) => ({ type: Type.STRING, description: desc, nullable: true });
+
 const SECTION_CONFIG: Record<
   SectionKey,
-  { label: string; sources: string; jsonTemplate: string }
+  { label: string; sources: string; jsonTemplate: string; responseSchema: any }
 > = {
   basic: {
     label: "基本情報",
@@ -38,6 +42,20 @@ const SECTION_CONFIG: Record<
   "occupation": "職業（例：会社員、主婦、留学生）",
   "homeTownCity": "本国における居住地（都市・国名）"
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        nationality:   S("国籍・地域（例：中国、ベトナム）"),
+        dateOfBirth:   S("生年月日（YYYY-MM-DD）"),
+        familyNameEn:  S("姓（ローマ字・パスポート記載の大文字）"),
+        givenNameEn:   S("名（ローマ字・パスポート記載の大文字）"),
+        sex:           S("性別（男 または 女）"),
+        placeOfBirth:  S("出生地（都市・国名）"),
+        maritalStatus: S("配偶者の有無（有 または 無）"),
+        occupation:    S("職業（例：会社員、主婦、留学生）"),
+        homeTownCity:  S("本国における居住地（都市・国名）"),
+      },
+    },
   },
 
   contact: {
@@ -51,6 +69,17 @@ const SECTION_CONFIG: Record<
   "telephoneNo": "固定電話番号（例：03-1234-5678）",
   "cellularPhoneNo": "携帯電話番号（例：090-1234-5678）"
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        postalCodeInJapan: S("郵便番号（7桁・ハイフンなし）"),
+        prefectureInJapan: S("都道府県"),
+        cityInJapan:       S("市区町村"),
+        addressLineInJapan: S("番地・建物名・部屋番号"),
+        telephoneNo:       S("固定電話番号"),
+        cellularPhoneNo:   S("携帯電話番号"),
+      },
+    },
   },
 
   passport: {
@@ -60,6 +89,13 @@ const SECTION_CONFIG: Record<
   "passportNumber": "パスポート番号（英数字。例：AB1234567）",
   "passportExpiry": "パスポート有効期限（YYYY-MM-DD）"
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        passportNumber: S("パスポート番号（英数字）"),
+        passportExpiry: S("パスポート有効期限（YYYY-MM-DD）"),
+      },
+    },
   },
 
   status: {
@@ -71,6 +107,15 @@ const SECTION_CONFIG: Record<
   "currentPeriodExpiry": "在留期間満了日（YYYY-MM-DD）",
   "residenceCardNumber": "在留カード番号（英数字12桁。例：AB12345678CD）"
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        currentStatusOfResidence: S("在留資格（日本語）"),
+        currentPeriodOfStay:     S("在留期間の長さ"),
+        currentPeriodExpiry:     S("在留期間満了日（YYYY-MM-DD）"),
+        residenceCardNumber:     S("在留カード番号（英数字12桁）"),
+      },
+    },
   },
 
   employer: {
@@ -87,6 +132,20 @@ const SECTION_CONFIG: Record<
   "activityDetails": "業務内容・職務内容の詳細",
   "employmentStartDate": "雇用開始年月日（YYYY-MM-DD）"
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        employerName:       S("勤務先名称（正式名称）"),
+        employerBranchName: S("支店・事業所名"),
+        employerAddress:    S("勤務先所在地（フル住所）"),
+        employerPhone:      S("勤務先電話番号"),
+        salary:             S("給与・報酬額（数値のみ）"),
+        salaryType:         S("給与種別（月額 または 年額）"),
+        position:           S("職務上の地位・役職名"),
+        activityDetails:    S("業務内容・職務内容の詳細"),
+        employmentStartDate: S("雇用開始年月日（YYYY-MM-DD）"),
+      },
+    },
   },
 
   education: {
@@ -99,6 +158,16 @@ const SECTION_CONFIG: Record<
   "educationGraduationDate": "卒業年月日（YYYY-MM-DD）",
   "majorCategory": "専攻・専門分野（例：情報工学、経営学）"
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        educationCountry:        S("学校所在国（本邦（日本） または 外国）"),
+        educationDegree:         S("学位・区分"),
+        educationSchoolName:     S("学校名（正式名称）"),
+        educationGraduationDate: S("卒業年月日（YYYY-MM-DD）"),
+        majorCategory:           S("専攻・専門分野"),
+      },
+    },
   },
 
   workhistory: {
@@ -113,6 +182,23 @@ const SECTION_CONFIG: Record<
     }
   ]
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        workHistory: {
+          type: Type.ARRAY,
+          description: "職歴一覧（古い順）",
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              joinDate:  S("入社年月（YYYY-MM形式）"),
+              leaveDate: S("退社年月（YYYY-MM形式。現職は空文字）"),
+              employer:  S("勤務先名称"),
+            },
+          },
+        },
+      },
+    },
   },
 
   marriage: {
@@ -124,6 +210,15 @@ const SECTION_CONFIG: Record<
   "marriageNotificationPlaceForeign": "本国等の機関への届出先（例：中国民政局上海市徐匯区）",
   "marriageNotificationDateForeign": "本国等への届出年月日（YYYY-MM-DD）"
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        marriageNotificationPlaceJapan:   S("日本の市区町村役場への届出先"),
+        marriageNotificationDateJapan:    S("日本への届出年月日（YYYY-MM-DD）"),
+        marriageNotificationPlaceForeign: S("本国等の機関への届出先"),
+        marriageNotificationDateForeign:  S("本国等への届出年月日（YYYY-MM-DD）"),
+      },
+    },
   },
 
   supporter: {
@@ -145,6 +240,25 @@ const SECTION_CONFIG: Record<
   "supporterEmployerPhone": "扶養者の勤務先電話番号",
   "supporterAnnualIncome": "扶養者の年収（数値のみ・円）"
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        supporterNameEn:             S("扶養者の氏名（ローマ字）"),
+        supporterDob:                S("扶養者の生年月日（YYYY-MM-DD）"),
+        supporterNationality:        S("扶養者の国籍・地域"),
+        supporterResidenceCard:      S("扶養者の在留カード番号（英数字12桁）"),
+        supporterStatusOfResidence:  S("扶養者の在留資格（日本語）"),
+        supporterPeriodOfStay:       S("扶養者の在留期間の長さ"),
+        supporterPeriodExpiry:       S("扶養者の在留期間満了日（YYYY-MM-DD）"),
+        supporterRelationship:       S("申請人との続柄（夫/妻/父/母 等）"),
+        supporterEmployer:           S("扶養者の勤務先名称"),
+        supporterCorporateNumber:    S("扶養者の勤務先法人番号（13桁）"),
+        supporterBranchName:         S("扶養者の支店・事業所名"),
+        supporterEmployerAddress:    S("扶養者の勤務先所在地"),
+        supporterEmployerPhone:      S("扶養者の勤務先電話番号"),
+        supporterAnnualIncome:       S("扶養者の年収（数値のみ・円）"),
+      },
+    },
   },
 
   spouse: {
@@ -164,6 +278,23 @@ const SECTION_CONFIG: Record<
   "marriageRegistrationPlace": "婚姻届出市区町村名",
   "cohabitation": "同居の有無（有 または 無）"
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        spouseFamilyNameEn:      S("配偶者 姓（ローマ字）"),
+        spouseGivenNameEn:       S("配偶者 名（ローマ字）"),
+        spouseDob:               S("配偶者 生年月日（YYYY-MM-DD）"),
+        spouseNationality:       S("配偶者 国籍"),
+        spouseResidenceStatus:   S("配偶者 身分（日本国籍/永住者/特別永住者）"),
+        spouseResidenceCard:     S("配偶者 在留カード番号"),
+        spouseOccupation:        S("配偶者 職業"),
+        spouseEmployer:          S("配偶者 勤務先・通学先"),
+        spouseAddress:           S("配偶者 住所"),
+        marriageDate:            S("婚姻年月日（YYYY-MM-DD）"),
+        marriageRegistrationPlace: S("婚姻届出市区町村名"),
+        cohabitation:            S("同居の有無（有 または 無）"),
+      },
+    },
   },
 
   school: {
@@ -181,6 +312,21 @@ const SECTION_CONFIG: Record<
   "fundingSource": "費用支弁方法（例：親族負担、奨学金）",
   "fundingAmount": "月額生活費（数値のみ・円）"
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        schoolName:             S("学校名（正式名称）"),
+        schoolType:             S("学校種別"),
+        schoolAddress:          S("学校所在地"),
+        schoolPhone:            S("学校電話番号"),
+        enrollmentDate:         S("入学年月日（YYYY-MM-DD）"),
+        expectedGraduationDate: S("卒業予定年月日（YYYY-MM-DD）"),
+        courseOfStudy:          S("在籍コース・専攻名"),
+        annualTuition:          S("年間学費（数値のみ・円）"),
+        fundingSource:          S("費用支弁方法"),
+        fundingAmount:          S("月額生活費（数値のみ・円）"),
+      },
+    },
   },
 
   org: {
@@ -198,6 +344,21 @@ const SECTION_CONFIG: Record<
   "orgEmployeeCount": "従業員数（数値のみ・名）",
   "orgForeignEmployeeCount": "うち外国人職員数（数値のみ・名）"
 }`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        orgName:                    S("機関名称（正式名称）"),
+        orgCorporateNumber:         S("法人番号（13桁）"),
+        orgBranchName:              S("支店・事業所名"),
+        orgEmploymentInsuranceNo:   S("雇用保険適用事業所番号（11桁）"),
+        orgAddress:                 S("所在地（フル住所）"),
+        orgPhone:                   S("電話番号"),
+        orgCapital:                 S("資本金（数値のみ・円）"),
+        orgAnnualSales:             S("年間売上高（数値のみ・円）"),
+        orgEmployeeCount:           S("従業員数（数値のみ）"),
+        orgForeignEmployeeCount:    S("うち外国人職員数（数値のみ）"),
+      },
+    },
   },
 };
 
@@ -307,22 +468,28 @@ export async function extractSectionFromDocs(
       }
     }
 
-    const prompt = `あなたは在留資格申請の専門行政書士AIです。
-この書類「{DOC_NAME}」から、以下のフィールドを読み取ってください。
+    const prompt = `【役割】あなたは在留資格申請を専門とする行政書士AIアシスタントです。提出書類から申請書記入に必要な情報を正確に読み取ります。
+
+【処理対象】書類「{DOC_NAME}」から「${config.label}」セクションの情報を抽出
 ${applicantNameContext}
 【参考書類の種類】${config.sources}
+
+【処理手順】
+1. 書類全体を確認し、書類の種類・内容を把握する
+2. 抽出対象フィールドに該当する情報を書類から探す
+3. 該当情報が見つかった場合のみ値を設定する
+4. 日付・数値等のフォーマットを指定形式に変換する
 
 【抽出対象フィールド】
 ${config.jsonTemplate}
 
-【重要ルール】
-・書類に記載されている情報のみを抽出し、推測しないこと
-・この書類に該当情報がない場合は ""（空文字列）を返すこと
-・日付はすべて YYYY-MM-DD 形式で返すこと（例：2028-03-15）
-・数値フィールド（金額・人数等）は数値のみ返し、単位や記号は含めないこと
-・JSONのみを返し、説明文・コメントは不要
-
-JSONのみを返してください。`;
+【制約（必ず遵守）】
+・書類に明記されている情報のみ抽出し、推測・補完は行わないこと
+・該当情報がない場合は ""（空文字列）とすること（nullは使用しない）
+・日付はすべて YYYY-MM-DD 形式（例：2028-03-15）
+・数値フィールド（金額・人数等）は数値のみ（単位・記号・カンマ不可）
+・性別は「男」または「女」（M/Fは使用しない）
+・有無は「有」または「無」（英語不可）`;
 
     // 全提出済み書類を順に処理
     for (const doc of submitted.slice(0, 15)) {
@@ -342,13 +509,22 @@ JSONのみを返してください。`;
               { text: docPrompt },
             ],
           }],
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: config.responseSchema,
+          },
         });
 
         const txt = resp.text ?? "{}";
-        const m = txt.match(/```json\s*([\s\S]*?)```/) ?? txt.match(/(\{[\s\S]*\})/);
-        if (!m) continue;
-
-        const extracted: Record<string, any> = JSON.parse(m[1] ?? m[0]);
+        let extracted: Record<string, any>;
+        try {
+          extracted = JSON.parse(txt);
+        } catch {
+          // フォールバック: マークダウンコードフェンスが含まれる場合
+          const m = txt.match(/```json?\s*([\s\S]*?)```/) ?? txt.match(/(\{[\s\S]*\})/);
+          if (!m) continue;
+          extracted = JSON.parse(m[1] ?? m[0]);
+        }
 
         // 空でない値をマージ（既に取得済みのフィールドは上書きしない）
         for (const [k, v] of Object.entries(extracted)) {

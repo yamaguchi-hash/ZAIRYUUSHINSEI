@@ -456,10 +456,28 @@ interface AddressSplitSimpleProps {
   labelPrefix?: string;
 }
 
+// ── 郵便番号を住所文字列に埋め込む/取り出すユーティリティ ──────────────────
+// 形式: "〒1234567|東京都渋谷区..." → zipCode="1234567", address="東京都渋谷区..."
+const ZIP_PREFIX_RE = /^〒(\d{7})\|/;
+
+function parseZipFromValue(value: string): { zipCode: string; address: string } {
+  const m = (value || "").match(ZIP_PREFIX_RE);
+  if (m) return { zipCode: m[1], address: value.slice(m[0].length) };
+  return { zipCode: "", address: value || "" };
+}
+
+function embedZipInValue(zipCode: string, address: string): string {
+  const clean = zipCode.replace(/[-ー−\s]/g, "");
+  if (clean.length === 7) return `〒${clean}|${address}`;
+  return address;
+}
+
 /**
  * 1つの住所 string を郵便番号 / 都道府県 / 市区町村 / 番地以降に分割して入力するコンポーネント。
  * 郵便番号7桁入力で都道府県・市区町村を自動入力。
  * 住所入力後に〒検索で郵便番号を逆引き。
+ *
+ * 郵便番号は value 文字列の先頭に "〒1234567|" として永続化される。
  */
 export function AddressSplitSimple({
   value,
@@ -468,17 +486,27 @@ export function AddressSplitSimple({
   labelClassName = "block text-xs font-medium text-gray-600 mb-1",
   labelPrefix = "",
 }: AddressSplitSimpleProps) {
-  const [zipCode, setZipCode] = useState("");
+  const { zipCode: savedZip, address: addressPart } = parseZipFromValue(value);
+  const [zipInput, setZipInput] = useState(savedZip);
   const [zipLoading, setZipLoading] = useState(false);
   const [reverseLoading, setReverseLoading] = useState(false);
   const [zipError, setZipError] = useState("");
 
-  const { prefecture, rest } = extractPrefecture(value || "");
+  // savedZip が外部から変わった場合（AI自動入力等）にローカルstate を同期
+  const [prevSavedZip, setPrevSavedZip] = useState(savedZip);
+  if (savedZip !== prevSavedZip) {
+    setPrevSavedZip(savedZip);
+    if (savedZip && savedZip !== zipInput) setZipInput(savedZip);
+  }
+
+  const { prefecture, rest } = extractPrefecture(addressPart);
   const { city, addressLine } = extractCity(rest);
   const { town, block } = extractTown(addressLine);
 
-  function handleChange(pref: string, ct: string, twn: string, blk: string) {
-    onChange(`${pref}${ct}${twn}${blk}`);
+  function handleChange(pref: string, ct: string, twn: string, blk: string, zip?: string) {
+    const addr = `${pref}${ct}${twn}${blk}`;
+    const z = zip ?? zipInput;
+    onChange(embedZipInValue(z, addr));
   }
 
   function cleanZip(v: string) {
@@ -491,7 +519,7 @@ export function AddressSplitSimple({
     setZipError("");
     const result = await fetchAddressFromZip(zipValue);
     if (result) {
-      handleChange(result.prefecture, result.city, result.town, block);
+      handleChange(result.prefecture, result.city, result.town, block, zipValue);
     } else {
       setZipError("該当する住所が見つかりませんでした");
     }
@@ -500,10 +528,16 @@ export function AddressSplitSimple({
 
   function handleZipChange(e: React.ChangeEvent<HTMLInputElement>) {
     const v = e.target.value;
-    setZipCode(v);
+    setZipInput(v);
     setZipError("");
-    if (cleanZip(v).length === 7) {
+    const clean = cleanZip(v);
+    if (clean.length === 7) {
+      // 郵便番号を即座に保存（住所は後で自動入力）
+      onChange(embedZipInValue(v, addressPart));
       setTimeout(() => zipToAddress(v), 100);
+    } else {
+      // 7桁未満: 郵便番号プレフィックスを除去して住所のみ保存
+      onChange(addressPart);
     }
   }
 
@@ -515,7 +549,8 @@ export function AddressSplitSimple({
     setZipError("");
     const zip = await fetchZipFromAddress(addr);
     if (zip) {
-      setZipCode(zip);
+      setZipInput(zip);
+      onChange(embedZipInValue(zip, addressPart));
     } else {
       setZipError("郵便番号が見つかりませんでした");
     }
@@ -533,7 +568,7 @@ export function AddressSplitSimple({
         <div className="flex gap-1.5">
           <input
             type="text"
-            value={zipCode}
+            value={zipInput}
             onChange={handleZipChange}
             placeholder="1600023"
             maxLength={8}
@@ -541,8 +576,8 @@ export function AddressSplitSimple({
           />
           <button
             type="button"
-            onClick={() => zipToAddress(zipCode)}
-            disabled={zipLoading || cleanZip(zipCode).length !== 7}
+            onClick={() => zipToAddress(zipInput)}
+            disabled={zipLoading || cleanZip(zipInput).length !== 7}
             title="郵便番号から住所を自動入力"
             className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors"
           >

@@ -53,12 +53,13 @@ export default async function ShinseiFormPage({
     ),
     addressInJapan:             applicant.japanAddress ?? '',
     telephoneNo:                applicant.phone ?? '',
+    cellularPhoneNo:            (applicant as any).mobilePhone ?? '',
     passportNumber:             applicant.passportNumber ?? '',
     passportExpiry:             applicant.passportExpiry ?? '',
     currentStatusOfResidence:   VISA_TYPE_LABELS[applicant.currentVisaType ?? ''] ?? applicant.currentVisaType ?? '',
     currentPeriodExpiry:        applicant.currentVisaExpiry ?? '',
     residenceCardNumber:        applicant.residenceCardNumber ?? '',
-    desiredStatusOfResidence:   application.visaType ?? '',
+    desiredStatusOfResidence:   VISA_TYPE_LABELS[application.visaType] ?? application.visaType ?? '',
     employerName:               organization?.nameJa ?? '',
     employerAddress:            [organization?.prefecture, organization?.city, organization?.addressLine].filter(Boolean).join(''),
     employerPhone:              organization?.phone ?? '',
@@ -78,8 +79,9 @@ export default async function ShinseiFormPage({
     addressLineInJapan: (applicant as any).japanAddressLine ?? (
       !(applicant as any).japanPrefecture ? (applicant.japanAddress ?? '') : ''
     ),
-    addressInJapan: applicant.japanAddress ?? '',
-    telephoneNo:    applicant.phone        ?? '',
+    addressInJapan:  applicant.japanAddress ?? '',
+    telephoneNo:     applicant.phone        ?? '',
+    cellularPhoneNo: (applicant as any).mobilePhone ?? '',
   };
 
   // 在留資格の英語キー → 日本語ラベル変換
@@ -116,6 +118,10 @@ export default async function ShinseiFormPage({
   const visaLabel = VISA_TYPE_LABELS[application.visaType] ?? application.visaType;
   const appTypeLabel = APPLICATION_TYPE_LABELS[application.applicationType] ?? application.applicationType;
 
+  // 理由書PDF表示条件: 家族滞在 かつ（認定 or 変更）
+  const showRiyusho = application.visaType === "dependent"
+    && (application.applicationType === "certification" || application.applicationType === "change");
+
   return (
     <div className="p-6 max-w-5xl">
       {/* ヘッダー */}
@@ -138,6 +144,16 @@ export default async function ShinseiFormPage({
             <FileDown className="w-4 h-4" />
             申請書PDF出力
           </Link>
+          {showRiyusho && (
+            <Link
+              href={`/print/${id}/riyusho`}
+              target="_blank"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-300"
+            >
+              <FileDown className="w-4 h-4" />
+              理由書PDF
+            </Link>
+          )}
         </div>
       </div>
 

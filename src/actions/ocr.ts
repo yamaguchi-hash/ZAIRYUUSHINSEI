@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth";
 import { db, applicantDocuments, applicantMaster } from "@/lib/db";
 import { eq, and, inArray } from "drizzle-orm";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { revalidatePath } from "next/cache";
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
@@ -13,6 +13,66 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   residence_card_back: "在留カード（裏面）",
   residence_card: "在留カード（表面・裏面）",
 };
+
+// ─── 構造化出力スキーマ定義 ──────────────────────────────────────────────────
+const RESIDENCE_CARD_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    surname_ja:            { type: Type.STRING, description: "姓（漢字）", nullable: true },
+    given_name_ja:         { type: Type.STRING, description: "名（漢字）", nullable: true },
+    surname_en:            { type: Type.STRING, description: "姓（ローマ字）", nullable: true },
+    given_name_en:         { type: Type.STRING, description: "名（ローマ字）", nullable: true },
+    nationality:           { type: Type.STRING, description: "国籍・地域", nullable: true },
+    date_of_birth:         { type: Type.STRING, description: "生年月日（YYYY-MM-DD形式）", nullable: true },
+    gender:                { type: Type.STRING, description: "性別（M または F）", nullable: true },
+    residence_card_number: { type: Type.STRING, description: "在留カード番号", nullable: true },
+    status_of_residence:   { type: Type.STRING, description: "在留資格（日本語）", nullable: true },
+    period_of_stay:        { type: Type.STRING, description: "在留期間", nullable: true },
+    date_of_expiry:        { type: Type.STRING, description: "在留期限（YYYY-MM-DD形式）", nullable: true },
+    postal_code:           { type: Type.STRING, description: "郵便番号（数字7桁のみ）", nullable: true },
+    address:               { type: Type.STRING, description: "住居地（郵便番号を除いた住所）", nullable: true },
+    back_address:          { type: Type.STRING, description: "裏面の変更後最新住所", nullable: true },
+    back_postal_code:      { type: Type.STRING, description: "裏面の変更後郵便番号（数字7桁）", nullable: true },
+    workplace:             { type: Type.STRING, description: "勤務先・所属機関", nullable: true },
+    qualification:         { type: Type.STRING, description: "資格外活動許可等", nullable: true },
+  },
+};
+
+const PASSPORT_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    surname:          { type: Type.STRING, description: "姓（ローマ字）", nullable: true },
+    given_name:       { type: Type.STRING, description: "名（ローマ字）", nullable: true },
+    nationality:      { type: Type.STRING, description: "国籍", nullable: true },
+    date_of_birth:    { type: Type.STRING, description: "生年月日（YYYY-MM-DD形式）", nullable: true },
+    gender:           { type: Type.STRING, description: "性別（M または F）", nullable: true },
+    passport_number:  { type: Type.STRING, description: "パスポート番号", nullable: true },
+    expiry_date:      { type: Type.STRING, description: "有効期限（YYYY-MM-DD形式）", nullable: true },
+    issuing_country:  { type: Type.STRING, description: "発行国", nullable: true },
+    place_of_birth:   { type: Type.STRING, description: "出生地", nullable: true },
+    mrz_line1:        { type: Type.STRING, description: "MRZ第1行", nullable: true },
+    mrz_line2:        { type: Type.STRING, description: "MRZ第2行", nullable: true },
+  },
+};
+
+const GENERIC_DOC_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    doc_type:    { type: Type.STRING, description: "書類の種類", nullable: true },
+    data:        { type: Type.STRING, description: "抽出された情報（JSON文字列）", nullable: true },
+  },
+};
+
+/** documentType に対応する responseSchema を返す */
+function getOcrSchema(documentType: string) {
+  if (documentType === "residence_card" || documentType === "residence_card_front" || documentType === "residence_card_back") {
+    return RESIDENCE_CARD_SCHEMA;
+  }
+  if (documentType === "passport_data_page" || documentType === "passport_front") {
+    return PASSPORT_SCHEMA;
+  }
+  return undefined; // 汎用書類はスキーマなし（responseMimeTypeのみ）
+}
 
 // Save uploaded document metadata to DB
 export async function saveApplicantDocument(data: {
@@ -79,56 +139,78 @@ export async function deleteApplicantDocument(documentId: string) {
 // ─── プロンプト生成 ───────────────────────────────────────────────────────────
 function buildPrompt(documentType: string): string {
   if (documentType === "residence_card" || documentType === "residence_card_front" || documentType === "residence_card_back") {
-    return `あなたは身分証明書のOCR専門家です。
-このファイルは在留カードです。PDFの場合は全ページを確認し、表面・裏面の両方から情報を抽出してください。
+    return `【役割】あなたは在留資格申請を専門とする行政書士AIアシスタントです。身分証明書（在留カード）からの正確な情報読み取りを担当します。
 
-【表面から抽出する項目】
-- surname_ja (姓・漢字)
-- given_name_ja (名・漢字)
-- surname_en (姓・ローマ字)
-- given_name_en (名・ローマ字)
-- nationality (国籍・地域)
-- date_of_birth (生年月日、YYYY-MM-DD形式)
-- gender (性別: M or F)
-- residence_card_number (在留カード番号)
-- status_of_residence (在留資格)
-- period_of_stay (在留期間)
-- date_of_expiry (在留期限、YYYY-MM-DD形式)
-- postal_code (郵便番号、数字7桁のみ。〒マーク不要)
-- address (住居地。郵便番号を除いた住所のみ)
+【処理対象】在留カード（表面・裏面）
 
-【裏面から抽出する項目】
-重要: 裏面には住所変更の記録が記載されている場合があります。
-- back_address (変更後の最新住所。「住居地」「新住所」「変更後」などの欄の最新記載。なければnull)
-- back_postal_code (変更後住所の郵便番号、数字7桁のみ。なければnull)
-- workplace (勤務先・所属機関)
-- qualification (資格外活動許可等)
+【処理手順】
+1. まず書類全体を確認し、表面・裏面を識別する
+2. 表面から氏名・国籍・在留資格等の基本情報を読み取る
+3. 裏面から住所変更記録・勤務先情報を読み取る
+4. 日付はすべてYYYY-MM-DD形式に変換する
 
-読み取れなかった項目はnullにしてください。
-JSONのみを返し、説明文は不要です。`;
+【抽出フィールド（表面）】
+- surname_ja: 姓（漢字）
+- given_name_ja: 名（漢字）
+- surname_en: 姓（ローマ字・大文字）
+- given_name_en: 名（ローマ字・大文字）
+- nationality: 国籍・地域
+- date_of_birth: 生年月日（YYYY-MM-DD）
+- gender: 性別（M または F のみ）
+- residence_card_number: 在留カード番号（英数字）
+- status_of_residence: 在留資格（日本語表記）
+- period_of_stay: 在留期間（例：3年、1年）
+- date_of_expiry: 在留期限（YYYY-MM-DD）
+- postal_code: 郵便番号（数字7桁のみ。〒マーク不要）
+- address: 住居地（郵便番号を除いた住所のみ）
+
+【抽出フィールド（裏面）】
+- back_address: 住所変更がある場合の最新住所（変更記録の最終行。なければnull）
+- back_postal_code: 変更後住所の郵便番号（数字7桁。なければnull）
+- workplace: 勤務先・所属機関名
+- qualification: 資格外活動許可等の記載
+
+【制約】
+・書類に明記されている情報のみ抽出し、推測・補完は行わないこと
+・読み取れない項目はnullとすること
+・日付は必ずYYYY-MM-DD形式（例：2025-03-15）
+・性別はMまたはFのみ（男/女/MALE/FEMALE等は変換すること）`;
   }
 
   if (documentType === "passport_data_page" || documentType === "passport_front") {
-    return `あなたは身分証明書のOCR専門家です。
-この画像はパスポートです。以下の項目をすべて抽出してください。
+    return `【役割】あなたは在留資格申請を専門とする行政書士AIアシスタントです。パスポートからの正確な情報読み取りを担当します。
 
-- surname (姓・ファミリーネーム、ローマ字)
-- given_name (名・ファーストネーム、ローマ字)
-- nationality (国籍)
-- date_of_birth (生年月日、YYYY-MM-DD形式)
-- gender (性別: M or F)
-- passport_number (パスポート番号)
-- expiry_date (有効期限、YYYY-MM-DD形式)
-- issuing_country (発行国)
-- place_of_birth (出生地、読み取れる場合)
-- mrz_line1 (MRZ第1行、読み取れる場合)
-- mrz_line2 (MRZ第2行、読み取れる場合)
+【処理対象】パスポート（顔写真・データページ）
 
-読み取れなかった項目はnullにしてください。
-JSONのみを返し、説明文は不要です。`;
+【処理手順】
+1. まずMRZ（機械読取領域）を確認し、基本情報の正確性を検証する
+2. 顔写真ページの印字情報を読み取る
+3. MRZと印字情報を照合し、より正確な方を採用する
+4. 日付はすべてYYYY-MM-DD形式に変換する
+
+【抽出フィールド】
+- surname: 姓（ローマ字・大文字。ファミリーネーム）
+- given_name: 名（ローマ字・大文字。ファーストネーム）
+- nationality: 国籍（日本語表記。例：中国、ベトナム、フィリピン）
+- date_of_birth: 生年月日（YYYY-MM-DD）
+- gender: 性別（M または F のみ）
+- passport_number: パスポート番号（英数字）
+- expiry_date: 有効期限（YYYY-MM-DD）
+- issuing_country: 発行国
+- place_of_birth: 出生地（読み取れる場合）
+- mrz_line1: MRZ第1行（読み取れる場合）
+- mrz_line2: MRZ第2行（読み取れる場合）
+
+【制約】
+・書類に明記されている情報のみ抽出し、推測・補完は行わないこと
+・読み取れない項目はnullとすること
+・日付は必ずYYYY-MM-DD形式
+・性別はMまたはFのみ`;
   }
 
-  return `この書類から読み取れる全ての情報をJSON形式で抽出してください。JSONのみを返し、説明文は不要です。`;
+  return `【役割】あなたは在留資格申請の専門行政書士AIです。
+【指示】この書類から読み取れる全ての情報を正確に抽出してください。
+【制約】書類に明記されている情報のみ抽出し、推測しないこと。読み取れない項目はnullとすること。`;
 }
 
 // OCR a single document with Gemini
@@ -166,6 +248,7 @@ async function ocrSingleDocument(
   }
 
   const prompt = buildPrompt(documentType);
+  const schema = getOcrSchema(documentType);
 
   let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
   try {
@@ -179,6 +262,10 @@ async function ocrSingleDocument(
           ],
         },
       ],
+      config: {
+        responseMimeType: "application/json",
+        ...(schema ? { responseSchema: schema } : {}),
+      },
     });
   } catch (err: any) {
     const body = err?.errorDetails ?? err?.message ?? "";
@@ -195,19 +282,14 @@ async function ocrSingleDocument(
   const text = response.text ?? "{}";
   console.log("[OCR] raw response text:", text.slice(0, 1000));
 
-  // Extract JSON from response (strip markdown code fences if present)
+  // responseMimeType: "application/json" により、レスポンスは常に有効なJSON
   let parsed: Record<string, any> = {};
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/```\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
-  if (jsonMatch) {
-    try {
-      parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
-    } catch {
-      // フォールバック: テキスト全体をパース
-      try { parsed = JSON.parse(text.trim()); } catch { parsed = {}; }
-    }
-  } else {
-    // コードブロックなしで直接JSONが返された場合
-    try { parsed = JSON.parse(text.trim()); } catch { parsed = {}; }
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    // フォールバック: マークダウンコードフェンスが含まれる場合の処理
+    const m = text.match(/```json?\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+    try { parsed = JSON.parse(m?.[1] ?? text.trim()); } catch { parsed = {}; }
   }
 
   console.log("[OCR] parsed fields:", JSON.stringify(parsed));

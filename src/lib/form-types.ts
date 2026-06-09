@@ -344,7 +344,7 @@ export interface ApplicationFormData {
   orgSpecifiedIndustrialField: string; // (2) 特定産業分野
   orgWorkCategory: string;            // (2) 業務区分
   orgOccupationNumber: string;        // (2) 主職種番号
-  orgOccupationNumberAdditional: string; // (2) 追加職種番号
+  orgOccupationNumberAdditional: string[]; // (2) 追加職種番号（複数選択・配列）
   orgWorkHoursWeekly: string;         // (3) 所定労働時間（週平均）
   orgWorkHoursMonthly: string;        // (3) 所定労働時間（月平均）
   orgWorkHoursEquivalent: string;     // (3) 正規労働者と同等か 有/無
@@ -540,9 +540,10 @@ export interface ApplicationFormData {
   gaikatsuEmployerBusinessType: string;  // 製造 / 商業 / 教育 / その他
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 申請理由書（別紙）
+  // 理由書（家族滞在用）
   // ══════════════════════════════════════════════════════════════════════════
-  applicationStatement: string;
+  riyushoSubmissionBureau: string;   // 提出先管理局（例: "大阪", "東京", "名古屋"）
+  riyushoBody: string;               // 理由書本文
 }
 
 // ─── 空フォームデータ ─────────────────────────────────────────────────────────
@@ -633,7 +634,7 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   // 所属機関 V型固有
   orgContractStartDate: '', orgContractEndDate: '',
   orgSpecifiedIndustrialField: '', orgWorkCategory: '',
-  orgOccupationNumber: '', orgOccupationNumberAdditional: '',
+  orgOccupationNumber: '', orgOccupationNumberAdditional: [],
   orgWorkHoursWeekly: '', orgWorkHoursMonthly: '', orgWorkHoursEquivalent: '有',
   orgTimeConvertedBasicSalary: '', orgJapaneseEquivalentSalary: '', orgSalaryEqualToJapanese: '有',
   orgSalaryPaymentCash: '無', orgSalaryPaymentBank: '有',
@@ -711,8 +712,9 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   gaikatsuSalary: '', gaikatsuSalaryType: '月額',
   gaikatsuEmployerName: '', gaikatsuEmployerAddress: '', gaikatsuEmployerPhone: '',
   gaikatsuEmployerBusinessType: '',
-  // 理由書
-  applicationStatement: '',
+  // 理由書（家族滞在用）
+  riyushoSubmissionBureau: '',
+  riyushoBody: '',
 };
 
 // ─── 業種一覧（別紙） ─────────────────────────────────────────────────────────
@@ -743,6 +745,61 @@ export const BUSINESS_TYPES: { code: number; label: string }[] = [
   { code: 42, label: '職業紹介・労働者派遣業' },
   { code: 43, label: 'その他の事業サービス業' }, { code: 44, label: 'その他のサービス業' },
   { code: 45, label: '宗教' }, { code: 46, label: '公務' }, { code: 47, label: '分類不能の産業' },
+];
+
+// ─── 職種一覧（別紙） ──────────────────────────────────────────────────────────
+export const OCCUPATION_TYPES: { code: number; label: string }[] = [
+  { code: 1, label: '経営' }, { code: 2, label: '管理業務（経営者を除く）' },
+  { code: 3, label: '調査研究' }, { code: 4, label: '技術開発（農林水産分野）' },
+  { code: 5, label: '技術開発（食品分野）' }, { code: 6, label: '技術開発（機械器具分野）' },
+  { code: 7, label: '技術開発（その他製造分野）' }, { code: 8, label: '生産管理（食品分野）' },
+  { code: 9, label: '生産管理（機械器具分野）' }, { code: 10, label: '生産管理（その他製造分野）' },
+  { code: 11, label: '建築・土木・測量技術' }, { code: 12, label: '情報処理・通信技術' },
+  { code: 13, label: '法律関係業務' }, { code: 14, label: '金融・保険' },
+  { code: 15, label: 'コピーライティング' }, { code: 16, label: '報道' },
+  { code: 17, label: '編集' }, { code: 18, label: 'デザイン' },
+  { code: 19, label: '教育（教員免許を有する者が行う教育）' },
+  { code: 20, label: '教育（小学校・中学校・高等学校における語学教育）' },
+  { code: 21, label: '教育（専修学校）' }, { code: 22, label: '教育（各種学校）' },
+  { code: 23, label: '教育（インターナショナルスクール）' },
+  { code: 24, label: '教育（教育機関を除く）' }, { code: 25, label: '翻訳・通訳' },
+  { code: 26, label: '海外取引業務' }, { code: 27, label: '企画事務（マーケティング，リサーチ）' },
+  { code: 28, label: '企画事務（広報・宣伝）' }, { code: 29, label: '会計事務' },
+  { code: 30, label: '法人営業' }, { code: 31, label: 'ＣＡＤオペレーション' },
+  { code: 32, label: '調理' }, { code: 33, label: '外国特有の建築技術' },
+  { code: 34, label: '外国特有の製品製造' }, { code: 35, label: '宝石・貴金属・毛皮加工' },
+  { code: 36, label: '動物の調教' }, { code: 37, label: '石油・地熱等掘削調査' },
+  { code: 38, label: 'パイロット' }, { code: 39, label: 'スポーツ指導' },
+  { code: 40, label: 'ソムリエ' }, { code: 41, label: '介護福祉士' },
+  { code: 42, label: '研究' }, { code: 43, label: '研究の指導' },
+  { code: 45, label: '記者' }, { code: 46, label: '報道カメラマン' },
+  { code: 47, label: '医師' }, { code: 48, label: '歯科医師' },
+  { code: 49, label: '薬剤師' }, { code: 50, label: '看護師' },
+  { code: 55, label: '保健師' }, { code: 56, label: '助産師' },
+  { code: 57, label: '准看護師' }, { code: 58, label: '歯科衛生士' },
+  { code: 59, label: '診療放射線技師' }, { code: 60, label: '理学療法士' },
+  { code: 61, label: '作業療法士' }, { code: 62, label: '視能訓練士' },
+  { code: 63, label: '臨床工学技士' }, { code: 64, label: '義肢装具士' },
+  { code: 65, label: '弁護士' }, { code: 66, label: '司法書士' },
+  { code: 67, label: '弁理士' }, { code: 68, label: '土地家屋調査士' },
+  { code: 69, label: '外国法事務弁護士' }, { code: 70, label: '公認会計士' },
+  { code: 71, label: '外国公認会計士' }, { code: 72, label: '税理士' },
+  { code: 73, label: '社会保険労務士' }, { code: 74, label: '行政書士' },
+  { code: 75, label: '海事代理士' }, { code: 76, label: '著述家' },
+  { code: 77, label: '美術家・写真家' }, { code: 78, label: '音楽家・舞台芸術家' },
+  { code: 79, label: '宗教家' }, { code: 80, label: '家事使用人' },
+  { code: 81, label: 'プロスポーツ選手' },
+  { code: 100, label: 'その他のサービス職業従事者（他に分類されないもの）' },
+  { code: 101, label: '農林漁業従事者' },
+  { code: 102, label: '製品製造・加工処理従事者（金属製品）' },
+  { code: 103, label: '製品製造・加工処理従事者（金属製品を除く）' },
+  { code: 104, label: '機械組立従事者' }, { code: 105, label: '機械整備・修理従事者' },
+  { code: 106, label: '機械検査従事者' }, { code: 107, label: '建設躯体工事従事者' },
+  { code: 108, label: '建設従事者（建設躯体工事従事者を除く）' },
+  { code: 109, label: 'その他の建設・採掘従事者（他に分類されないもの）' },
+  { code: 110, label: '運搬・清掃・包装等従事者' },
+  { code: 111, label: '外交' }, { code: 112, label: '公用' },
+  { code: 999, label: 'その他' },
 ];
 
 // ─── 専攻・専門分野（大学・短大・大学院） ────────────────────────────────────────

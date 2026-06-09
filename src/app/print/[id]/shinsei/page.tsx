@@ -3,10 +3,17 @@ import { db, applications, applicantMaster, organizationMaster } from "@/lib/db"
 import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { ApplicationFormData, FamilyMember, WorkHistoryEntry } from "@/lib/form-types";
-import { FORM_TYPE_LABELS, VISA_CATEGORY_NEEDS_ORG, VISA_CATEGORY_PART2 } from "@/lib/form-types";
+import { FORM_TYPE_LABELS, VISA_CATEGORY_NEEDS_ORG, VISA_CATEGORY_PART2, OCCUPATION_TYPES } from "@/lib/form-types";
 import { PrintTrigger } from "../print-trigger";
 
 function fmt(v: string | null | undefined) { return v || "　"; }
+/** 住所文字列から「〒1234567|」プレフィックスを解析し、「〒123-4567　住所」形式で表示 */
+function fmtAddr(v: string | null | undefined) {
+  if (!v) return "　";
+  const m = v.match(/^〒(\d{3})(\d{4})\|(.*)$/);
+  if (m) return `〒${m[1]}-${m[2]}　${m[3] || ""}`.trim() || "　";
+  return v;
+}
 function fmtDate(v: string | null | undefined) {
   if (!v) return "　";
   const d = new Date(v);
@@ -19,6 +26,16 @@ function fmtMoney(v: string | null | undefined) {
   return isNaN(n) ? String(v) : `${n.toLocaleString()}円`;
 }
 function businessTypeLabel(code: string) { return code ? `${code}番` : "　"; }
+/** 追加職種番号の表示（配列/旧string両対応） */
+function fmtAdditionalOccupations(v: string | string[] | null | undefined): string {
+  if (!v) return "　";
+  const codes = Array.isArray(v) ? v : String(v).split(",").map(s => s.trim()).filter(Boolean);
+  if (codes.length === 0) return "　";
+  return codes.map(code => {
+    const occ = OCCUPATION_TYPES.find(o => String(o.code) === code);
+    return occ ? `${occ.code}` : code;
+  }).join(", ");
+}
 
 // ─── 後方互換ヘルパー（旧英語混在値 "有（Yes）" と新日本語値 "有" の両方に対応） ─
 function yes(v: string | null | undefined): boolean {
@@ -375,7 +392,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     <td className="lbl">支店・事業所名</td><td>{fmt(form.employerBranchName)}</td>
                   </tr>
                   <tr>
-                    <td className="lbl">所在地（主たる勤務場所）</td><td colSpan={3}>{fmt(form.employerAddress)}</td>
+                    <td className="lbl">所在地（主たる勤務場所）</td><td colSpan={3}>{fmtAddr(form.employerAddress)}</td>
                   </tr>
                   <tr>
                     <td className="lbl">電話番号</td><td>{fmt(form.employerPhone)}</td>
@@ -453,7 +470,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     <td className="lbl"></td><td></td>
                   </tr>
                   <tr>
-                    <td className="lbl">住所</td><td colSpan={3}>{fmt(form.spouseAddress)}</td>
+                    <td className="lbl">住所</td><td colSpan={3}>{fmtAddr(form.spouseAddress)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -581,7 +598,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   </tr>
                   <tr>
                     <td className="lbl">(3) 住所</td>
-                    <td colSpan={3}>{fmt(form.representativeAddress)}</td>
+                    <td colSpan={3}>{fmtAddr(form.representativeAddress)}</td>
                   </tr>
                   <tr>
                     <td className="lbl">電話番号</td>
@@ -717,7 +734,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   </tr>
                   <tr>
                     <td className="lbl">(12) 勤務先所在地</td>
-                    <td colSpan={3}>{fmt(form.supporterEmployerAddress || form.supporterAddress)}</td>
+                    <td colSpan={3}>{fmtAddr(form.supporterEmployerAddress || form.supporterAddress)}</td>
                   </tr>
                   <tr>
                     <td className="lbl">　　 電話番号</td>
@@ -771,7 +788,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     <td className="lbl">電話番号</td><td>{fmt(form.schoolPhone)}</td>
                   </tr>
                   <tr>
-                    <td className="lbl">所在地</td><td colSpan={3}>{fmt(form.schoolAddress)}</td>
+                    <td className="lbl">所在地</td><td colSpan={3}>{fmtAddr(form.schoolAddress)}</td>
                   </tr>
                   <tr>
                     <td className="lbl">在籍コース・専攻</td><td>{fmt(form.courseOfStudy)}</td>
@@ -808,13 +825,13 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           {isVtype && (
             <>
               <div className="section page-break">
-                申請人等作成用　２　Ｖ　—「特定技能（１号・２号）」（項目 17〜21）
+                申請人等作成用 ２　　　Ｖ　（「特定技能（１号）」・「特定技能（２号）」）
               </div>
 
               <div className="section3">17. 特定技能所属機関</div>
               <table><tbody>
-                <tr><td className="lbl" style={{width:'30%'}}>(1) 名称</td><td colSpan={3}>{fmt(form.employerName)}</td></tr>
-                <tr><td className="lbl">(2) 所在地</td><td colSpan={3}>{fmt(form.employerAddress)}</td><td className="lbl" style={{width:'15%'}}>電話番号</td><td>{fmt(form.employerPhone)}</td></tr>
+                <tr><td className="lbl" style={{width:'30%'}}>(1) 氏名又は名称</td><td colSpan={3}>{fmt(form.employerName)}</td></tr>
+                <tr><td className="lbl">(2) 住所（所在地）</td><td colSpan={3}>{fmtAddr(form.employerAddress)}</td><td className="lbl" style={{width:'15%'}}>電話番号</td><td>{fmt(form.employerPhone)}</td></tr>
               </tbody></table>
 
               <div className="section3">18. 技能水準</div>
@@ -824,7 +841,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 {form.skillLevelExamName2 && <tr><td className="lbl">試験名②</td><td>{fmt(form.skillLevelExamName2)}</td><td className="lbl">試験地②</td><td>{fmt(form.skillLevelExamCountry2)}{form.skillLevelExamCountry2 === '国外' ? `（${form.skillLevelExamCountryName2}）` : ''}</td></tr>}
               </tbody></table>
 
-              <div className="section3">19. 日本語能力（特定技能１号の場合）</div>
+              <div className="section3">19. 日本語能力（「特定技能1号」での在留を希望する場合に記入）</div>
               <table><tbody>
                 <tr><td className="lbl" style={{width:'30%'}}>証明方法</td><td colSpan={3}>{fmt(form.japaneseAbilityProofMethod)}</td></tr>
                 {form.japaneseAbilityExamName1 && <tr><td className="lbl">試験名①</td><td>{fmt(form.japaneseAbilityExamName1)}</td><td className="lbl" style={{width:'15%'}}>試験地①</td><td>{fmt(form.japaneseAbilityExamCountry1)}{form.japaneseAbilityExamCountry1 === '国外' ? `（${form.japaneseAbilityExamCountryName1}）` : ''}</td></tr>}
@@ -832,7 +849,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               </tbody></table>
 
               {(form.completedTit2Occupation1 || form.completedTit2Occupation2) && (<>
-                <div className="section3">20. 修了した技能実習2号</div>
+                <div className="section3">20. 良好に修了した技能実習2号（上記18，19において技能実習2号を良好に修了を選択した場合に記入）</div>
                 <table><tbody>
                   <tr><td className="lbl" style={{width:'20%'}}>職種①</td><td>{fmt(form.completedTit2Occupation1)}</td><td className="lbl" style={{width:'15%'}}>作業①</td><td>{fmt(form.completedTit2Operations1)}</td><td className="lbl" style={{width:'15%'}}>証明</td><td>{fmt(form.completedTit2ProofType1)}</td></tr>
                   {form.completedTit2Occupation2 && <tr><td className="lbl">職種②</td><td>{fmt(form.completedTit2Occupation2)}</td><td className="lbl">作業②</td><td>{fmt(form.completedTit2Operations2)}</td><td className="lbl">証明</td><td>{fmt(form.completedTit2ProofType2)}</td></tr>}
@@ -840,28 +857,28 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               </>)}
 
               {(form.cumulativeStayYears || form.cumulativeStayMonths) && (<>
-                <div className="section3">21. 通算在留期間（特定技能１号）</div>
+                <div className="section3">21. 申請時における特定技能1号での通算在留期間（過去の在留歴を含む。「特定技能1号」での在留を希望する場合に記入）</div>
                 <table><tbody>
                   <tr><td className="lbl" style={{width:'30%'}}>通算在留期間</td><td>{form.cumulativeStayYears ? `${form.cumulativeStayYears}年` : '　'}{form.cumulativeStayMonths ? `${form.cumulativeStayMonths}ヶ月` : '　'}</td></tr>
                 </tbody></table>
               </>)}
 
-              {/* Part 3 V — 項目22〜27 */}
+              {/* Part 3 V — 項目22〜28 */}
               <div className="section page-break">
-                申請人等作成用　３　Ｖ　—「特定技能（１号・２号）」（項目 22〜27）
+                申請人等作成用 ３　　　Ｖ　（「特定技能（１号）」・「特定技能（２号）」）
               </div>
               <table><tbody>
-                <tr><td className="lbl" style={{width:'60%'}}>22. 保証金徴収・財産管理・違約金契約の有無</td><td>{fmtYesNo(form.depositContractExists)}</td></tr>
-                <tr><td className="lbl">23. 外国の機関への費用（了解の有無）</td><td>{fmtYesNo(form.overseasExpensesExists)}{form.overseasExpensesExists === '有' ? `（${fmt(form.overseasExpensesOrgName)}、約${fmt(form.overseasExpensesAmount)}円）` : ''}</td></tr>
-                <tr><td className="lbl">24. 本国・居住国の手続きの実施</td><td>{fmtYesNo(form.homeCountryProcedureComplied)}</td></tr>
-                <tr><td className="lbl">25. 定期的費用の了解</td><td>{fmtYesNo(form.regularExpensesUnderstood)}</td></tr>
-                <tr><td className="lbl">26. 技能移転への努力（技能実習歴あり＋2号希望の場合）</td><td>{fmtYesNo(form.technologyTransferEffortV)}</td></tr>
-                <tr><td className="lbl">27. 特定産業分野の基準への適合</td><td>{fmtYesNo(form.ssfSpecificFieldCriteriaMet)}</td></tr>
+                <tr><td className="lbl" style={{width:'70%'}}>22. 特定技能雇用契約に係る保証金の徴収その他財産管理又は違約金等の支払契約の有無</td><td>{fmtYesNo(form.depositContractExists)}</td></tr>
+                <tr><td className="lbl">23. 特定技能雇用契約に係る申込みの取次ぎ又は外国における活動準備に関する外国の機関への費用の支払について，その額及び内訳を十分に理解して合意していることの有無（当該費用の支払がある場合に記入）</td><td>{fmtYesNo(form.overseasExpensesExists)}{form.overseasExpensesExists === '有' ? `（${fmt(form.overseasExpensesOrgName)}、約${fmt(form.overseasExpensesAmount)}円）` : ''}</td></tr>
+                <tr><td className="lbl">24. 国籍又は住居を有する国又は地域において定められる，本邦で行う活動に関連して遵守すべき手続を経ていることの有無（当該手続が定められている場合に記入）</td><td>{fmtYesNo(form.homeCountryProcedureComplied)}</td></tr>
+                <tr><td className="lbl">25. 本邦において定期的に負担する費用について，対価の内容を十分に理解して合意していることの有無（当該費用の負担がある場合に記入）</td><td>{fmtYesNo(form.regularExpensesUnderstood)}</td></tr>
+                <tr><td className="lbl">26. 技能実習によって本邦において修得，習熟又は熟達した技能等の本国への移転に努めることの有無（技能実習の在留資格をもって在留していたことがある場合であって，「特定技能2号」での在留を希望する場合に記入）</td><td>{fmtYesNo(form.technologyTransferEffortV)}</td></tr>
+                <tr><td className="lbl">27. 申請人につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）</td><td>{fmtYesNo(form.ssfSpecificFieldCriteriaMet)}</td></tr>
               </tbody></table>
 
               {/* 28. 職歴 */}
               {workHistory.length > 0 && workHistory.some(w => w.employer) && (<>
-                <div className="section3">28. 職歴（外国における職歴を含む）</div>
+                <div className="section3">28. 職歴（外国におけるものを含む）</div>
                 <table><tbody>
                   <tr>
                     <td className="lbl" style={{width:'15%'}}>入社年月</td>
@@ -878,12 +895,12 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 </tbody></table>
               </>)}
 
-              {/* 所属機関等作成用 Part 1-3 V */}
+              {/* 所属機関等作成用 Part 1-4 V */}
               <div className="section page-break">
-                所属機関等作成用　Part 1・2　Ｖ　—「特定技能（１号・２号）」
+                所属機関等作成用 １　　　Ｖ　（「特定技能（１号）」・「特定技能（２号）」）
               </div>
 
-              <div className="section3">1. 雇用する外国人の氏名</div>
+              <div className="section3">1. 雇用している外国人の氏名</div>
               <table><tbody>
                 <tr><td colSpan={4}>{form.familyNameEn} {form.givenNameEn}</td></tr>
               </tbody></table>
@@ -891,29 +908,30 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               <div className="section3">2. 特定技能雇用契約</div>
               <table><tbody>
                 <tr><td className="lbl" style={{width:'30%'}}>(1) 雇用契約期間</td><td colSpan={3}>{fmt(form.orgContractStartDate)} 〜 {fmt(form.orgContractEndDate)}</td></tr>
-                <tr><td className="lbl">(2) 特定産業分野</td><td>{fmt(form.orgSpecifiedIndustrialField)}</td><td className="lbl">業務区分</td><td>{fmt(form.orgWorkCategory)}</td></tr>
-                <tr><td className="lbl">主職種番号</td><td>{fmt(form.orgOccupationNumber)}</td><td className="lbl">追加職種番号</td><td>{fmt(form.orgOccupationNumberAdditional)}</td></tr>
-                <tr><td className="lbl">(3) 所定労働時間（週平均）</td><td>{fmt(form.orgWorkHoursWeekly)}時間</td><td className="lbl">（月平均）</td><td>{fmt(form.orgWorkHoursMonthly)}時間</td></tr>
-                <tr><td className="lbl">正規労働者と同等か</td><td colSpan={3}>{fmtYesNo(form.orgWorkHoursEquivalent)}</td></tr>
-                <tr><td className="lbl">(4) 月額報酬（円）</td><td>{form.salary ? Number(form.salary).toLocaleString() + '円' : '　'}</td><td className="lbl">時間換算基本給</td><td>{form.orgTimeConvertedBasicSalary ? Number(form.orgTimeConvertedBasicSalary).toLocaleString() + '円' : '　'}</td></tr>
-                <tr><td className="lbl">日本人同種業務の月額</td><td>{form.orgJapaneseEquivalentSalary ? Number(form.orgJapaneseEquivalentSalary).toLocaleString() + '円' : '　'}</td><td className="lbl">日本人同等以上か</td><td>{fmtYesNo(form.orgSalaryEqualToJapanese)}</td></tr>
-                <tr><td className="lbl">(5) 報酬支払方法</td><td colSpan={3}>{yes(form.orgSalaryPaymentCash) ? '現金払い　' : ''}{yes(form.orgSalaryPaymentBank) ? '銀行振込' : ''}</td></tr>
-                <tr><td className="lbl">(6) 外国人差別的扱い</td><td>{fmtYesNo(form.orgForeignTreatmentDifference)}</td><td className="lbl">(7) 一時帰国有給</td><td>{fmtYesNo(form.orgPaidHolidayForReturn)}</td></tr>
-                <tr><td className="lbl">(8) 分野別雇用基準</td><td>{fmtYesNo(form.orgFieldSpecificEmploymentCriteria)}</td><td className="lbl">(9) 帰国旅費負担</td><td>{fmtYesNo(form.orgReturnTravelExpenses)}</td></tr>
-                <tr><td className="lbl">(10) 健康確認措置</td><td>{fmtYesNo(form.orgHealthCheck)}</td><td className="lbl">(11) 適正在留基準</td><td>{fmtYesNo(form.orgProperResidenceCriteria)}</td></tr>
+                <tr><td className="lbl">(2) 従事すべき業務の内容（複数ある場合は全て記入）</td><td colSpan={3}>&nbsp;</td></tr>
+                <tr><td className="lbl">　特定産業分野</td><td>{fmt(form.orgSpecifiedIndustrialField)}</td><td className="lbl">業務区分</td><td>{fmt(form.orgWorkCategory)}</td></tr>
+                <tr><td className="lbl">　主たる職種（別紙「職種一覧」から選択、1のみ）</td><td>{fmt(form.orgOccupationNumber)}</td><td className="lbl">追加職種番号</td><td>{fmtAdditionalOccupations(form.orgOccupationNumberAdditional)}</td></tr>
+                <tr><td className="lbl">(3) 所定労働時間（週平均）</td><td>{fmt(form.orgWorkHoursWeekly)}時間</td><td className="lbl">所定労働時間（月平均）</td><td>{fmt(form.orgWorkHoursMonthly)}時間</td></tr>
+                <tr><td className="lbl">　所定労働時間が通常の労働者の所定労働時間と同等であることの有無</td><td colSpan={3}>{fmtYesNo(form.orgWorkHoursEquivalent)}</td></tr>
+                <tr><td className="lbl">(4) 月額報酬</td><td>{form.salary ? Number(form.salary).toLocaleString() + '円' : '　'}</td><td className="lbl">基本給の時間換算額</td><td>{form.orgTimeConvertedBasicSalary ? Number(form.orgTimeConvertedBasicSalary).toLocaleString() + '円' : '　'}</td></tr>
+                <tr><td className="lbl">　同等の業務に従事する日本人の月額報酬</td><td>{form.orgJapaneseEquivalentSalary ? Number(form.orgJapaneseEquivalentSalary).toLocaleString() + '円' : '　'}</td><td className="lbl">報酬の額が日本人が従事する場合の報酬の額と同等以上であることの有無</td><td>{fmtYesNo(form.orgSalaryEqualToJapanese)}</td></tr>
+                <tr><td className="lbl">(5) 報酬の支払方法</td><td colSpan={3}>{yes(form.orgSalaryPaymentCash) ? '通貨払　' : ''}{yes(form.orgSalaryPaymentBank) ? '口座振込み' : ''}</td></tr>
+                <tr><td className="lbl">(6) 外国人であることを理由として日本人と異なった待遇としている事項の有無</td><td>{fmtYesNo(form.orgForeignTreatmentDifference)}</td><td className="lbl">(7) 外国人が一時帰国を希望した場合には，必要な有給休暇を取得させるものとしていることの有無</td><td>{fmtYesNo(form.orgPaidHolidayForReturn)}</td></tr>
+                <tr><td className="lbl">(8) 雇用関係につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）</td><td>{fmtYesNo(form.orgFieldSpecificEmploymentCriteria)}</td><td className="lbl">(9) 外国人が特定技能雇用契約終了後の帰国に要する旅費を負担することができないときは，当該旅費を負担するとともに，出国が円滑になされるよう必要な措置を講ずることとしていることの有無</td><td>{fmtYesNo(form.orgReturnTravelExpenses)}</td></tr>
+                <tr><td className="lbl">(10) 外国人の健康の状況その他の生活の状況を把握するために必要な措置を講ずることとしていることの有無</td><td>{fmtYesNo(form.orgHealthCheck)}</td><td className="lbl">(11) 外国人の適正な在留に資するために必要な事項につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）</td><td>{fmtYesNo(form.orgProperResidenceCriteria)}</td></tr>
               </tbody></table>
 
-              <div className="section3">3. 特定技能所属機関情報</div>
+              <div className="section3">3. 特定技能所属機関</div>
               <table><tbody>
-                <tr><td className="lbl" style={{width:'30%'}}>(1) 名称</td><td colSpan={3}>{fmt(form.orgName)}</td></tr>
-                <tr><td className="lbl">(2) 法人番号</td><td>{fmt(form.orgCorporateNumber)}</td><td className="lbl">(3) 雇用保険番号</td><td>{fmt(form.orgEmploymentInsuranceNo)}</td></tr>
-                <tr><td className="lbl">(4) 業種コード（主）</td><td>{fmt(form.orgBusinessTypeCode)}</td><td className="lbl">業種コード（他）</td><td>{fmt(form.orgBusinessTypeOtherCode)}</td></tr>
-                <tr><td className="lbl">(5) 所在地</td><td colSpan={3}>{fmt(form.orgAddress)}　☎ {fmt(form.orgPhone)}</td></tr>
-                <tr><td className="lbl">(6) 資本金</td><td>{form.orgCapital ? Number(form.orgCapital).toLocaleString() + '円' : '　'}</td><td className="lbl">(7) 年間売上高</td><td>{form.orgAnnualSales ? Number(form.orgAnnualSales).toLocaleString() + '円' : '　'}</td></tr>
-                <tr><td className="lbl">(8) 常勤職員数</td><td>{form.orgEmployeeCount ? `${form.orgEmployeeCount}名` : '　'}</td><td className="lbl">(9) 代表者</td><td>{fmt(form.position)}</td></tr>
-                {form.orgBranchName && <tr><td className="lbl">(10) 勤務先事業所</td><td>{fmt(form.orgBranchName)}</td><td className="lbl">所在地</td><td>{fmt(form.activityDetails)}</td></tr>}
-                <tr><td className="lbl">労働保険番号</td><td>{fmt(form.orgLaborInsuranceNo)}</td><td className="lbl">健康・年金保険適用</td><td>{fmtYesNo(form.orgHealthInsuranceMet)}</td></tr>
-                <tr><td className="lbl">労災・雇用保険適用</td><td colSpan={3}>{fmtYesNo(form.orgLaborInsuranceMet)}</td></tr>
+                <tr><td className="lbl" style={{width:'30%'}}>(1) 氏名又は名称</td><td colSpan={3}>{fmt(form.orgName)}</td></tr>
+                <tr><td className="lbl">(2) 法人番号（13桁）</td><td>{fmt(form.orgCorporateNumber)}</td><td className="lbl">(3) 雇用保険適用事業所番号（11桁）</td><td>{fmt(form.orgEmploymentInsuranceNo)}</td></tr>
+                <tr><td className="lbl">(4) 業種（主たる業種を別紙「業種一覧」から選択、1のみ）</td><td>{fmt(form.orgBusinessTypeCode)}</td><td className="lbl">追加業種番号</td><td>{fmt(form.orgBusinessTypeOtherCode)}</td></tr>
+                <tr><td className="lbl">(5) 住所（所在地）</td><td colSpan={3}>{fmtAddr(form.orgAddress)}　☎ {fmt(form.orgPhone)}</td></tr>
+                <tr><td className="lbl">(6) 資本金</td><td>{form.orgCapital ? Number(form.orgCapital).toLocaleString() + '円' : '　'}</td><td className="lbl">(7) 年間売上金額（直近年度）</td><td>{form.orgAnnualSales ? Number(form.orgAnnualSales).toLocaleString() + '円' : '　'}</td></tr>
+                <tr><td className="lbl">(8) 常勤職員数</td><td>{form.orgEmployeeCount ? `${form.orgEmployeeCount}名` : '　'}</td><td className="lbl">(9) 代表者の氏名</td><td>{fmt(form.position)}</td></tr>
+                {form.orgBranchName && <tr><td className="lbl">(10) 勤務させる事業所名</td><td>{fmt(form.orgBranchName)}</td><td className="lbl">所在地</td><td>{fmt(form.activityDetails)}</td></tr>}
+                <tr><td className="lbl">　健康保険及び厚生年金保険の適用事業所であることの有無</td><td>{fmtYesNo(form.orgHealthInsuranceMet)}</td><td className="lbl">　労災保険及び雇用保険の適用事業所であることの有無</td><td>{fmtYesNo(form.orgLaborInsuranceMet)}</td></tr>
+                <tr><td className="lbl">　労働保険番号</td><td colSpan={3}>{fmt(form.orgLaborInsuranceNo)}</td></tr>
               </tbody></table>
 
               {/* 支援計画 */}
@@ -992,7 +1010,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   </tr>
                   {form.representativeAddress && (
                     <tr>
-                      <td className="lbl">代理人住所</td><td colSpan={3}>{fmt(form.representativeAddress)}</td>
+                      <td className="lbl">代理人住所</td><td colSpan={3}>{fmtAddr(form.representativeAddress)}</td>
                     </tr>
                   )}
                   <tr>
@@ -1039,7 +1057,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                       {businessTypeLabel(form.orgBusinessTypeCode ?? "")}
                       {form.orgBusinessTypeOtherCode ? `　他：${form.orgBusinessTypeOtherCode}` : ""}
                     </td>
-                    <td className="lbl">所在地</td><td>{fmt(form.orgAddress)}</td>
+                    <td className="lbl">所在地</td><td>{fmtAddr(form.orgAddress)}</td>
                   </tr>
                   <tr>
                     <td className="lbl">電話番号</td><td>{fmt(form.orgPhone)}</td>
@@ -1178,22 +1196,6 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   <tr>
                     <td style={{ padding: "8px", whiteSpace: "pre-wrap", lineHeight: "1.7" }}>
                       {form.freeformOrgNotes}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </>
-          )}
-
-          {/* ══ 申請理由書（別紙） ══════════════════════════════════════════════ */}
-          {form.applicationStatement && (
-            <>
-              <div className="section page-break">申請理由書（別紙）</div>
-              <table>
-                <tbody>
-                  <tr>
-                    <td style={{ padding: "10px", whiteSpace: "pre-wrap", lineHeight: "2.0", minHeight: "260px", fontSize: "11px" }}>
-                      {form.applicationStatement}
                     </td>
                   </tr>
                 </tbody>

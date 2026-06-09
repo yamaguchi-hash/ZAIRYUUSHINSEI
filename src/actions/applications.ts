@@ -15,6 +15,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, ne, inArray, desc, ilike, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { VISA_TYPE_LABELS } from "@/lib/utils";
 
 function requireTenantId(tenantId: string | undefined | null): string {
   if (!tenantId) throw new Error("テナントIDが不正です");
@@ -1714,6 +1715,7 @@ notes(その他重要事項)
       addressLineInJapan:       (applicant as any)?.japanAddressLine ?? existingForm.addressLineInJapan ?? '',
       addressInJapan:           applicant?.japanAddress ?? existingForm.addressInJapan ?? '',
       telephoneNo:              applicant?.phone ?? existingForm.telephoneNo ?? '',
+      cellularPhoneNo:          (applicant as any)?.mobilePhone ?? existingForm.cellularPhoneNo ?? '',
       passportNumber:           applicant?.passportNumber ?? existingForm.passportNumber ?? '',
       passportExpiry:           applicant?.passportExpiry ?? existingForm.passportExpiry ?? '',
       currentStatusOfResidence: toJaVisa(applicant?.currentVisaType) || existingForm.currentStatusOfResidence || '',
@@ -1728,7 +1730,7 @@ notes(その他重要事項)
       currentPeriodExpiry:      applicant?.currentVisaExpiry ?? existingForm.currentPeriodExpiry ?? '',
       residenceCardNumber:      applicant?.residenceCardNumber ?? existingForm.residenceCardNumber ?? '',
       // 申請情報
-      desiredStatusOfResidence: app.visaType ?? existingForm.desiredStatusOfResidence ?? '',
+      desiredStatusOfResidence: VISA_TYPE_LABELS[app.visaType] ?? app.visaType ?? existingForm.desiredStatusOfResidence ?? '',
       // 組織マスター
       employerName:             org?.nameJa ?? existingForm.employerName ?? '',
       employerAddress:          [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join('') || existingForm.employerAddress || '',

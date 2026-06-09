@@ -50,11 +50,22 @@ function toFullWidthSymbols(str: string): string {
 /** 住所用：文字列を全角に変換（数字・英字・記号） */
 function toFullWidthAddress(str: string): string {
   if (!str) return "";
-  let result = str;
+  let result = stripZipPrefix(str);
   result = toFullWidthDigits(result);
   result = toFullWidthAlpha(result);
   result = toFullWidthSymbols(result);
   return result;
+}
+
+/** AddressSplitSimple が埋め込む「〒1234567|」プレフィックスを除去して住所部分のみ返す */
+function stripZipPrefix(str: string): string {
+  return str.replace(/^〒\d{7}\|/, "");
+}
+
+/** AddressSplitSimple が埋め込む「〒1234567|」プレフィックスから郵便番号を取り出す */
+function extractZipFromValue(str: string): string {
+  const m = (str || "").match(/^〒(\d{7})\|/);
+  return m ? m[1] : "";
 }
 
 /** 日付をYYYYMMDD形式に変換（ハイフン除去） */
@@ -182,7 +193,7 @@ export function buildRasensFields(
         ? [{ label: "扶養者　支店・事業所名", value: f.supporterBranchName }]
         : []),
       ...(f.supporterEmployerAddress || f.supporterAddress
-        ? [{ label: "扶養者　勤務先所在地", value: f.supporterEmployerAddress || f.supporterAddress || "" }]
+        ? [{ label: "扶養者　勤務先所在地", value: stripZipPrefix(f.supporterEmployerAddress || f.supporterAddress || "") }]
         : []),
       ...(f.supporterEmployerPhone
         ? [{ label: "扶養者　勤務先電話番号", value: f.supporterEmployerPhone }]

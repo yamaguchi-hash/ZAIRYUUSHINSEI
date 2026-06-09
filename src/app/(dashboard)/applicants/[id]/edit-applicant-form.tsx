@@ -22,6 +22,7 @@ interface EditApplicantFormProps {
     currentVisaType: string | null;
     currentVisaExpiry: string | null;
     phone: string | null;
+    mobilePhone: string | null;
     emailAddress: string | null;
     postalCode?: string | null;
     japanPrefecture?: string | null;
@@ -106,6 +107,7 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
     currentVisaType: applicant.currentVisaType ?? "",
     currentVisaExpiry: applicant.currentVisaExpiry ?? "",
     phone: applicant.phone ?? "",
+    mobilePhone: applicant.mobilePhone ?? "",
     emailAddress: applicant.emailAddress ?? "",
     postalCode: applicant.postalCode ?? "",
     japanPrefecture: prefix,
@@ -207,8 +209,12 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">電話番号</label>
-          <input name="phone" value={form.phone} onChange={handleChange} className="input-field text-sm py-1.5" />
+          <input name="phone" value={form.phone} onChange={handleChange} placeholder="03-0000-0000" className="input-field text-sm py-1.5" />
         </div>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">携帯番号</label>
+        <input name="mobilePhone" value={form.mobilePhone} onChange={handleChange} placeholder="090-0000-0000" className="input-field text-sm py-1.5" />
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">パスポート番号</label>

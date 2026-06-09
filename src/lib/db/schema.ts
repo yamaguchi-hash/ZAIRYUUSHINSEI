@@ -104,6 +104,7 @@ export const applicantMaster = pgTable("applicant_master", {
   currentVisaType: text("current_visa_type"),
   currentVisaExpiry: date("current_visa_expiry"),
   phone: text("phone"),
+  mobilePhone: text("mobile_phone"),
   emailAddress: text("email_address"),
   postalCode: text("postal_code"),
   japanPrefecture: text("japan_prefecture"),

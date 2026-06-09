@@ -87,12 +87,19 @@ export async function fillAllFieldsFromDocs(
       if (!file) continue;
 
       try {
-        const ocrPrompt = `あなたは在留資格申請書類の専門読み取りAIです。
-書類「${doc.documentName}」から読み取れる全情報をJSONで返してください。
+        const ocrPrompt = `【役割】あなたは在留資格申請を専門とする行政書士AIアシスタントです。提出書類から申請書記入に必要な情報を正確に読み取ります。
+
+【処理対象】書類「${doc.documentName}」
 
 【申請人の情報】
 申請人氏名: ${applicantNameEn}${applicantNameJa ? `（${applicantNameJa}）` : ""}
 ※この書類に申請人と別人の情報が混在する場合（扶養者の書類等）、それぞれ区別して抽出してください。
+
+【処理手順】
+1. 書類全体を確認し、書類の種類を特定する
+2. 申請人の情報か、別人（扶養者・配偶者等）の情報かを判別する
+3. 各フィールドに該当する情報を正確に読み取る
+4. 日付・数値等のフォーマットを指定形式に変換する
 
 【抽出フィールド】
 {
@@ -146,7 +153,11 @@ export async function fillAllFieldsFromDocs(
   "notes": "その他重要事項"
 }
 
-読み取れない項目はnull。JSONのみ返答。`;
+【制約（必ず遵守）】
+・書類に明記されている情報のみ抽出し、推測・補完は行わないこと
+・読み取れない項目はnullとすること
+・日付は必ずYYYY-MM-DD形式
+・数値フィールドは数値のみ（単位・記号・カンマ不可）`;
 
         const resp = await ai.models.generateContent({
           model: "gemini-2.5-flash",
@@ -154,14 +165,24 @@ export async function fillAllFieldsFromDocs(
             { inlineData: { mimeType: file.mime, data: file.base64 } },
             { text: ocrPrompt },
           ]}],
+          config: {
+            responseMimeType: "application/json",
+          },
         });
 
         const txt = resp.text ?? "{}";
-        const m = txt.match(/```json\s*([\s\S]*?)```/) ?? txt.match(/(\{[\s\S]*\})/);
-        if (m) {
-          const data = JSON.parse(m[1] ?? m[0]);
+        try {
+          const data = JSON.parse(txt);
           ocrPerDoc.push({ name: doc.documentName, data });
           docsRead++;
+        } catch {
+          // フォールバック: マークダウンコードフェンスが含まれる場合
+          const m = txt.match(/```json?\s*([\s\S]*?)```/) ?? txt.match(/(\{[\s\S]*\})/);
+          if (m) {
+            const data = JSON.parse(m[1] ?? m[0]);
+            ocrPerDoc.push({ name: doc.documentName, data });
+            docsRead++;
+          }
         }
       } catch { /* 1書類エラーは無視 */ }
     }
@@ -194,12 +215,13 @@ export async function fillAllFieldsFromDocs(
       addressLineInJapan:       (applicant as any)?.japanAddressLine ?? "",
       addressInJapan:           applicant?.japanAddress ?? "",
       telephoneNo:              applicant?.phone ?? "",
+      cellularPhoneNo:          (applicant as any)?.mobilePhone ?? "",
       passportNumber:           applicant?.passportNumber ?? "",
       passportExpiry:           applicant?.passportExpiry ?? "",
       currentStatusOfResidence: toJaVisa(applicant?.currentVisaType),
       currentPeriodExpiry:      applicant?.currentVisaExpiry ?? "",
       residenceCardNumber:      applicant?.residenceCardNumber ?? "",
-      desiredStatusOfResidence: app.visaType ?? "",
+      desiredStatusOfResidence: VISA_TYPE_LABELS[app.visaType] ?? app.visaType ?? "",
       // 組織マスター
       employerName:    org?.nameJa ?? "",
       employerAddress: [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join(""),
@@ -218,8 +240,13 @@ export async function fillAllFieldsFromDocs(
     };
 
     // ── 6. 包括的Geminiコール：全フィールドを一括入力 ─────────────────────────
-    const synthPrompt = `あなたは在留資格申請の専門行政書士AIです。
-以下の${docsRead}件の書類から読み取った情報を精査して、申請書の全フィールドを埋めてください。
+    const synthPrompt = `【役割】あなたは在留資格申請を専門とする行政書士AIアシスタントです。複数の提出書類から読み取った情報を統合し、申請書の全フィールドを正確に埋めます。
+
+【処理手順】
+1. 全${docsRead}件の書類読取結果を確認する
+2. 同一フィールドに複数の情報源がある場合、最も信頼性の高い書類の値を採用する
+3. 申請人の情報と扶養者・配偶者の情報を正確に区別する
+4. 各フィールドの値を指定されたフォーマットに整形する
 
 ━━ 申請人情報（確定値・変更不可） ━━
 氏名: ${applicantNameEn}${applicantNameJa ? `（${applicantNameJa}）` : ""}
@@ -233,14 +260,14 @@ ${docSummary}
 ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[org.prefecture, org.city, org.addressLine].filter(Boolean).join("")}` : "（なし）"}
 
 上記の書類情報を精査し、以下のJSONフィールドをすべて埋めてください。
-【重要ルール】
-・書類に明記されている情報を最優先（推測・補完は最小限）
-・日付はYYYY-MM-DD形式
-・有無は「有」または「無」（英語不可）
-・性別は「男」または「女」（英語不可）
-・数値フィールドは数値のみ（単位・記号不可）
-・不明・書類に記載なしは ""（空文字列）
-・JSONのみ返し、説明文は不要
+
+【制約（必ず遵守）】
+・書類に明記されている情報を最優先（推測・補完は行わない）
+・日付は必ずYYYY-MM-DD形式（例：2025-03-15）
+・有無は「有」または「無」のみ（英語不可）
+・性別は「男」または「女」のみ（M/F不可）
+・数値フィールドは数値のみ（単位・記号・カンマ不可）
+・不明・書類に記載なしは ""（空文字列）とすること
 
 {
   "placeOfBirth": "出生地（都市・国名）",
@@ -339,11 +366,20 @@ ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[o
     const synthResp = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [{ parts: [{ text: synthPrompt }] }],
+      config: {
+        responseMimeType: "application/json",
+      },
     });
 
     const synthTxt = synthResp.text ?? "{}";
-    const synthM = synthTxt.match(/```json\s*([\s\S]*?)```/) ?? synthTxt.match(/(\{[\s\S]*\})/);
-    const aiData: Record<string, any> = synthM ? JSON.parse(synthM[1] ?? synthM[0]) : {};
+    let aiData: Record<string, any>;
+    try {
+      aiData = JSON.parse(synthTxt);
+    } catch {
+      // フォールバック: マークダウンコードフェンスが含まれる場合
+      const synthM = synthTxt.match(/```json?\s*([\s\S]*?)```/) ?? synthTxt.match(/(\{[\s\S]*\})/);
+      aiData = synthM ? JSON.parse(synthM[1] ?? synthM[0]) : {};
+    }
 
     // ── 7. マスターデータ優先でマージ ────────────────────────────────────────
     // EMPTY_FORM_DATA → 既存保存データ → AI抽出 → マスター確定値 の順で上書き

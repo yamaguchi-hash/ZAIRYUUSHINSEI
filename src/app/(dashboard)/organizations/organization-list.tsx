@@ -24,6 +24,7 @@ type Org = {
   industry: string | null;
   workersAccidentInsuranceNo: string | null;
   employmentInsuranceNo: string | null;
+  laborInsuranceNo: string | null;
   representativeTitle: string | null;
   representativeName: string | null;
 };
@@ -131,6 +132,7 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
             industry: editingOrg.industry ?? undefined,
             workersAccidentInsuranceNo: editingOrg.workersAccidentInsuranceNo ?? undefined,
             employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? undefined,
+            laborInsuranceNo: editingOrg.laborInsuranceNo ?? undefined,
             representativeTitle: editingOrg.representativeTitle ?? undefined,
             representativeName: editingOrg.representativeName ?? undefined,
           }}
@@ -252,7 +254,7 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                       )}
 
                       {/* 保険番号 */}
-                      {(org.workersAccidentInsuranceNo || org.employmentInsuranceNo) && (
+                      {(org.workersAccidentInsuranceNo || org.employmentInsuranceNo || org.laborInsuranceNo) && (
                         <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-gray-400">
                           <Shield className="w-2.5 h-2.5 mt-0.5 flex-shrink-0" />
                           {org.workersAccidentInsuranceNo && (
@@ -260,6 +262,9 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                           )}
                           {org.employmentInsuranceNo && (
                             <span>雇用: <span className="font-mono">{org.employmentInsuranceNo}</span></span>
+                          )}
+                          {org.laborInsuranceNo && (
+                            <span>労保: <span className="font-mono">{org.laborInsuranceNo}</span></span>
                           )}
                         </div>
                       )}

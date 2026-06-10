@@ -23,6 +23,7 @@ type OrgForm = {
   industry: string;
   workersAccidentInsuranceNo: string;
   employmentInsuranceNo: string;
+  laborInsuranceNo: string;
   representativeTitle: string;
   representativeName: string;
 };
@@ -31,7 +32,7 @@ const EMPTY_FORM: OrgForm = {
   nameJa: "", nameEn: "", corporateNumber: "", postalCode: "",
   prefecture: "", city: "", addressLine: "", phone: "", email: "",
   category: "", capital: "", annualSales: "", employeeCount: "", industry: "",
-  workersAccidentInsuranceNo: "", employmentInsuranceNo: "",
+  workersAccidentInsuranceNo: "", employmentInsuranceNo: "", laborInsuranceNo: "",
   representativeTitle: "", representativeName: "",
 };
 
@@ -53,6 +54,7 @@ type EditingOrg = {
   industry?: string;
   workersAccidentInsuranceNo?: string;
   employmentInsuranceNo?: string;
+  laborInsuranceNo?: string;
   representativeTitle?: string;
   representativeName?: string;
 };
@@ -87,6 +89,7 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
       industry: editingOrg.industry ?? "",
       workersAccidentInsuranceNo: editingOrg.workersAccidentInsuranceNo ?? "",
       employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? "",
+      laborInsuranceNo: editingOrg.laborInsuranceNo ?? "",
       representativeTitle: editingOrg.representativeTitle ?? "",
       representativeName: editingOrg.representativeName ?? "",
     };
@@ -201,6 +204,10 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">雇用保険事業者番号</label>
                 <input name="employmentInsuranceNo" value={form.employmentInsuranceNo} onChange={handleChange} placeholder="0100-012345-6" className="input-field font-mono" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">労働保険番号（14桁）</label>
+                <input name="laborInsuranceNo" value={form.laborInsuranceNo} onChange={handleChange} placeholder="01-234567-890123-000" className="input-field font-mono" />
               </div>
             </div>
           </div>

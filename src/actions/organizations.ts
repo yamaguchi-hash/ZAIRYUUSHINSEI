@@ -58,6 +58,7 @@ export async function createOrganization(data: {
   industry?: string;
   workersAccidentInsuranceNo?: string;
   employmentInsuranceNo?: string;
+  laborInsuranceNo?: string;
   representativeTitle?: string;
   representativeName?: string;
   email?: string;
@@ -101,6 +102,7 @@ export async function updateOrganization(
     industry: string;
     workersAccidentInsuranceNo: string;
     employmentInsuranceNo: string;
+    laborInsuranceNo: string;
     representativeTitle: string;
     representativeName: string;
     email: string;

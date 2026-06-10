@@ -78,6 +78,7 @@ export const organizationMaster = pgTable("organization_master", {
   // ── 追加フィールド ────────────────────────────────────────────────────────
   workersAccidentInsuranceNo: text("workers_accident_insurance_no"),  // 労働災害保険番号
   employmentInsuranceNo: text("employment_insurance_no"),              // 雇用保険事業者番号
+  laborInsuranceNo: text("labor_insurance_no"),                        // 労働保険番号（14桁）
   representativeTitle: text("representative_title"),                   // 代表者役職
   representativeName: text("representative_name"),                     // 代表者氏名
   email: text("email"),                                                // メールアドレス

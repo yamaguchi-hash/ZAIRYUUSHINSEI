@@ -142,7 +142,23 @@ export default async function ShinseiFormPage({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-300"
           >
             <FileDown className="w-4 h-4" />
-            申請書PDF出力
+            申請書PDF（一括）
+          </Link>
+          <Link
+            href={`/print/${id}/shinsei-applicant`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            申請人用PDF
+          </Link>
+          <Link
+            href={`/print/${id}/shinsei-org`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            所属機関用PDF
           </Link>
           {showRiyusho && (
             <Link

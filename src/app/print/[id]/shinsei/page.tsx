@@ -147,10 +147,25 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           td,th{border:1px solid #333;padding:4px 8px;vertical-align:middle;font-size:10.5px;line-height:1.45;}
           .lbl{background:#d5d5d5;font-weight:bold;white-space:nowrap;width:25%;}
           .lbl-w20{width:20%;}
+          .lbl-wrap{white-space:normal!important;word-break:break-word;overflow-wrap:break-word;line-height:1.35;}
 
           .section{background:#1c1c1c;color:#fff;font-weight:bold;font-size:11.5px;padding:5px 9px;margin:14px 0 5px;letter-spacing:0.03em;}
           .section2{background:#444;color:#fff;font-size:10.5px;padding:3px 8px;margin:8px 0 4px;}
           .section3{background:#777;color:#fff;font-size:10px;padding:3px 7px;margin:5px 0 3px;}
+
+          /* V型テーブル: 長い項目名に対応 */
+          .v-tbl{table-layout:fixed;}
+          .v-tbl td,.v-tbl th{word-break:break-word;overflow-wrap:break-word;white-space:normal;}
+          .v-tbl .lbl{white-space:normal;word-break:break-word;overflow-wrap:break-word;line-height:1.35;}
+
+          /* 省略可能セクション */
+          body.omit-vCompliance1 .omittable-vCompliance1{display:none!important;}
+          body.omit-vCompliance2 .omittable-vCompliance2{display:none!important;}
+          body.omit-vDispatch .omittable-vDispatch{display:none!important;}
+          body.omit-vPlacement .omittable-vPlacement{display:none!important;}
+          body.omit-vIntermediary .omittable-vIntermediary{display:none!important;}
+          body.omit-vRso .omittable-vRso{display:none!important;}
+          body.omit-vWorkHistory .omittable-vWorkHistory{display:none!important;}
 
           .sign-table td{height:44px;}
           .page-break{page-break-before:always;}
@@ -824,127 +839,260 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           {/* ── V型 Part 2（特定技能） ──────────────────────────────────── */}
           {isVtype && (
             <>
+              {/* ═══ 申請人等作成用 ２ V ═══ */}
               <div className="section page-break">
                 申請人等作成用 ２　　　Ｖ　（「特定技能（１号）」・「特定技能（２号）」）
               </div>
 
               <div className="section3">17. 特定技能所属機関</div>
-              <table><tbody>
+              <table className="v-tbl"><tbody>
                 <tr><td className="lbl" style={{width:'30%'}}>(1) 氏名又は名称</td><td colSpan={3}>{fmt(form.employerName)}</td></tr>
-                <tr><td className="lbl">(2) 住所（所在地）</td><td colSpan={3}>{fmtAddr(form.employerAddress)}</td><td className="lbl" style={{width:'15%'}}>電話番号</td><td>{fmt(form.employerPhone)}</td></tr>
+                <tr><td className="lbl">(2) 住所（所在地）</td><td colSpan={3}>{fmtAddr(form.employerAddress)}</td></tr>
+                <tr><td className="lbl">　　電話番号</td><td colSpan={3}>{fmt(form.employerPhone)}</td></tr>
               </tbody></table>
 
               <div className="section3">18. 技能水準</div>
-              <table><tbody>
+              <table className="v-tbl"><tbody>
                 <tr><td className="lbl" style={{width:'30%'}}>証明方法</td><td colSpan={3}>{fmt(form.skillLevelProofMethod)}</td></tr>
                 {form.skillLevelExamName1 && <tr><td className="lbl">試験名①</td><td>{fmt(form.skillLevelExamName1)}</td><td className="lbl" style={{width:'15%'}}>試験地①</td><td>{fmt(form.skillLevelExamCountry1)}{form.skillLevelExamCountry1 === '国外' ? `（${form.skillLevelExamCountryName1}）` : ''}</td></tr>}
                 {form.skillLevelExamName2 && <tr><td className="lbl">試験名②</td><td>{fmt(form.skillLevelExamName2)}</td><td className="lbl">試験地②</td><td>{fmt(form.skillLevelExamCountry2)}{form.skillLevelExamCountry2 === '国外' ? `（${form.skillLevelExamCountryName2}）` : ''}</td></tr>}
               </tbody></table>
 
               <div className="section3">19. 日本語能力（「特定技能1号」での在留を希望する場合に記入）</div>
-              <table><tbody>
+              <table className="v-tbl"><tbody>
                 <tr><td className="lbl" style={{width:'30%'}}>証明方法</td><td colSpan={3}>{fmt(form.japaneseAbilityProofMethod)}</td></tr>
                 {form.japaneseAbilityExamName1 && <tr><td className="lbl">試験名①</td><td>{fmt(form.japaneseAbilityExamName1)}</td><td className="lbl" style={{width:'15%'}}>試験地①</td><td>{fmt(form.japaneseAbilityExamCountry1)}{form.japaneseAbilityExamCountry1 === '国外' ? `（${form.japaneseAbilityExamCountryName1}）` : ''}</td></tr>}
                 {form.japaneseAbilityExamName2 && <tr><td className="lbl">試験名②</td><td>{fmt(form.japaneseAbilityExamName2)}</td><td className="lbl">試験地②</td><td>{fmt(form.japaneseAbilityExamCountry2)}{form.japaneseAbilityExamCountry2 === '国外' ? `（${form.japaneseAbilityExamCountryName2}）` : ''}</td></tr>}
               </tbody></table>
 
               {(form.completedTit2Occupation1 || form.completedTit2Occupation2) && (<>
-                <div className="section3">20. 良好に修了した技能実習2号（上記18，19において技能実習2号を良好に修了を選択した場合に記入）</div>
-                <table><tbody>
-                  <tr><td className="lbl" style={{width:'20%'}}>職種①</td><td>{fmt(form.completedTit2Occupation1)}</td><td className="lbl" style={{width:'15%'}}>作業①</td><td>{fmt(form.completedTit2Operations1)}</td><td className="lbl" style={{width:'15%'}}>証明</td><td>{fmt(form.completedTit2ProofType1)}</td></tr>
-                  {form.completedTit2Occupation2 && <tr><td className="lbl">職種②</td><td>{fmt(form.completedTit2Occupation2)}</td><td className="lbl">作業②</td><td>{fmt(form.completedTit2Operations2)}</td><td className="lbl">証明</td><td>{fmt(form.completedTit2ProofType2)}</td></tr>}
+                <div className="section3">20. 良好に修了した技能実習2号</div>
+                <table className="v-tbl"><tbody>
+                  <tr><td className="lbl" style={{width:'15%'}}>職種①</td><td style={{width:'35%'}}>{fmt(form.completedTit2Occupation1)}</td><td className="lbl" style={{width:'15%'}}>作業①</td><td style={{width:'35%'}}>{fmt(form.completedTit2Operations1)}</td></tr>
+                  <tr><td className="lbl">証明①</td><td colSpan={3}>{fmt(form.completedTit2ProofType1)}</td></tr>
+                  {form.completedTit2Occupation2 && (<>
+                    <tr><td className="lbl">職種②</td><td>{fmt(form.completedTit2Occupation2)}</td><td className="lbl">作業②</td><td>{fmt(form.completedTit2Operations2)}</td></tr>
+                    <tr><td className="lbl">証明②</td><td colSpan={3}>{fmt(form.completedTit2ProofType2)}</td></tr>
+                  </>)}
                 </tbody></table>
               </>)}
 
               {(form.cumulativeStayYears || form.cumulativeStayMonths) && (<>
-                <div className="section3">21. 申請時における特定技能1号での通算在留期間（過去の在留歴を含む。「特定技能1号」での在留を希望する場合に記入）</div>
-                <table><tbody>
-                  <tr><td className="lbl" style={{width:'30%'}}>通算在留期間</td><td>{form.cumulativeStayYears ? `${form.cumulativeStayYears}年` : '　'}{form.cumulativeStayMonths ? `${form.cumulativeStayMonths}ヶ月` : '　'}</td></tr>
+                <div className="section3">21. 通算在留期間（特定技能1号）</div>
+                <table className="v-tbl"><tbody>
+                  <tr><td className="lbl" style={{width:'30%'}}>通算在留期間</td><td>{form.cumulativeStayYears ? `${form.cumulativeStayYears}年` : ''}{form.cumulativeStayMonths ? `${form.cumulativeStayMonths}ヶ月` : ''}</td></tr>
                 </tbody></table>
               </>)}
 
-              {/* Part 3 V — 項目22〜28 */}
+              {/* ═══ 申請人等作成用 ３ V — 項目22〜28 ═══ */}
               <div className="section page-break">
                 申請人等作成用 ３　　　Ｖ　（「特定技能（１号）」・「特定技能（２号）」）
               </div>
-              <table><tbody>
-                <tr><td className="lbl" style={{width:'70%'}}>22. 特定技能雇用契約に係る保証金の徴収その他財産管理又は違約金等の支払契約の有無</td><td>{fmtYesNo(form.depositContractExists)}</td></tr>
-                <tr><td className="lbl">23. 特定技能雇用契約に係る申込みの取次ぎ又は外国における活動準備に関する外国の機関への費用の支払について，その額及び内訳を十分に理解して合意していることの有無（当該費用の支払がある場合に記入）</td><td>{fmtYesNo(form.overseasExpensesExists)}{form.overseasExpensesExists === '有' ? `（${fmt(form.overseasExpensesOrgName)}、約${fmt(form.overseasExpensesAmount)}円）` : ''}</td></tr>
-                <tr><td className="lbl">24. 国籍又は住居を有する国又は地域において定められる，本邦で行う活動に関連して遵守すべき手続を経ていることの有無（当該手続が定められている場合に記入）</td><td>{fmtYesNo(form.homeCountryProcedureComplied)}</td></tr>
-                <tr><td className="lbl">25. 本邦において定期的に負担する費用について，対価の内容を十分に理解して合意していることの有無（当該費用の負担がある場合に記入）</td><td>{fmtYesNo(form.regularExpensesUnderstood)}</td></tr>
-                <tr><td className="lbl">26. 技能実習によって本邦において修得，習熟又は熟達した技能等の本国への移転に努めることの有無（技能実習の在留資格をもって在留していたことがある場合であって，「特定技能2号」での在留を希望する場合に記入）</td><td>{fmtYesNo(form.technologyTransferEffortV)}</td></tr>
-                <tr><td className="lbl">27. 申請人につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）</td><td>{fmtYesNo(form.ssfSpecificFieldCriteriaMet)}</td></tr>
+              <table className="v-tbl"><tbody>
+                {([
+                  { no: "22", label: "特定技能雇用契約に係る保証金の徴収その他財産管理又は違約金等の支払契約の有無", val: fmtYesNo(form.depositContractExists) },
+                  { no: "23", label: "特定技能雇用契約に係る申込みの取次ぎ又は外国における活動準備に関する外国の機関への費用の支払について，その額及び内訳を十分に理解して合意していることの有無（当該費用の支払がある場合に記入）", val: `${fmtYesNo(form.overseasExpensesExists)}${form.overseasExpensesExists === '有' ? `（${fmt(form.overseasExpensesOrgName)}、約${fmt(form.overseasExpensesAmount)}円）` : ''}` },
+                  { no: "24", label: "国籍又は住居を有する国又は地域において定められる，本邦で行う活動に関連して遵守すべき手続を経ていることの有無（当該手続が定められている場合に記入）", val: fmtYesNo(form.homeCountryProcedureComplied) },
+                  { no: "25", label: "本邦において定期的に負担する費用について，対価の内容を十分に理解して合意していることの有無（当該費用の負担がある場合に記入）", val: fmtYesNo(form.regularExpensesUnderstood) },
+                  { no: "26", label: "技能実習によって本邦において修得，習熟又は熟達した技能等の本国への移転に努めることの有無（技能実習の在留資格をもって在留していたことがある場合であって，「特定技能2号」での在留を希望する場合に記入）", val: fmtYesNo(form.technologyTransferEffortV) },
+                  { no: "27", label: "申請人につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）", val: fmtYesNo(form.ssfSpecificFieldCriteriaMet) },
+                ] as const).map((item, i) => (
+                  <tr key={i}><td className="lbl lbl-wrap" style={{width:'82%'}}>{item.no}. {item.label}</td><td style={{textAlign:'center',width:'18%'}}>{item.val}</td></tr>
+                ))}
               </tbody></table>
 
               {/* 28. 職歴 */}
-              {workHistory.length > 0 && workHistory.some(w => w.employer) && (<>
+              <div className="omittable-vWorkHistory">
                 <div className="section3">28. 職歴（外国におけるものを含む）</div>
-                <table><tbody>
-                  <tr>
-                    <td className="lbl" style={{width:'15%'}}>入社年月</td>
-                    <td className="lbl" style={{width:'15%'}}>退社年月</td>
-                    <td className="lbl">勤務先名称</td>
-                  </tr>
-                  {workHistory.filter(w => w.employer).map((w, i) => (
-                    <tr key={i}>
-                      <td>{fmt(w.joinDate)}</td>
-                      <td>{fmt(w.leaveDate)}</td>
-                      <td>{fmt(w.employer)}</td>
-                    </tr>
-                  ))}
-                </tbody></table>
-              </>)}
+                {workHistory.length > 0 && workHistory.some(w => w.employer) ? (
+                  <table className="v-tbl"><tbody>
+                    <tr><th style={{width:'20%'}}>入社年月</th><th style={{width:'20%'}}>退社年月</th><th>勤務先名称</th></tr>
+                    {workHistory.filter(w => w.employer).map((w, i) => (
+                      <tr key={i}><td>{fmt(w.joinDate)}</td><td>{fmt(w.leaveDate)}</td><td>{fmt(w.employer)}</td></tr>
+                    ))}
+                  </tbody></table>
+                ) : (
+                  <table><tbody><tr><td style={{textAlign:'center',color:'#777',padding:'6px'}}>なし</td></tr></tbody></table>
+                )}
+              </div>
 
-              {/* 所属機関等作成用 Part 1-4 V */}
+              {/* ═══ 所属機関等作成用 １ V — 雇用契約・所属機関 ═══ */}
               <div className="section page-break">
                 所属機関等作成用 １　　　Ｖ　（「特定技能（１号）」・「特定技能（２号）」）
               </div>
 
               <div className="section3">1. 雇用している外国人の氏名</div>
-              <table><tbody>
+              <table className="v-tbl"><tbody>
                 <tr><td colSpan={4}>{form.familyNameEn} {form.givenNameEn}</td></tr>
               </tbody></table>
 
               <div className="section3">2. 特定技能雇用契約</div>
-              <table><tbody>
+              <table className="v-tbl"><tbody>
                 <tr><td className="lbl" style={{width:'30%'}}>(1) 雇用契約期間</td><td colSpan={3}>{fmt(form.orgContractStartDate)} 〜 {fmt(form.orgContractEndDate)}</td></tr>
-                <tr><td className="lbl">(2) 従事すべき業務の内容（複数ある場合は全て記入）</td><td colSpan={3}>&nbsp;</td></tr>
-                <tr><td className="lbl">　特定産業分野</td><td>{fmt(form.orgSpecifiedIndustrialField)}</td><td className="lbl">業務区分</td><td>{fmt(form.orgWorkCategory)}</td></tr>
-                <tr><td className="lbl">　主たる職種（別紙「職種一覧」から選択、1のみ）</td><td>{fmt(form.orgOccupationNumber)}</td><td className="lbl">追加職種番号</td><td>{fmtAdditionalOccupations(form.orgOccupationNumberAdditional)}</td></tr>
-                <tr><td className="lbl">(3) 所定労働時間（週平均）</td><td>{fmt(form.orgWorkHoursWeekly)}時間</td><td className="lbl">所定労働時間（月平均）</td><td>{fmt(form.orgWorkHoursMonthly)}時間</td></tr>
-                <tr><td className="lbl">　所定労働時間が通常の労働者の所定労働時間と同等であることの有無</td><td colSpan={3}>{fmtYesNo(form.orgWorkHoursEquivalent)}</td></tr>
+                <tr><td className="lbl">(2) 従事すべき業務の内容</td><td colSpan={3}>&nbsp;</td></tr>
+                <tr><td className="lbl">　特定産業分野</td><td>{fmt(form.orgSpecifiedIndustrialField)}</td><td className="lbl" style={{width:'20%'}}>業務区分</td><td>{fmt(form.orgWorkCategory)}</td></tr>
+                <tr><td className="lbl">　主たる職種番号</td><td>{fmt(form.orgOccupationNumber)}</td><td className="lbl">追加職種番号</td><td>{fmtAdditionalOccupations(form.orgOccupationNumberAdditional)}</td></tr>
+                <tr><td className="lbl">(3) 所定労働時間（週平均）</td><td>{fmt(form.orgWorkHoursWeekly)}時間</td><td className="lbl">月平均</td><td>{fmt(form.orgWorkHoursMonthly)}時間</td></tr>
+                <tr><td className="lbl lbl-wrap" colSpan={3}>　所定労働時間が通常の労働者の所定労働時間と同等であることの有無</td><td>{fmtYesNo(form.orgWorkHoursEquivalent)}</td></tr>
                 <tr><td className="lbl">(4) 月額報酬</td><td>{form.salary ? Number(form.salary).toLocaleString() + '円' : '　'}</td><td className="lbl">基本給の時間換算額</td><td>{form.orgTimeConvertedBasicSalary ? Number(form.orgTimeConvertedBasicSalary).toLocaleString() + '円' : '　'}</td></tr>
-                <tr><td className="lbl">　同等の業務に従事する日本人の月額報酬</td><td>{form.orgJapaneseEquivalentSalary ? Number(form.orgJapaneseEquivalentSalary).toLocaleString() + '円' : '　'}</td><td className="lbl">報酬の額が日本人が従事する場合の報酬の額と同等以上であることの有無</td><td>{fmtYesNo(form.orgSalaryEqualToJapanese)}</td></tr>
+                <tr><td className="lbl lbl-wrap">　日本人の月額報酬</td><td>{form.orgJapaneseEquivalentSalary ? Number(form.orgJapaneseEquivalentSalary).toLocaleString() + '円' : '　'}</td><td className="lbl lbl-wrap">　日本人同等以上か</td><td>{fmtYesNo(form.orgSalaryEqualToJapanese)}</td></tr>
                 <tr><td className="lbl">(5) 報酬の支払方法</td><td colSpan={3}>{yes(form.orgSalaryPaymentCash) ? '通貨払　' : ''}{yes(form.orgSalaryPaymentBank) ? '口座振込み' : ''}</td></tr>
-                <tr><td className="lbl">(6) 外国人であることを理由として日本人と異なった待遇としている事項の有無</td><td>{fmtYesNo(form.orgForeignTreatmentDifference)}</td><td className="lbl">(7) 外国人が一時帰国を希望した場合には，必要な有給休暇を取得させるものとしていることの有無</td><td>{fmtYesNo(form.orgPaidHolidayForReturn)}</td></tr>
-                <tr><td className="lbl">(8) 雇用関係につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）</td><td>{fmtYesNo(form.orgFieldSpecificEmploymentCriteria)}</td><td className="lbl">(9) 外国人が特定技能雇用契約終了後の帰国に要する旅費を負担することができないときは，当該旅費を負担するとともに，出国が円滑になされるよう必要な措置を講ずることとしていることの有無</td><td>{fmtYesNo(form.orgReturnTravelExpenses)}</td></tr>
-                <tr><td className="lbl">(10) 外国人の健康の状況その他の生活の状況を把握するために必要な措置を講ずることとしていることの有無</td><td>{fmtYesNo(form.orgHealthCheck)}</td><td className="lbl">(11) 外国人の適正な在留に資するために必要な事項につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）</td><td>{fmtYesNo(form.orgProperResidenceCriteria)}</td></tr>
+              </tbody></table>
+              {/* 項目(6)〜(11): 長い項目名のため2列レイアウト */}
+              <table className="v-tbl"><tbody>
+                {([
+                  { no: "(6)", label: "外国人であることを理由として日本人と異なった待遇としている事項の有無", val: fmtYesNo(form.orgForeignTreatmentDifference), detail: form.orgForeignTreatmentDetail },
+                  { no: "(7)", label: "外国人が一時帰国を希望した場合には，必要な有給休暇を取得させるものとしていることの有無", val: fmtYesNo(form.orgPaidHolidayForReturn) },
+                  { no: "(8)", label: "雇用関係につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）", val: fmtYesNo(form.orgFieldSpecificEmploymentCriteria) },
+                  { no: "(9)", label: "外国人が特定技能雇用契約終了後の帰国に要する旅費を負担することができないときは，当該旅費を負担するとともに，出国が円滑になされるよう必要な措置を講ずることとしていることの有無", val: fmtYesNo(form.orgReturnTravelExpenses) },
+                  { no: "(10)", label: "外国人の健康の状況その他の生活の状況を把握するために必要な措置を講ずることとしていることの有無", val: fmtYesNo(form.orgHealthCheck) },
+                  { no: "(11)", label: "外国人の適正な在留に資するために必要な事項につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）", val: fmtYesNo(form.orgProperResidenceCriteria) },
+                ] as { no: string; label: string; val: string; detail?: string | null | undefined }[]).map((item, i) => (
+                  <tr key={i}><td className="lbl lbl-wrap" style={{width:'82%'}}>{item.no} {item.label}</td><td style={{textAlign:'center',width:'18%'}}>{item.val}</td></tr>
+                ))}
               </tbody></table>
 
               <div className="section3">3. 特定技能所属機関</div>
-              <table><tbody>
+              <table className="v-tbl"><tbody>
                 <tr><td className="lbl" style={{width:'30%'}}>(1) 氏名又は名称</td><td colSpan={3}>{fmt(form.orgName)}</td></tr>
-                <tr><td className="lbl">(2) 法人番号（13桁）</td><td>{fmt(form.orgCorporateNumber)}</td><td className="lbl">(3) 雇用保険適用事業所番号（11桁）</td><td>{fmt(form.orgEmploymentInsuranceNo)}</td></tr>
-                <tr><td className="lbl">(4) 業種（主たる業種を別紙「業種一覧」から選択、1のみ）</td><td>{fmt(form.orgBusinessTypeCode)}</td><td className="lbl">追加業種番号</td><td>{fmt(form.orgBusinessTypeOtherCode)}</td></tr>
-                <tr><td className="lbl">(5) 住所（所在地）</td><td colSpan={3}>{fmtAddr(form.orgAddress)}　☎ {fmt(form.orgPhone)}</td></tr>
-                <tr><td className="lbl">(6) 資本金</td><td>{form.orgCapital ? Number(form.orgCapital).toLocaleString() + '円' : '　'}</td><td className="lbl">(7) 年間売上金額（直近年度）</td><td>{form.orgAnnualSales ? Number(form.orgAnnualSales).toLocaleString() + '円' : '　'}</td></tr>
+                <tr><td className="lbl">(2) 法人番号（13桁）</td><td>{fmt(form.orgCorporateNumber)}</td><td className="lbl" style={{width:'25%'}}>(3) 雇用保険番号（11桁）</td><td>{fmt(form.orgEmploymentInsuranceNo)}</td></tr>
+                <tr><td className="lbl lbl-wrap">(4) 業種番号</td><td>{fmt(form.orgBusinessTypeCode)}</td><td className="lbl">追加業種番号</td><td>{fmt(form.orgBusinessTypeOtherCode)}</td></tr>
+                <tr><td className="lbl">(5) 住所（所在地）</td><td colSpan={3}>{fmtAddr(form.orgAddress)}</td></tr>
+                <tr><td className="lbl">　電話番号</td><td colSpan={3}>{fmt(form.orgPhone)}</td></tr>
+                <tr><td className="lbl">(6) 資本金</td><td>{form.orgCapital ? Number(form.orgCapital).toLocaleString() + '円' : '　'}</td><td className="lbl">(7) 年間売上金額</td><td>{form.orgAnnualSales ? Number(form.orgAnnualSales).toLocaleString() + '円' : '　'}</td></tr>
                 <tr><td className="lbl">(8) 常勤職員数</td><td>{form.orgEmployeeCount ? `${form.orgEmployeeCount}名` : '　'}</td><td className="lbl">(9) 代表者の氏名</td><td>{fmt(form.position)}</td></tr>
                 {form.orgBranchName && <tr><td className="lbl">(10) 勤務させる事業所名</td><td>{fmt(form.orgBranchName)}</td><td className="lbl">所在地</td><td>{fmt(form.activityDetails)}</td></tr>}
-                <tr><td className="lbl">　健康保険及び厚生年金保険の適用事業所であることの有無</td><td>{fmtYesNo(form.orgHealthInsuranceMet)}</td><td className="lbl">　労災保険及び雇用保険の適用事業所であることの有無</td><td>{fmtYesNo(form.orgLaborInsuranceMet)}</td></tr>
-                <tr><td className="lbl">　労働保険番号</td><td colSpan={3}>{fmt(form.orgLaborInsuranceNo)}</td></tr>
+              </tbody></table>
+              <table className="v-tbl"><tbody>
+                <tr><td className="lbl lbl-wrap" style={{width:'60%'}}>健康保険及び厚生年金保険の適用事業所であることの有無</td><td style={{width:'10%',textAlign:'center'}}>{fmtYesNo(form.orgHealthInsuranceMet)}</td><td className="lbl lbl-wrap" style={{width:'20%'}}>労災・雇用保険</td><td style={{width:'10%',textAlign:'center'}}>{fmtYesNo(form.orgLaborInsuranceMet)}</td></tr>
+                <tr><td className="lbl">労働保険番号</td><td colSpan={3}>{fmt(form.orgLaborInsuranceNo)}</td></tr>
               </tbody></table>
 
-              {/* 支援計画 */}
-              {(form.supportManagerName || form.rsoName) && (<>
-                <div className="section3">支援責任者・担当者 / 登録支援機関</div>
-                <table><tbody>
-                  {form.supportManagerName && <tr><td className="lbl" style={{width:'30%'}}>支援責任者</td><td>{fmt(form.supportManagerName)}　{fmt(form.supportManagerTitle)}</td><td className="lbl">支援担当者</td><td>{fmt(form.supportStaffName)}　{fmt(form.supportStaffTitle)}</td></tr>}
-                  {form.rsoName && (<>
-                    <tr><td className="lbl">登録支援機関名</td><td colSpan={3}>{fmt(form.rsoName)}（登録番号: {fmt(form.rsoRegNo)}）</td></tr>
-                    <tr><td className="lbl">代表者</td><td>{fmt(form.rsoRepresentative)}</td><td className="lbl">対応言語</td><td>{fmt(form.rsoAvailableLanguages)}</td></tr>
-                  </>)}
+              {/* ═══ 所属機関等作成用 ２ V — 派遣先・職業紹介・取次機関 ═══ */}
+              <div className="omittable-vDispatch">
+                <div className="section page-break">
+                  所属機関等作成用 ２　　　Ｖ　— 派遣先・職業紹介事業者・取次機関
+                </div>
+
+                <div className="section3">4. 派遣先（雇用形態が労働者派遣の場合に記入）</div>
+                <table className="v-tbl"><tbody>
+                  <tr><td className="lbl" style={{width:'30%'}}>(1) 氏名又は名称</td><td colSpan={3}>{fmt(form.orgVDispatchName)}</td></tr>
+                  <tr><td className="lbl">(2) 法人番号（13桁）</td><td>{fmt(form.orgVDispatchCorporateNo)}</td><td className="lbl" style={{width:'25%'}}>(3) 雇用保険番号</td><td>{fmt(form.orgVDispatchInsuranceNo)}</td></tr>
+                  <tr><td className="lbl">(4) 住所（所在地）</td><td colSpan={3}>{fmtAddr(form.orgVDispatchAddress)}</td></tr>
+                  <tr><td className="lbl">　電話番号</td><td>{fmt(form.orgVDispatchPhone)}</td><td className="lbl">(5) 代表者の氏名</td><td>{fmt(form.orgVDispatchRepresentative)}</td></tr>
+                  <tr><td className="lbl">(6) 派遣期間</td><td colSpan={3}>{fmt(form.orgVDispatchStartDate)} 〜 {fmt(form.orgVDispatchEndDate)}</td></tr>
                 </tbody></table>
-              </>)}
+              </div>
+
+              <div className="omittable-vPlacement">
+                <div className="section3">4-2. 職業紹介事業者（職業紹介により雇用する場合に記入）</div>
+                <table className="v-tbl"><tbody>
+                  <tr><td className="lbl" style={{width:'30%'}}>(1) 名称</td><td colSpan={3}>{fmt(form.orgPlacementProviderName)}</td></tr>
+                  <tr><td className="lbl">(2) 法人番号（13桁）</td><td>{fmt(form.orgPlacementProviderCorporateNo)}</td><td className="lbl" style={{width:'25%'}}>(3) 雇用保険番号</td><td>{fmt(form.orgPlacementProviderInsuranceNo)}</td></tr>
+                  <tr><td className="lbl">(4) 住所（所在地）</td><td colSpan={3}>{fmtAddr(form.orgPlacementProviderAddress)}</td></tr>
+                  <tr><td className="lbl">　電話番号</td><td>{fmt(form.orgPlacementProviderPhone)}</td><td className="lbl">(5) 許可・届出番号</td><td>{fmt(form.orgPlacementProviderLicenseNo)}</td></tr>
+                  <tr><td className="lbl">(6) 許可・届出年月日</td><td colSpan={3}>{fmtDate(form.orgPlacementProviderLicenseDate)}</td></tr>
+                </tbody></table>
+              </div>
+
+              <div className="omittable-vIntermediary">
+                <div className="section3">4-3. 取次機関</div>
+                <table className="v-tbl"><tbody>
+                  <tr><td className="lbl" style={{width:'30%'}}>(1) 氏名又は名称</td><td colSpan={3}>{fmt(form.orgIntermediaryName)}</td></tr>
+                  <tr><td className="lbl">(2) 住所（所在地）</td><td colSpan={3}>{fmtAddr(form.orgIntermediaryAddress)}</td></tr>
+                  <tr><td className="lbl">　電話番号</td><td colSpan={3}>{fmt(form.orgIntermediaryPhone)}</td></tr>
+                </tbody></table>
+              </div>
+
+              {/* ═══ 所属機関等作成用 ３ V — コンプライアンス(11)〜(21) ═══ */}
+              <div className="omittable-vCompliance1">
+                <div className="section page-break">
+                  所属機関等作成用 ３　　　Ｖ　— コンプライアンス確認（(11)〜(21)）
+                </div>
+                <table className="v-tbl"><tbody>
+                  {([
+                    { has: form.orgLaborLawViolation, detail: form.orgLaborLawViolationDetail, label: "(11) 労働，社会保険及び租税に関する法令の規定に違反したことの有無" },
+                    { has: form.orgInvoluntaryDismissal, detail: form.orgInvoluntaryDismissalDetail, label: "(12) 特定技能外国人の活動に係る非自発的離職者の発生の有無" },
+                    { has: form.orgMissingPerson, detail: form.orgMissingPersonDetail, label: "(13) 特定技能外国人の行方不明者の発生の有無" },
+                    { has: form.orgCriminalPunishment, detail: form.orgCriminalPunishmentDetail, label: "(14) 出入国又は労働関係法令に関する不正行為等を理由とする刑罰の有無" },
+                    { has: form.orgMentalDisability, detail: form.orgMentalDisabilityDetail, label: "(15) 精神の機能の障害により特定技能雇用契約の適正な履行に必要な認知等を適切に行うことができない者に該当するか" },
+                    { has: form.orgBankruptcy, detail: form.orgBankruptcyDetail, label: "(16) 破産手続開始の決定を受けて復権を得ない者に該当するか" },
+                    { has: form.orgTrainingRevoked, detail: form.orgTrainingRevokedDetail, label: "(17) 実習認定の取消しを受けたことの有無（5年以内）" },
+                    { has: form.orgWasOfficerOfRevoked, detail: form.orgWasOfficerOfRevokedDetail, label: "(18) 実習認定の取消しの処分を受けた者の役員であった者に該当するか（取消しから5年以内）" },
+                    { has: form.orgIllegalActFiveYears, detail: form.orgIllegalActFiveYearsDetail, label: "(19) 出入国又は労働に関する法令に関し不正又は著しく不当な行為をしたことの有無（5年以内）" },
+                    { has: form.orgGangsterMember, detail: form.orgGangsterMemberDetail, label: "(20) 暴力団員又は暴力団員でなくなった日から5年を経過しない者に該当するか" },
+                    { has: form.orgLegalAgentViolation, detail: form.orgLegalAgentViolationDetail, label: "(21) 未成年者の場合の法定代理人が(14)〜(20)に該当するか" },
+                  ] as const).map((item, i) => (
+                    <tr key={i}>
+                      <td className="lbl lbl-wrap" style={{width:'82%'}}>{item.label}</td>
+                      <td style={{textAlign:'center',width:'18%'}}>{fmtYesNo(item.has)}{yes(item.has) && item.detail ? <><br/><span style={{fontSize:'9px',color:'#333'}}>→{item.detail}</span></> : null}</td>
+                    </tr>
+                  ))}
+                </tbody></table>
+              </div>
+
+              {/* ═══ 所属機関等作成用 ４ V — コンプライアンス(22)〜(33) ═══ */}
+              <div className="omittable-vCompliance2">
+                <div className="section page-break">
+                  所属機関等作成用 ４　　　Ｖ　— コンプライアンス確認（(22)〜(33)）
+                </div>
+                <table className="v-tbl"><tbody>
+                  {([
+                    { has: form.orgGangsterControl, detail: form.orgGangsterControlDetail, label: "(22) 暴力団員等がその事業活動を支配する者に該当するか" },
+                    { has: form.orgActivityDocumentKept, detail: null, label: "(23) 特定技能外国人の活動の内容に係る文書を作成し，特定技能雇用契約の終了の日から1年以上保存することとしているか" },
+                    { has: form.orgAwareOfDeposit, detail: form.orgAwareOfDepositDetail, label: "(24) 保証金の徴収その他財産の管理を受けていること又は違約金を定める契約を締結していることを認識して雇用契約を締結していないか" },
+                    { has: form.orgPenaltyContractExists, detail: form.orgPenaltyContractDetail, label: "(25) 特定技能雇用契約の不履行について違約金を定める契約等を締結していないか" },
+                    { has: form.orgSupportCostNotBurdened, detail: null, label: "(26) 1号特定技能外国人支援に要する費用を，直接又は間接に外国人に負担させないこととしているか（特定技能1号の場合）" },
+                    { has: form.orgDispatchMeetsCondition, detail: form.orgDispatchConditionDetail, label: "(27) 労働者派遣の場合，派遣先が法定の要件のいずれかに該当すること" },
+                    { has: form.orgDispatchMeetsCompliance, detail: form.orgDispatchComplianceDetail, label: "(28) 労働者派遣の場合，派遣先が(11)〜(22)に該当しないこと" },
+                    { has: form.orgAccidentInsurance, detail: form.orgAccidentInsuranceDetail, label: "(29) 労災保険関係の成立の届出等の措置を講じていること" },
+                    { has: form.orgContinuousPerformance, detail: null, label: "(30) 特定技能雇用契約を継続して履行する体制が適切に整備されていること" },
+                    { has: form.orgSalaryPaymentVerifiable, detail: null, label: "(31) 報酬を預貯金口座への振込等により支払うこととしていること" },
+                  ] as const).map((item, i) => (
+                    <tr key={i}>
+                      <td className="lbl lbl-wrap" style={{width:'82%'}}>{item.label}</td>
+                      <td style={{textAlign:'center',width:'18%'}}>{fmtYesNo(item.has)}{yes(item.has) && item.detail ? <><br/><span style={{fontSize:'9px',color:'#333'}}>→{item.detail}</span></> : null}</td>
+                    </tr>
+                  ))}
+                </tbody></table>
+                {/* (32) 共生社会への協力 */}
+                <table className="v-tbl" style={{marginTop:'4px'}}><tbody>
+                  <tr><td className="lbl lbl-wrap" style={{width:'82%'}}>(32) 分野横断的な協議会に参加し，必要な協力を行う旨の同意について</td><td style={{textAlign:'center',width:'18%'}}>{fmtYesNo(form.orgCoexistenceCooperation)}</td></tr>
+                  {form.orgCoexistenceWorkplaceCityName && <tr><td className="lbl">　勤務地市区町村への協力確認書提出</td><td>{fmt(form.orgCoexistenceWorkplaceCityName)}（{fmtDate(form.orgCoexistenceWorkplaceCityDate)}）</td></tr>}
+                  {form.orgCoexistenceResidenceCityName && <tr><td className="lbl">　住居地市区町村への協力確認書提出</td><td>{fmt(form.orgCoexistenceResidenceCityName)}（{fmtDate(form.orgCoexistenceResidenceCityDate)}）</td></tr>}
+                </tbody></table>
+                <table className="v-tbl" style={{marginTop:'4px'}}><tbody>
+                  <tr><td className="lbl lbl-wrap" style={{width:'82%'}}>(33) 分野に特有の基準に適合していること（特定産業分野に特有の事情に鑑みて告示で定める基準がある場合）</td><td style={{textAlign:'center',width:'18%'}}>{fmtYesNo(form.orgFieldSpecificContractCriteria)}</td></tr>
+                </tbody></table>
+              </div>
+
+              {/* ═══ 所属機関等作成用 ５ V — 登録支援機関 ═══ */}
+              <div className="omittable-vRso">
+                <div className="section page-break">
+                  所属機関等作成用 ５　　　Ｖ　— 登録支援機関（支援計画の全部を委託する場合）
+                </div>
+
+                <div className="section3">支援責任者・支援担当者</div>
+                <table className="v-tbl"><tbody>
+                  <tr><td className="lbl" style={{width:'30%'}}>支援責任者氏名</td><td>{fmt(form.supportManagerName)}</td><td className="lbl" style={{width:'20%'}}>役職・部署</td><td>{fmt(form.supportManagerTitle)}</td></tr>
+                  <tr><td className="lbl">支援担当者氏名</td><td>{fmt(form.supportStaffName)}</td><td className="lbl">役職・部署</td><td>{fmt(form.supportStaffTitle)}</td></tr>
+                </tbody></table>
+
+                <div className="section3">5. 登録支援機関</div>
+                <table className="v-tbl"><tbody>
+                  <tr><td className="lbl" style={{width:'30%'}}>(1) 名称</td><td colSpan={3}>{fmt(form.rsoName)}</td></tr>
+                  <tr><td className="lbl">(2) 法人番号（13桁）</td><td>{fmt(form.rsoCorporateNo)}</td><td className="lbl" style={{width:'25%'}}>(3) 雇用保険番号</td><td>{fmt(form.rsoInsuranceNo)}</td></tr>
+                  <tr><td className="lbl">(4) 所在地</td><td colSpan={3}>{fmtAddr(form.rsoAddress)}</td></tr>
+                  <tr><td className="lbl">　電話番号</td><td colSpan={3}>{fmt(form.rsoPhone)}</td></tr>
+                  <tr><td className="lbl">(5) 代表者の氏名</td><td colSpan={3}>{fmt(form.rsoRepresentative)}</td></tr>
+                  <tr><td className="lbl">(6) 登録番号</td><td>{fmt(form.rsoRegNo)}</td><td className="lbl">(7) 登録年月日</td><td>{fmtDate(form.rsoRegDate)}</td></tr>
+                  <tr><td className="lbl">(8) 支援実施事業所名</td><td colSpan={3}>{fmt(form.rsoSupportBusinessName)}</td></tr>
+                  <tr><td className="lbl">　支援実施事業所所在地</td><td colSpan={3}>{fmtAddr(form.rsoSupportBusinessAddress)}</td></tr>
+                  <tr><td className="lbl">(10) 支援責任者</td><td>{fmt(form.rsoSupportManager)}</td><td className="lbl">(11) 支援担当者</td><td>{fmt(form.rsoSupportStaff)}</td></tr>
+                  <tr><td className="lbl">(12) 対応可能言語</td><td colSpan={3}>{fmt(form.rsoAvailableLanguages)}</td></tr>
+                  <tr><td className="lbl">(13) 支援委託費用（月額）</td><td colSpan={3}>{form.rsoFeePerMonth ? Number(form.rsoFeePerMonth).toLocaleString() + '円' : '　'}</td></tr>
+                </tbody></table>
+              </div>
 
               {/* 取次者（固定） */}
               <div className="section3" style={{marginTop:'10px'}}>※ 取次者</div>

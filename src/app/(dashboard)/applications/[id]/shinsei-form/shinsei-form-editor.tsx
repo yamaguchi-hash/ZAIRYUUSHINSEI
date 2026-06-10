@@ -8,7 +8,6 @@ import {
   Loader2, Save, User, Building2, GraduationCap, Briefcase,
   Plus, Trash2, FileText, Settings, Heart, GraduationCap as School, ScanText, BookOpen, ChevronDown,
 } from "lucide-react";
-import { SectionExtractButton } from "@/components/applications/section-extract-button";
 import { cn, VISA_TYPE_LABELS } from "@/lib/utils";
 import { AddressSplitInput, AddressSplitSimple } from "@/components/ui/postal-code-input";
 import type { ApplicationFormData, WorkHistoryEntry, FamilyMember, ApplicationFormType, VisaFormCategory } from "@/lib/form-types";
@@ -30,12 +29,18 @@ const inputCls = "w-full text-sm border border-gray-300 rounded-lg px-3 py-1.5 f
 const selectCls = "w-full text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white";
 const textareaCls = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white resize-y";
 
-function Field({ label, required, note, children }: { label: string; required?: boolean; note?: string; children: React.ReactNode }) {
+function Field({ label, required, note, children, aiStatus }: {
+  label: string; required?: boolean; note?: string; children: React.ReactNode;
+  aiStatus?: 'confirmed' | 'empty';
+}) {
   return (
-    <div>
+    <div className={cn(
+      aiStatus === 'empty' && 'pl-2 border-l-2 border-amber-400 bg-amber-50/40 rounded-r-md -ml-2 pr-1 py-0.5',
+    )}>
       <label className="block text-xs font-medium text-gray-600 mb-1">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
         {note && <span className="text-gray-400 font-normal ml-1">（{note}）</span>}
+        {aiStatus === 'empty' && <span className="text-amber-600 font-normal ml-1 text-[10px]">⚠ 要確認</span>}
       </label>
       {children}
     </div>
@@ -129,6 +134,17 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
     setMsg("");
   }
 
+  // AI読み取りステータスヘルパー
+  const aiStatus = (key: string): 'confirmed' | 'empty' | undefined =>
+    form.aiFieldStatus?.[key] as 'confirmed' | 'empty' | undefined;
+  const hasAiStatus = !!form.aiFieldStatus && Object.keys(form.aiFieldStatus).length > 0;
+  const aiEmptyCount = hasAiStatus
+    ? Object.values(form.aiFieldStatus!).filter(v => v === 'empty').length
+    : 0;
+  const aiConfirmedCount = hasAiStatus
+    ? Object.values(form.aiFieldStatus!).filter(v => v === 'confirmed').length
+    : 0;
+
   // ── 追加職種番号: 旧データ（string）→ 新データ（string[]）の後方互換ノーマライズ ──
   const additionalOccupations: string[] = (() => {
     const raw: any = form.orgOccupationNumberAdditional; // DB旧データはstring型の可能性あり
@@ -189,20 +205,6 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
       setFillProgress("");
     }
     setIsFilling(false);
-  }
-
-  // 書類抽出結果をフォームにマージ
-  function applyExtracted(data: Record<string, any>) {
-    setForm(prev => {
-      const next = { ...prev };
-      for (const [k, v] of Object.entries(data)) {
-        if (v !== null && v !== undefined && v !== "") {
-          (next as any)[k] = v;
-        }
-      }
-      return next;
-    });
-    setMsg("✓ 書類から読み取りました");
   }
 
   /** 申請書（R型/P型）の入力内容から資格外活動許可申請書フィールドへ一括引用 */
@@ -330,7 +332,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
           )}
         </div>
         <div className="flex items-center gap-3">
-          {msg && <span className={cn("text-xs", msg.startsWith("エラー") ? "text-red-600" : "text-green-600")}>{msg}</span>}
+          {msg && <span className={cn("text-xs whitespace-pre-wrap", msg.startsWith("エラー") ? "text-red-600" : "text-green-600")}>{msg}</span>}
           <button onClick={handleSave} disabled={isSaving || isCompleted}
             title={isCompleted ? "申請が完了しているため編集できません" : undefined}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
@@ -338,6 +340,24 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
           </button>
         </div>
       </div>
+
+      {/* AI読み取りステータスバナー */}
+      {hasAiStatus && (
+        <div className="mb-4 rounded-lg border px-4 py-2.5 flex items-center gap-4 text-xs bg-blue-50 border-blue-200">
+          <span className="font-medium text-blue-700">AI読取結果:</span>
+          <span className="text-green-700">✓ {aiConfirmedCount}件入力済み</span>
+          {aiEmptyCount > 0 && (
+            <span className="text-amber-700 font-medium">⚠ {aiEmptyCount}件 要確認（黄色で表示中）</span>
+          )}
+          <button
+            onClick={() => setForm(prev => {
+              const { aiFieldStatus: _, ...rest } = prev as any;
+              return rest as typeof prev;
+            })}
+            className="ml-auto text-gray-400 hover:text-gray-600 underline"
+          >ステータス表示を消す</button>
+        </div>
+      )}
 
       {/* タブ */}
       <div className="flex border-b border-gray-200 mb-6 overflow-x-auto gap-0">
@@ -423,10 +443,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-base"><User className="w-4 h-4" />基本情報（項目 1〜{isCoe || isChange ? '8' : '7'}）</CardTitle>
-                <SectionExtractButton applicationId={applicationId} sectionKey="basic" onExtracted={applyExtracted} />
-              </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="1. 国籍・地域" required>
@@ -457,14 +474,14 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 </Field>
               )}
 
-              <Field label={`${isCoe || isChange ? '6' : '5'}. 配偶者の有無`}>
+              <Field label={`${isCoe || isChange ? '6' : '5'}. 配偶者の有無`} aiStatus={aiStatus("maritalStatus")}>
                 <RadioGroup value={form.maritalStatus} onChange={v => set("maritalStatus", v)} options={["有", "無"]} />
               </Field>
-              <Field label={`${isCoe || isChange ? '7' : '6'}. 職業`}>
+              <Field label={`${isCoe || isChange ? '7' : '6'}. 職業`} aiStatus={aiStatus("occupation")}>
                 <input className={inputCls} value={form.occupation} onChange={e => set("occupation", e.target.value)} placeholder="例: 会社員 / Company Employee" />
               </Field>
               <div className="sm:col-span-2">
-                <Field label={`${isCoe || isChange ? '8' : '7'}. 本国における居住地`}>
+                <Field label={`${isCoe || isChange ? '8' : '7'}. 本国における居住地`} aiStatus={aiStatus("homeTownCity")}>
                   <input className={inputCls} value={form.homeTownCity} onChange={e => set("homeTownCity", e.target.value)} placeholder="本国での住所" />
                 </Field>
               </div>
@@ -473,10 +490,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
                 <CardTitle className="text-base">{isCoe ? '9' : '8'}. 日本における連絡先</CardTitle>
-                <SectionExtractButton applicationId={applicationId} sectionKey="contact" onExtracted={applyExtracted} />
-              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <AddressSplitInput
@@ -514,10 +528,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
                 <CardTitle className="text-base">{isCoe ? '10' : '9'}. 旅券（パスポート）</CardTitle>
-                <SectionExtractButton applicationId={applicationId} sectionKey="passport" onExtracted={applyExtracted} />
-              </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="(1) 旅券番号" required>
@@ -618,16 +629,13 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
           {isChange && (
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
                   <CardTitle className="text-base">現在の在留状況・変更申請（項目 11〜14）</CardTitle>
-                  <SectionExtractButton applicationId={applicationId} sectionKey="status" onExtracted={applyExtracted} />
-                </div>
               </CardHeader>
               <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="11. 現在の在留資格" required>
                   <input className={inputCls} value={form.currentStatusOfResidence} onChange={e => set("currentStatusOfResidence", e.target.value)} placeholder="例: 技術・人文知識・国際業務" />
                 </Field>
-                <Field label="    在留期間">
+                <Field label="    在留期間" aiStatus={aiStatus("currentPeriodOfStay")}>
                   <input className={inputCls} value={form.currentPeriodOfStay} onChange={e => set("currentPeriodOfStay", e.target.value)} placeholder="例: 3年" />
                 </Field>
                 <Field label="    在留期間の満了日" required>
@@ -644,11 +652,11 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     ))}
                   </select>
                 </Field>
-                <Field label="    希望する在留期間">
+                <Field label="    希望する在留期間" aiStatus={aiStatus("desiredPeriodOfStay")}>
                   <input className={inputCls} value={form.desiredPeriodOfStay} onChange={e => set("desiredPeriodOfStay", e.target.value)} placeholder="例: 3年" />
                 </Field>
                 <div className="sm:col-span-2">
-                  <Field label="14. 変更の理由" required>
+                  <Field label="14. 変更の理由" required aiStatus={aiStatus("reasonForApplication")}>
                     <textarea className={textareaCls} rows={3} value={form.reasonForApplication} onChange={e => set("reasonForApplication", e.target.value)} placeholder="変更の理由を記載してください" />
                   </Field>
                 </div>
@@ -660,16 +668,13 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
           {isExtension && (
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
                   <CardTitle className="text-base">現在の在留状況・更新申請（項目 11〜14）</CardTitle>
-                  <SectionExtractButton applicationId={applicationId} sectionKey="status" onExtracted={applyExtracted} />
-                </div>
               </CardHeader>
               <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="11. 現在の在留資格" required>
                   <input className={inputCls} value={form.currentStatusOfResidence} onChange={e => set("currentStatusOfResidence", e.target.value)} placeholder="例: 技術・人文知識・国際業務" />
                 </Field>
-                <Field label="    在留期間">
+                <Field label="    在留期間" aiStatus={aiStatus("currentPeriodOfStay")}>
                   <input className={inputCls} value={form.currentPeriodOfStay} onChange={e => set("currentPeriodOfStay", e.target.value)} placeholder="例: 3年" />
                 </Field>
                 <Field label="    在留期間の満了日" required>
@@ -680,12 +685,12 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 </Field>
                 {/* ★ Extension 項目13: 希望する在留期間（在留資格は変わらないため「期間」のみ） */}
                 <div className="sm:col-span-2">
-                  <Field label="13. 希望する在留期間" note="審査の結果によって希望の期間とならない場合があります">
+                  <Field label="13. 希望する在留期間" note="審査の結果によって希望の期間とならない場合があります" aiStatus={aiStatus("desiredPeriodOfStay")}>
                     <input className={inputCls} value={form.desiredPeriodOfStay} onChange={e => set("desiredPeriodOfStay", e.target.value)} placeholder="例: 3年" />
                   </Field>
                 </div>
                 <div className="sm:col-span-2">
-                  <Field label="14. 更新の理由" required>
+                  <Field label="14. 更新の理由" required aiStatus={aiStatus("reasonForApplication")}>
                     <textarea className={textareaCls} rows={3} value={form.reasonForApplication} onChange={e => set("reasonForApplication", e.target.value)} placeholder="更新の理由を記載してください" />
                   </Field>
                 </div>
@@ -791,14 +796,11 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
             <>
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-base"><Briefcase className="w-4 h-4" />{isCoe ? "22." : "17."} 勤務先</CardTitle>
-                    <SectionExtractButton applicationId={applicationId} sectionKey="employer" onExtracted={applyExtracted} />
-                  </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="(1) 名称（勤務先）" required><input className={inputCls} value={form.employerName} onChange={e => set("employerName", e.target.value)} /></Field>
-                  <Field label="    支店・事業所名"><input className={inputCls} value={form.employerBranchName} onChange={e => set("employerBranchName", e.target.value)} /></Field>
+                  <Field label="    支店・事業所名" aiStatus={aiStatus("employerBranchName")}><input className={inputCls} value={form.employerBranchName} onChange={e => set("employerBranchName", e.target.value)} /></Field>
                   <div className="sm:col-span-2">
                     <Field label="(2) 所在地（主たる勤務場所）">
                       <AddressSplitSimple value={form.employerAddress} onChange={v => set("employerAddress", v)} inputClassName={inputCls} />
@@ -810,10 +812,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
 
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-base"><GraduationCap className="w-4 h-4" />{isCoe ? "23." : "18."} 最終学歴</CardTitle>
-                    <SectionExtractButton applicationId={applicationId} sectionKey="education" onExtracted={applyExtracted} />
-                  </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="(1) 学校の所在国">
@@ -833,8 +832,8 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       <option value="その他">その他 Others</option>
                     </select>
                   </Field>
-                  <Field label="(3) 学校名" required><input className={inputCls} value={form.educationSchoolName} onChange={e => set("educationSchoolName", e.target.value)} /></Field>
-                  <Field label="(4) 卒業年月日"><input className={inputCls} type="date" value={form.educationGraduationDate} onChange={e => set("educationGraduationDate", e.target.value)} /></Field>
+                  <Field label="(3) 学校名" required aiStatus={aiStatus("educationSchoolName")}><input className={inputCls} value={form.educationSchoolName} onChange={e => set("educationSchoolName", e.target.value)} /></Field>
+                  <Field label="(4) 卒業年月日" aiStatus={aiStatus("educationGraduationDate")}><input className={inputCls} type="date" value={form.educationGraduationDate} onChange={e => set("educationGraduationDate", e.target.value)} /></Field>
                 </CardContent>
               </Card>
 
@@ -922,13 +921,13 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   <p className="text-xs text-gray-500 mt-1">日本人の配偶者等・永住者の配偶者等・定住者の場合に記入</p>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="氏名 Family Name（ローマ字）">
+                  <Field label="氏名 Family Name（ローマ字）" aiStatus={aiStatus("spouseFamilyNameEn")}>
                     <input className={inputCls} value={form.spouseFamilyNameEn} onChange={e => set("spouseFamilyNameEn", e.target.value)} placeholder="YAMADA" />
                   </Field>
-                  <Field label="氏名 Given Name（ローマ字）">
+                  <Field label="氏名 Given Name（ローマ字）" aiStatus={aiStatus("spouseGivenNameEn")}>
                     <input className={inputCls} value={form.spouseGivenNameEn} onChange={e => set("spouseGivenNameEn", e.target.value)} placeholder="HANAKO" />
                   </Field>
-                  <Field label="生年月日">
+                  <Field label="生年月日" aiStatus={aiStatus("spouseDob")}>
                     <input className={inputCls} type="date" value={form.spouseDob} onChange={e => set("spouseDob", e.target.value)} />
                   </Field>
                   <Field label="国籍・身分">
@@ -938,13 +937,13 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       <option value="特別永住者">特別永住者</option>
                     </select>
                   </Field>
-                  <Field label="在留カード番号 / 特別永住者証明書番号">
+                  <Field label="在留カード番号 / 特別永住者証明書番号" aiStatus={aiStatus("spouseResidenceCard")}>
                     <input className={inputCls} value={form.spouseResidenceCard} onChange={e => set("spouseResidenceCard", e.target.value)} placeholder="AA12345678AB（日本国籍の場合は不要）" />
                   </Field>
-                  <Field label="職業">
+                  <Field label="職業" aiStatus={aiStatus("spouseOccupation")}>
                     <input className={inputCls} value={form.spouseOccupation} onChange={e => set("spouseOccupation", e.target.value)} placeholder="例: 会社員" />
                   </Field>
-                  <Field label="勤務先または通学先">
+                  <Field label="勤務先または通学先" aiStatus={aiStatus("spouseEmployer")}>
                     <input className={inputCls} value={form.spouseEmployer} onChange={e => set("spouseEmployer", e.target.value)} />
                   </Field>
                   <div className="sm:col-span-2">
@@ -957,16 +956,13 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
 
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
                     <CardTitle className="text-base">婚姻・家族関係</CardTitle>
-                    <SectionExtractButton applicationId={applicationId} sectionKey="spouse" onExtracted={applyExtracted} />
-                  </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="婚姻（届出）年月日">
+                  <Field label="婚姻（届出）年月日" aiStatus={aiStatus("marriageDate")}>
                     <input className={inputCls} type="date" value={form.marriageDate} onChange={e => set("marriageDate", e.target.value)} />
                   </Field>
-                  <Field label="婚姻届出市区町村名">
+                  <Field label="婚姻届出市区町村名" aiStatus={aiStatus("marriageRegistrationPlace")}>
                     <input className={inputCls} value={form.marriageRegistrationPlace} onChange={e => set("marriageRegistrationPlace", e.target.value)} placeholder="例: 東京都渋谷区" />
                   </Field>
                   <Field label="同居の有無">
@@ -1104,7 +1100,6 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
               {/* 扶養者情報（扶養者用Ｒ）*/}
               <Card>
                 <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
                     <div>
                       <CardTitle className="flex items-center gap-2 text-base">
                         <User className="w-4 h-4" />
@@ -1112,8 +1107,6 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       </CardTitle>
                       <p className="text-xs text-gray-500 mt-1">別紙「扶養者等作成用 Part 1 R」に対応</p>
                     </div>
-                    <SectionExtractButton applicationId={applicationId} sectionKey="supporter" onExtracted={applyExtracted} />
-                  </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="(1) 氏名（ローマ字）">
@@ -1183,13 +1176,10 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
             <>
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <School className="w-4 h-4" />
                       在籍学校の情報（留学）
                     </CardTitle>
-                    <SectionExtractButton applicationId={applicationId} sectionKey="school" onExtracted={applyExtracted} />
-                  </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
@@ -1235,10 +1225,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
 
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
                     <CardTitle className="text-base">費用支弁方法</CardTitle>
-                    <SectionExtractButton applicationId={applicationId} sectionKey="school" onExtracted={applyExtracted} />
-                  </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="費用支弁方法">
@@ -1596,10 +1583,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 <>
                   <Card>
                     <CardHeader>
-                      <div className="flex items-center justify-between">
                         <CardTitle className="flex items-center gap-2 text-base"><Building2 className="w-4 h-4" />1〜3. 外国人氏名・契約形態・所属機関</CardTitle>
-                        <SectionExtractButton applicationId={applicationId} sectionKey="org" onExtracted={applyExtracted} />
-                      </div>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="sm:col-span-2">
@@ -1662,7 +1646,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                           <option value="その他">その他</option>
                         </select>
                       </Field>
-                      <Field label={`${isCoe ? "7." : "6."} 給与・報酬（税引き前）`} required>
+                      <Field label={`${isCoe ? "7." : "6."} 給与・報酬（税引き前）`} required aiStatus={aiStatus("salary")}>
                         <div className="flex gap-2">
                           <input className={inputCls} value={form.salary} onChange={e => set("salary", e.target.value)} placeholder="例: 300000" />
                           <select className="text-sm border border-gray-300 rounded-lg px-2 focus:outline-none bg-white" value={form.salaryType} onChange={e => set("salaryType", e.target.value)}>
@@ -1671,10 +1655,10 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                           </select>
                         </div>
                       </Field>
-                      <Field label={`${isCoe ? "8." : "7."} 実務経験年数`} note="年">
+                      <Field label={`${isCoe ? "8." : "7."} 実務経験年数`} note="年" aiStatus={aiStatus("businessExperienceYears")}>
                         <input className={inputCls} value={form.businessExperienceYears} onChange={e => set("businessExperienceYears", e.target.value)} placeholder="例: 3" />
                       </Field>
-                      <Field label={`${isCoe ? "9." : "8."} 職務上の地位（役職名）`}>
+                      <Field label={`${isCoe ? "9." : "8."} 職務上の地位（役職名）`} aiStatus={aiStatus("position")}>
                         <RadioGroup value={form.positionExists} onChange={v => set("positionExists", v)} options={["あり", "なし"]} />
                       </Field>
                       {form.positionExists === "あり" && (
@@ -1687,7 +1671,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                         <input className={inputCls} value={form.occupationCodeOthers} onChange={e => set("occupationCodeOthers", e.target.value)} placeholder="例: 25, 30" />
                       </Field>
                       <div className="sm:col-span-2">
-                        <Field label={`${isCoe ? "11." : "10."} 活動内容詳細`} required>
+                        <Field label={`${isCoe ? "11." : "10."} 活動内容詳細`} required aiStatus={aiStatus("activityDetails")}>
                           <textarea className={textareaCls} rows={6} value={form.activityDetails} onChange={e => set("activityDetails", e.target.value)} placeholder="担当する業務内容・活動の詳細を具体的に記載してください" />
                         </Field>
                       </div>
@@ -1702,8 +1686,12 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   {/* 1. 雇用している外国人の氏名 */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base"><Building2 className="w-4 h-4" />所属機関等作成用 Part 1 V（特定技能）</CardTitle>
-                      <p className="text-xs text-gray-500 mt-1">特定技能外国人の氏名・雇用契約・派遣先・職業紹介事業者・取次機関</p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="flex items-center gap-2 text-base"><Building2 className="w-4 h-4" />所属機関等作成用 Part 1 V（特定技能）</CardTitle>
+                          <p className="text-xs text-gray-500 mt-1">特定技能外国人の氏名・雇用契約・派遣先・職業紹介事業者・取次機関</p>
+                        </div>
+                      </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <p className="text-xs font-semibold text-gray-600">1. 雇用している外国人の氏名</p>
@@ -1967,8 +1955,12 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
               {/* コンプライアンス確認 (11)〜(21) */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">コンプライアンス確認（(11)〜(21)）</CardTitle>
-                  <p className="text-xs text-gray-500 mt-1">「有」の場合は内容・該当者名を記入してください</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base">コンプライアンス確認（(11)〜(21)）</CardTitle>
+                      <p className="text-xs text-gray-500 mt-1">「有」の場合は内容・該当者名を記入してください</p>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {[
@@ -2503,7 +2495,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
 
       {/* 下部保存ボタン */}
       <div className="mt-6 flex justify-end gap-3">
-        {msg && <span className={cn("text-sm flex items-center", msg.startsWith("エラー") ? "text-red-600" : "text-green-600")}>{msg}</span>}
+        {msg && <span className={cn("text-sm flex items-center whitespace-pre-wrap", msg.startsWith("エラー") ? "text-red-600" : "text-green-600")}>{msg}</span>}
         <button onClick={handleSave} disabled={isSaving || isCompleted}
           title={isCompleted ? "申請が完了しているため編集できません" : undefined}
           className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">

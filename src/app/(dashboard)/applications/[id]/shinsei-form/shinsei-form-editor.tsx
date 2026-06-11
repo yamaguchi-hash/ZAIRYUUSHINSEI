@@ -1881,8 +1881,16 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                           <label className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="checkbox" checked={form.orgSalaryPaymentBank === "有"} onChange={e => set("orgSalaryPaymentBank", e.target.checked ? "有" : "無")} />口座振込み</label>
                         </div>
                       </Field>
+                      <div className="border rounded-lg p-2 bg-gray-50">
+                        <p className="text-xs font-medium text-gray-700 mb-1">(6) 外国人であることを理由として日本人と異なった待遇としている事項の有無</p>
+                        <div className="flex gap-4 mb-2">
+                          {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" checked={form.orgForeignTreatmentDifference === o} onChange={() => set("orgForeignTreatmentDifference", o)} />{o}</label>)}
+                        </div>
+                        {form.orgForeignTreatmentDifference === "有" && (
+                          <input className={inputCls} value={form.orgForeignTreatmentDetail} onChange={e => set("orgForeignTreatmentDetail", e.target.value)} placeholder="異なった待遇としている事項の内容を記入" />
+                        )}
+                      </div>
                       {[
-                        { key: "orgForeignTreatmentDifference" as const, label: "(6) 外国人であることを理由として日本人と異なった待遇としている事項の有無" },
                         { key: "orgPaidHolidayForReturn" as const, label: "(7) 外国人が一時帰国を希望した場合には，必要な有給休暇を取得させるものとしていることの有無" },
                         { key: "orgFieldSpecificEmploymentCriteria" as const, label: "(8) 雇用関係につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）" },
                         { key: "orgReturnTravelExpenses" as const, label: "(9) 外国人が特定技能雇用契約終了後の帰国に要する旅費を負担することができないときは，当該旅費を負担するとともに，出国が円滑になされるよう必要な措置を講ずることとしていることの有無" },

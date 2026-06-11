@@ -36,6 +36,25 @@ function safeName(s: string): string {
   return s.replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
 }
 
+/** 同一フォルダ内でファイル名が重複する場合に連番を付与して一意化（Zipエントリの上書き・隠れを防止） */
+function uniqueFileName(usedNames: Set<string>, fileName: string): string {
+  if (!usedNames.has(fileName)) {
+    usedNames.add(fileName);
+    return fileName;
+  }
+  const dotIndex = fileName.lastIndexOf(".");
+  const base = dotIndex > 0 ? fileName.slice(0, dotIndex) : fileName;
+  const ext = dotIndex > 0 ? fileName.slice(dotIndex) : "";
+  let n = 2;
+  let candidate = `${base}_${n}${ext}`;
+  while (usedNames.has(candidate)) {
+    n++;
+    candidate = `${base}_${n}${ext}`;
+  }
+  usedNames.add(candidate);
+  return candidate;
+}
+
 // ─── 申請書データExcel生成 ───────────────────────────────────────────────────
 async function buildFormDataExcel(
   form: Partial<ApplicationFormData>,
@@ -156,6 +175,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 
     let attachedCount = 0;
     const failedFiles: string[] = [];
+    const usedNamesByFolder = new Map<string, Set<string>>();
     for (const att of attachments) {
       const bytes = await fetchFileBytes(att.fileUrl);
       if (!bytes) {
@@ -165,8 +185,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       const typeLabel = att.documentLabel
         ?? ATTACHMENT_TYPE_MAP[att.documentType]?.label
         ?? att.documentType;
-      const sub = attachFolder.folder(safeName(typeLabel))!;
-      sub.file(safeName(att.fileName), bytes);
+      const folderKey = safeName(typeLabel);
+      const sub = attachFolder.folder(folderKey)!;
+      let usedNames = usedNamesByFolder.get(folderKey);
+      if (!usedNames) {
+        usedNames = new Set();
+        usedNamesByFolder.set(folderKey, usedNames);
+      }
+      sub.file(uniqueFileName(usedNames, safeName(att.fileName)), bytes);
       attachedCount++;
     }
 

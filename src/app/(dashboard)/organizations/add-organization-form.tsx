@@ -15,6 +15,7 @@ type OrgForm = {
   city: string;
   addressLine: string;
   phone: string;
+  fax: string;
   email: string;
   category: string;
   capital: string;
@@ -24,15 +25,17 @@ type OrgForm = {
   workersAccidentInsuranceNo: string;
   employmentInsuranceNo: string;
   laborInsuranceNo: string;
+  socialInsuranceSymbol: string;
   representativeTitle: string;
   representativeName: string;
 };
 
 const EMPTY_FORM: OrgForm = {
   nameJa: "", nameEn: "", corporateNumber: "", postalCode: "",
-  prefecture: "", city: "", addressLine: "", phone: "", email: "",
+  prefecture: "", city: "", addressLine: "", phone: "", fax: "", email: "",
   category: "", capital: "", annualSales: "", employeeCount: "", industry: "",
   workersAccidentInsuranceNo: "", employmentInsuranceNo: "", laborInsuranceNo: "",
+  socialInsuranceSymbol: "",
   representativeTitle: "", representativeName: "",
 };
 
@@ -46,6 +49,7 @@ type EditingOrg = {
   city?: string;
   addressLine?: string;
   phone?: string;
+  fax?: string;
   email?: string;
   category?: string;
   capital?: number | null;
@@ -55,6 +59,7 @@ type EditingOrg = {
   workersAccidentInsuranceNo?: string;
   employmentInsuranceNo?: string;
   laborInsuranceNo?: string;
+  socialInsuranceSymbol?: string;
   representativeTitle?: string;
   representativeName?: string;
 };
@@ -81,6 +86,7 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
       city: editingOrg.city ?? "",
       addressLine: editingOrg.addressLine ?? "",
       phone: editingOrg.phone ?? "",
+      fax: editingOrg.fax ?? "",
       email: editingOrg.email ?? "",
       category: editingOrg.category ?? "",
       capital: editingOrg.capital != null ? String(editingOrg.capital) : "",
@@ -90,6 +96,7 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
       workersAccidentInsuranceNo: editingOrg.workersAccidentInsuranceNo ?? "",
       employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? "",
       laborInsuranceNo: editingOrg.laborInsuranceNo ?? "",
+      socialInsuranceSymbol: editingOrg.socialInsuranceSymbol ?? "",
       representativeTitle: editingOrg.representativeTitle ?? "",
       representativeName: editingOrg.representativeName ?? "",
     };
@@ -173,6 +180,10 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
               <input name="phone" value={form.phone} onChange={handleChange} placeholder="03-0000-0000" className="input-field" />
             </div>
             <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">FAX番号</label>
+              <input name="fax" value={form.fax} onChange={handleChange} placeholder="03-0000-0001" className="input-field" />
+            </div>
+            <div className="col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">メールアドレス</label>
               <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="info@example.com" className="input-field" />
             </div>
@@ -208,6 +219,10 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">労働保険番号（14桁）</label>
                 <input name="laborInsuranceNo" value={form.laborInsuranceNo} onChange={handleChange} placeholder="01-234567-890123-000" className="input-field font-mono" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">健康保険・厚生年金保険事業所整理記号等</label>
+                <input name="socialInsuranceSymbol" value={form.socialInsuranceSymbol} onChange={handleChange} placeholder="例：12-アイウ" className="input-field font-mono" />
               </div>
             </div>
           </div>

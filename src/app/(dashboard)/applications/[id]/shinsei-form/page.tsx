@@ -8,6 +8,7 @@ import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
 import { ShinseiFormEditor } from "./shinsei-form-editor";
 import type { ApplicationFormData } from "@/lib/form-types";
 import { EMPTY_FORM_DATA } from "@/lib/form-types";
+import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
 
 export default async function ShinseiFormPage({
   params,
@@ -60,15 +61,8 @@ export default async function ShinseiFormPage({
     currentPeriodExpiry:        applicant.currentVisaExpiry ?? '',
     residenceCardNumber:        applicant.residenceCardNumber ?? '',
     desiredStatusOfResidence:   VISA_TYPE_LABELS[application.visaType] ?? application.visaType ?? '',
-    employerName:               organization?.nameJa ?? '',
-    employerAddress:            [organization?.prefecture, organization?.city, organization?.addressLine].filter(Boolean).join(''),
-    employerPhone:              organization?.phone ?? '',
-    orgName:                    organization?.nameJa ?? '',
-    orgCorporateNumber:         organization?.corporateNumber ?? '',
-    orgAddress:                 [organization?.prefecture, organization?.city, organization?.addressLine].filter(Boolean).join(''),
-    orgPhone:                   organization?.phone ?? '',
-    orgCapital:                 organization?.capital ? String(organization.capital) : '',
-    orgEmployeeCount:           organization?.employeeCount ? String(organization.employeeCount) : '',
+    // 所属機関マスター（全申請書共通の企業基本情報のみを自動反映）
+    ...mapOrganizationToFormData(organization),
   };
 
   // 8. 日本における連絡先（申請人マスターから常に取得）

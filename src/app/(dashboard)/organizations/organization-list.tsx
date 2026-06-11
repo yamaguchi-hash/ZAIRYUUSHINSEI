@@ -16,6 +16,7 @@ type Org = {
   city: string | null;
   addressLine: string | null;
   phone: string | null;
+  fax: string | null;
   email: string | null;
   category: string | null;
   capital: number | null;
@@ -25,6 +26,7 @@ type Org = {
   workersAccidentInsuranceNo: string | null;
   employmentInsuranceNo: string | null;
   laborInsuranceNo: string | null;
+  socialInsuranceSymbol: string | null;
   representativeTitle: string | null;
   representativeName: string | null;
 };
@@ -124,6 +126,7 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
             city: editingOrg.city ?? undefined,
             addressLine: editingOrg.addressLine ?? undefined,
             phone: editingOrg.phone ?? undefined,
+            fax: editingOrg.fax ?? undefined,
             email: editingOrg.email ?? undefined,
             category: editingOrg.category ?? undefined,
             capital: editingOrg.capital,
@@ -133,6 +136,7 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
             workersAccidentInsuranceNo: editingOrg.workersAccidentInsuranceNo ?? undefined,
             employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? undefined,
             laborInsuranceNo: editingOrg.laborInsuranceNo ?? undefined,
+            socialInsuranceSymbol: editingOrg.socialInsuranceSymbol ?? undefined,
             representativeTitle: editingOrg.representativeTitle ?? undefined,
             representativeName: editingOrg.representativeName ?? undefined,
           }}
@@ -254,7 +258,7 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                       )}
 
                       {/* 保険番号 */}
-                      {(org.workersAccidentInsuranceNo || org.employmentInsuranceNo || org.laborInsuranceNo) && (
+                      {(org.workersAccidentInsuranceNo || org.employmentInsuranceNo || org.laborInsuranceNo || org.socialInsuranceSymbol) && (
                         <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-gray-400">
                           <Shield className="w-2.5 h-2.5 mt-0.5 flex-shrink-0" />
                           {org.workersAccidentInsuranceNo && (
@@ -265,6 +269,9 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                           )}
                           {org.laborInsuranceNo && (
                             <span>労保: <span className="font-mono">{org.laborInsuranceNo}</span></span>
+                          )}
+                          {org.socialInsuranceSymbol && (
+                            <span>社保: <span className="font-mono">{org.socialInsuranceSymbol}</span></span>
                           )}
                         </div>
                       )}

@@ -16,6 +16,7 @@ import {
 import { eq, and, ne, inArray, desc, ilike, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
+import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
 
 function requireTenantId(tenantId: string | undefined | null): string {
   if (!tenantId) throw new Error("テナントIDが不正です");
@@ -1511,16 +1512,8 @@ notes(その他重要事項)
       residenceCardNumber:      applicant?.residenceCardNumber ?? existingForm.residenceCardNumber ?? '',
       // 申請情報
       desiredStatusOfResidence: VISA_TYPE_LABELS[app.visaType] ?? app.visaType ?? existingForm.desiredStatusOfResidence ?? '',
-      // 組織マスター
-      employerName:             org?.nameJa ?? existingForm.employerName ?? '',
-      employerAddress:          [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join('') || existingForm.employerAddress || '',
-      employerPhone:            org?.phone ?? existingForm.employerPhone ?? '',
-      orgName:                  org?.nameJa ?? existingForm.orgName ?? '',
-      orgCorporateNumber:       org?.corporateNumber ?? existingForm.orgCorporateNumber ?? '',
-      orgAddress:               [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join('') || existingForm.orgAddress || '',
-      orgPhone:                 org?.phone ?? existingForm.orgPhone ?? '',
-      orgCapital:               org?.capital ? String(org.capital) : existingForm.orgCapital ?? '',
-      orgEmployeeCount:         org?.employeeCount ? String(org.employeeCount) : existingForm.orgEmployeeCount ?? '',
+      // 組織マスター（全申請書共通の企業基本情報のみ。値がある項目だけ上書き）
+      ...mapOrganizationToFormData(org),
       // 取次者固定
       agentName:         '山口忠士',
       agentOrganization: '兵庫県行政書士会',

@@ -12,6 +12,7 @@ import { cleanseMasterCodes } from "@/lib/master-cleansing";
 import { normalizeFamilyMembers, mergeFamilyMembers } from "@/lib/family-schema";
 import { STAGE1_RESPONSE_SCHEMA, STAGE2_RESPONSE_SCHEMA, schemaToFieldList } from "@/lib/shinsei-ai-schemas";
 import { mapWithConcurrency } from "@/lib/concurrency";
+import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
 
 // プロンプト用フィールド定義リスト（モジュールロード時に1回だけ生成）
 const STAGE1_FIELD_LIST = schemaToFieldList(STAGE1_RESPONSE_SCHEMA);
@@ -378,16 +379,8 @@ ${STAGE1_FIELD_LIST}
       currentPeriodExpiry:      applicant?.currentVisaExpiry ?? "",
       residenceCardNumber:      applicant?.residenceCardNumber ?? "",
       desiredStatusOfResidence: VISA_TYPE_LABELS[app.visaType] ?? app.visaType ?? "",
-      employerName:    org?.nameJa ?? "",
-      employerAddress: [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join(""),
-      employerPhone:   org?.phone ?? "",
-      orgName:         org?.nameJa ?? "",
-      orgCorporateNumber: org?.corporateNumber ?? "",
-      orgAddress:      [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join(""),
-      orgPhone:        org?.phone ?? "",
-      orgCapital:      org?.capital ? String(org.capital) : "",
-      orgEmployeeCount: org?.employeeCount ? String(org.employeeCount) : "",
-      orgEmploymentInsuranceNo: org?.employmentInsuranceNo ?? "",
+      // 組織マスター（全申請書共通の企業基本情報のみ）
+      ...mapOrganizationToFormData(org),
       agentName:         "山口忠士",
       agentOrganization: "兵庫県行政書士会",
       agentAddress:      "〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B",

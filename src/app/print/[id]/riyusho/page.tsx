@@ -190,14 +190,18 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
             body { background: white !important; margin: 0; }
             .riyusho-page {
               margin: 0;
-              padding: 30mm 25mm 25mm 25mm;
+              padding: 0;
               box-shadow: none;
               max-width: 100%;
             }
           }
+          /* 理由書（本ファイル）専用のページ余白。@pageのmarginは全ページ（複数ページにまたがる
+             場合も各ページ共通）に適用されるため、.riyusho-pageのpaddingではなくこちらで
+             上下の余白を確保する。他の印刷用ページ（shinsei-shared.tsx等）の@page定義とは
+             独立しており影響しない。 */
           @page {
             size: A4;
-            margin: 0;
+            margin: 30mm 25mm 25mm 25mm;
           }
         `}</style>
       </head>

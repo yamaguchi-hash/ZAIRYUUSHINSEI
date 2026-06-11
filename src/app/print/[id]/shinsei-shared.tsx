@@ -6,7 +6,7 @@
 import { auth } from "@/lib/auth";
 import { db, applications, applicantMaster, organizationMaster } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
-import type { ApplicationFormData, FamilyMember, WorkHistoryEntry } from "@/lib/form-types";
+import type { ApplicationFormData, ApplicationFormType, FamilyMember, WorkHistoryEntry } from "@/lib/form-types";
 import { FORM_TYPE_LABELS, VISA_CATEGORY_NEEDS_ORG, OCCUPATION_TYPES } from "@/lib/form-types";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 
@@ -57,6 +57,8 @@ export interface ShinseiData {
   workHistory: WorkHistoryEntry[];
   today: string;
   isChange: boolean;
+  /** 申請書類の種別（coe/change/extension/permanent） */
+  formType: ApplicationFormType;
   /** 在留資格カテゴリ（N/L/I/T/R/P/V） */
   cat: string;
   isNtype: boolean;
@@ -86,10 +88,11 @@ export async function loadShinseiData(id: string): Promise<ShinseiData | null> {
     : null;
 
   const form = (app.formData ?? {}) as Partial<ApplicationFormData>;
-  const toFormType = (t: string) => {
+  const toFormType = (t: string): ApplicationFormType => {
     if (t === "coe" || t === "certification") return "coe";
     if (t === "change") return "change";
     if (t === "extension" || t === "renewal") return "extension";
+    if (t === "permanent" || t === "permanent_residence") return "permanent";
     return "extension";
   };
   const formType = toFormType(form.applicationFormType ?? app.applicationType);
@@ -112,8 +115,52 @@ export async function loadShinseiData(id: string): Promise<ShinseiData | null> {
     workHistory: (form.workHistory ?? []) as WorkHistoryEntry[],
     today,
     isChange,
+    formType,
     cat, isNtype, isTtype, isRtype, isPtype, isVtype, needsOrg,
   };
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 様式番号・タイトルのマッピング（書類種別ごとに動的に切り替える）
+// ─────────────────────────────────────────────────────────────────────────────
+// 申請書のヘッド部分に表示する「様式番号」「申請書タイトル（和文・英文）」は、
+// 申請書類の種別（formType: coe/change/extension/permanent）によって異なる。
+// すべてのページで同じレイアウトの FormHeader を使い、ここで定義した値を
+// formType（必要に応じて在留資格カテゴリ cat も）に応じて切り替えることで、
+// デザインは統一しつつ様式番号・タイトルだけが正しく動的に変わるようにする。
+//
+// 在留資格カテゴリ（cat）ごとに様式番号を変える必要が生じた場合は、
+// getFormNumber() 内に cat による分岐・専用マップを追加すればよい。
+// ═════════════════════════════════════════════════════════════════════════════
+export const FORM_NUMBER_MAP: Record<ApplicationFormType, string> = {
+  coe:       "別記第六号の三様式（第六条の二関係）",
+  change:    "別記第三十号様式（第二十条関係）",
+  extension: "別記第三十号の二様式（第二十一条関係）",
+  permanent: "別記第三十六号様式（第二十二条関係）",
+};
+
+export const FORM_TITLE_MAP: Record<ApplicationFormType, { ja: string; en: string }> = {
+  coe: {
+    ja: "在留資格認定証明書交付申請書",
+    en: "APPLICATION FOR CERTIFICATE OF ELIGIBILITY",
+  },
+  change: {
+    ja: "在留資格変更許可申請書",
+    en: "APPLICATION FOR CHANGE OF STATUS OF RESIDENCE",
+  },
+  extension: {
+    ja: "在留期間更新許可申請書",
+    en: "APPLICATION FOR EXTENSION OF PERIOD OF STAY",
+  },
+  permanent: {
+    ja: "永住許可申請書",
+    en: "APPLICATION FOR PERMISSION FOR PERMANENT RESIDENCE",
+  },
+};
+
+/** 様式番号を取得する（書類種別が主軸。在留資格カテゴリ別の例外があればここに追加） */
+export function getFormNumber(formType: ApplicationFormType, cat?: string): string {
+  return FORM_NUMBER_MAP[formType] ?? FORM_NUMBER_MAP.change;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -142,7 +189,10 @@ export const PRINT_STYLES = `
     font-family:"MS Mincho","ＭＳ 明朝","Hiragino Mincho ProN","游明朝",serif;
     font-size:10px;color:#000;background:#f3f4f6;line-height:1.4;
   }
-  @page{size:A4;margin:7mm 9mm;}
+  /* PDFの実際の用紙幅も --pdf-print-width に連動させる。
+     ※ @page の size は CSS変数(var())を解釈できないため、PDF_PRINT_WIDTH の値を
+        直接埋め込んでいる。PDF_PRINT_WIDTH は "210mm" のような長さ単位で指定すること。 */
+  @page{size:${PDF_PRINT_WIDTH} 297mm;margin:7mm 9mm;}
 
   /* ── 画面表示: A4カードとしてプレビュー ── */
   .page{
@@ -158,9 +208,11 @@ export const PRINT_STYLES = `
     body{background:#fff;font-size:8.5px;line-height:1.25;}
     *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
     .no-print{display:none!important;}
-    /* A4固定・強制改ページを解除し、内容量に応じて自然に流す */
+    /* A4固定・強制改ページを解除し、内容量に応じて自然に流す。
+       .page の幅は @page で確保した用紙幅いっぱい(100%)に追従させる。
+       table 等の内部要素は width:100% / 列は%指定のため、ここに連動して伸縮する。 */
     .page{
-      width:var(--pdf-print-width);max-width:var(--pdf-print-width);min-height:0;
+      width:100%;max-width:100%;min-height:0;
       padding:0;margin:0 auto;box-shadow:none;border-radius:0;
       page-break-after:auto;break-after:auto;
     }

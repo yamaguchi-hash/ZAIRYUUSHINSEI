@@ -1,12 +1,15 @@
 /**
  * 申請人等作成用 PDF（最大3ページ）
  * ─────────────────────────────────
- * Page 1: 別記第三十号様式（第二十条関係）申請人等作成用 １（全在留資格共通）
+ * Page 1: 申請人等作成用 １（全在留資格共通）
  * Page 2: 申請人等作成用 ２ V（「特定技能（１号）」・「特定技能（２号）」） ※特定技能のみ
  * Page 3: 申請人等作成用 ３ V（「特定技能（１号）」・「特定技能（２号）」） ※特定技能のみ
  *
  * Page 2・3 は在留資格カテゴリが V（特定技能）の場合のみ出力する。
  * それ以外の在留資格では Page 1 のみを出力し、末尾に署名欄を付す。
+ *
+ * 様式番号・申請書タイトルはヘッド部分（FormHeader）で全ページ共通のデザインに統一しつつ、
+ * 申請書類の種別（formType）に応じて getFormNumber() / FORM_TITLE_MAP から動的に取得する。
  */
 import { notFound } from "next/navigation";
 import {
@@ -14,6 +17,7 @@ import {
   fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes,
   fmtAdditionalOccupations, buildAddress,
   FormHeader, SignatureSection,
+  FORM_TITLE_MAP, getFormNumber,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
 
@@ -22,7 +26,11 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
   const data = await loadShinseiData(id);
   if (!data) notFound();
 
-  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, isVtype } = data;
+  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, cat, isVtype } = data;
+
+  // ── ヘッド部分（様式番号・タイトル）: 申請書類の種別に応じて動的に切り替え ──
+  const formNumber = getFormNumber(formType, cat);
+  const formTitle = FORM_TITLE_MAP[formType];
 
   return (
     <html lang="ja">
@@ -41,9 +49,9 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
           {/* ── ヘッダー（共通コンポーネント） ── */}
           <FormHeader
             showGov
-            formNumber="別記第三十号様式（第二十条関係）"
-            title="在留資格変更許可申請書"
-            titleEn="APPLICATION FOR CHANGE OF STATUS OF RESIDENCE"
+            formNumber={formNumber}
+            title={formTitle.ja}
+            titleEn={formTitle.en}
             partLabel="申請人等作成用　１"
             partLabelEn="For applicant, Part 1"
           />
@@ -235,6 +243,10 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         {/* Page 2: 申請人等作成用 ２ V（「特定技能（１号）」・「特定技能（２号）」） */}
         <div className="page">
           <FormHeader
+            showGov
+            formNumber={formNumber}
+            title={formTitle.ja}
+            titleEn={formTitle.en}
             partLabel="申請人等作成用　２"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For applicant, Part 2 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
@@ -364,6 +376,10 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
           <FormHeader
+            showGov
+            formNumber={formNumber}
+            title={formTitle.ja}
+            titleEn={formTitle.en}
             partLabel="申請人等作成用　３"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For applicant, Part 3 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}

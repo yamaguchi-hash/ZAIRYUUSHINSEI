@@ -137,12 +137,17 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
             font-family:"MS Mincho","ＭＳ 明朝","Hiragino Mincho ProN","游明朝",serif;
             font-size:11px;color:#000;background:#f3f4f6;line-height:1.5;
           }
+          /* PDFの実際の用紙幅も --pdf-print-width に連動させる。
+             ※ @page の size は CSS変数(var())を解釈できないため、PDF_PRINT_WIDTH の値を
+                直接埋め込んでいる。PDF_PRINT_WIDTH は "210mm" のような長さ単位で指定すること。 */
+          @page{size:${PDF_PRINT_WIDTH} 297mm;margin:0;}
           .page{background:#fff;max-width:var(--pdf-print-width);margin:0 auto;padding:14mm 16mm;min-height:297mm;}
           @media screen{.page{margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.12);border-radius:4px;}}
           @media print{
             body{background:#fff;}
             *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
-            .page{padding:10mm 13mm;max-width:var(--pdf-print-width);min-height:auto;}
+            /* @page で確保した用紙幅いっぱい(100%)に追従させる */
+            .page{padding:10mm 13mm;width:100%;max-width:100%;min-height:auto;}
             .no-print{display:none!important;}
           }
 

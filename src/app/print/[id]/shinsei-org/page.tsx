@@ -9,6 +9,9 @@
  *
  * 本書類は在留資格カテゴリが V（特定技能）の場合のみ作成が必要なため、
  * isVtype が false の場合は何も出力しない（画面上に案内のみ表示）。
+ *
+ * 様式番号・申請書タイトルはヘッド部分（FormHeader）で全ページ共通のデザインに統一しつつ、
+ * 申請書類の種別（formType）に応じて getFormNumber() / FORM_TITLE_MAP から動的に取得する。
  */
 import { notFound } from "next/navigation";
 import {
@@ -16,6 +19,7 @@ import {
   fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes,
   fmtAdditionalOccupations, buildAddress,
   FormHeader, SignatureSection,
+  FORM_TITLE_MAP, getFormNumber,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
 
@@ -24,7 +28,11 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
   const data = await loadShinseiData(id);
   if (!data) notFound();
 
-  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, isVtype } = data;
+  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, cat, isVtype } = data;
+
+  // ── ヘッド部分（様式番号・タイトル）: 申請書類の種別に応じて動的に切り替え ──
+  const formNumber = getFormNumber(formType, cat);
+  const formTitle = FORM_TITLE_MAP[formType];
 
   return (
     <html lang="ja">
@@ -50,6 +58,10 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
           <FormHeader
+            showGov
+            formNumber={formNumber}
+            title={formTitle.ja}
+            titleEn={formTitle.en}
             partLabel="所属機関等作成用　１"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For organization, Part 1 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
@@ -218,6 +230,10 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
           <FormHeader
+            showGov
+            formNumber={formNumber}
+            title={formTitle.ja}
+            titleEn={formTitle.en}
             partLabel="所属機関等作成用　２"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For organization, Part 2 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
@@ -388,6 +404,10 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
           <FormHeader
+            showGov
+            formNumber={formNumber}
+            title={formTitle.ja}
+            titleEn={formTitle.en}
             partLabel="所属機関等作成用　３"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For organization, Part 3 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
@@ -432,6 +452,10 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
           <FormHeader
+            showGov
+            formNumber={formNumber}
+            title={formTitle.ja}
+            titleEn={formTitle.en}
             partLabel="所属機関等作成用　４"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For organization, Part 4 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
@@ -508,6 +532,10 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
           <FormHeader
+            showGov
+            formNumber={formNumber}
+            title={formTitle.ja}
+            titleEn={formTitle.en}
             partLabel="所属機関等作成用　５"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For organization, Part 4 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)") — Support plan`}

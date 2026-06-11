@@ -444,8 +444,45 @@ export interface ApplicationFormData {
   // 支援責任者・支援担当者
   supportManagerName: string;         // 支援責任者氏名
   supportManagerTitle: string;        // 支援責任者役職・部署
+  supportManagerAppointed: string;    // (34) 役員又は職員の中から支援責任者を選任していることの有無
   supportStaffName: string;           // 支援担当者氏名
   supportStaffTitle: string;          // 支援担当者役職・部署
+  supportStaffAppointed: string;      // (35) 役員又は職員の中から支援担当者を選任していることの有無
+
+  // (36) 中長期在留者受入・管理実績等のいずれかに該当することの有無 — V3シート
+  supportExperienceCriteria: string;
+  supportExperienceCriteriaItem1: boolean; // ① 中長期在留者の受入れ又は管理を適正に行った実績
+  supportExperienceCriteriaItem2: boolean; // ② 支援責任者・担当者の生活相談等従事経験
+  supportExperienceCriteriaItem3: boolean; // ③ その他支援業務を適正に実施できる事情
+  supportExperienceCriteriaItem3Detail: string;
+
+  supportLanguageCapability: string;  // (37) 外国人が理解できる言語による支援体制の有無
+  supportDocumentKept: string;        // (38) 1号支援状況に関する文書の作成・1年以上保管
+
+  // V4シート (39)〜(42)
+  supportNeutralPosition: string;     // (39) 支援責任者・担当者が中立な立場であることの有無
+  supportFailureHistory: string;      // (40) 過去の1号特定技能外国人支援の懈怠の有無
+  supportFailureHistoryDetail: string;
+  supportPeriodicInterviewCapability: string; // (41) 定期面談を実施できる体制の有無
+  supportImplementationFieldCriteria: string; // (42) 支援計画実施の分野別基準への適合の有無
+
+  // 4 1号特定技能外国人支援計画の内容（特定技能1号の場合のみ）— V4シート (1)〜(16)
+  supportPlanInfoProvision: string;       // (1) 在留に関する留意事項等の情報提供
+  supportPlanInfoProvisionMethod: string; // (2) 対面・テレビ電話等による実施
+  supportPlanAirportTransfer: string;     // (3) 出入国時の送迎
+  supportPlanHousingSupport: string;      // (4) 住居確保に係る支援
+  supportPlanLifeContractSupport: string; // (5) 預金口座開設・携帯電話契約等の支援
+  supportPlanLivingInfoProvision: string; // (6) 生活一般に関する情報提供
+  supportPlanProcedureAccompany: string;  // (7) 行政手続への同行等
+  supportPlanJapaneseLearning: string;    // (8) 日本語学習機会の提供
+  supportPlanConsultationResponse: string;// (9) 相談・苦情対応
+  supportPlanExchangePromotion: string;   // (10) 日本人との交流促進支援
+  supportPlanJobChangeSupport: string;    // (11) 非自発的離職時の転職支援
+  supportPlanPeriodicInterview: string;   // (12) 定期面談・行政機関への通報
+  supportPlanCopyProvided: string;        // (13) 支援計画の作成・写しの交付
+  supportPlanFieldSpecificMatters: string;// (14) 分野別告示事項の記載（該当する場合のみ）
+  supportPlanContentAppropriate: string;  // (15) 支援内容の適正性
+  supportPlanFieldSpecificCriteria: string; // (16) 分野別告示基準への適合（該当する場合のみ）
 
   // 登録支援機関（特定技能１号・全支援委託の場合）
   rsoName: string;                    // (5-1) 登録支援機関名称
@@ -684,7 +721,34 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   orgCoexistenceWorkplaceCity: '有', orgCoexistenceWorkplaceCityDate: '', orgCoexistenceWorkplaceCityName: '',
   orgCoexistenceResidenceCity: '有', orgCoexistenceResidenceCityDate: '', orgCoexistenceResidenceCityName: '',
   orgFieldSpecificContractCriteria: '有',
-  supportManagerName: '', supportManagerTitle: '', supportStaffName: '', supportStaffTitle: '',
+  supportManagerName: '', supportManagerTitle: '', supportManagerAppointed: '有',
+  supportStaffName: '', supportStaffTitle: '', supportStaffAppointed: '有',
+  supportExperienceCriteria: '無',
+  supportExperienceCriteriaItem1: false, supportExperienceCriteriaItem2: false,
+  supportExperienceCriteriaItem3: false, supportExperienceCriteriaItem3Detail: '',
+  supportLanguageCapability: '有',
+  supportDocumentKept: '有',
+  supportNeutralPosition: '有',
+  supportFailureHistory: '無', supportFailureHistoryDetail: '',
+  supportPeriodicInterviewCapability: '有',
+  supportImplementationFieldCriteria: '有',
+  // 4 1号特定技能外国人支援計画 (1)〜(16)
+  supportPlanInfoProvision: '有',
+  supportPlanInfoProvisionMethod: '有',
+  supportPlanAirportTransfer: '有',
+  supportPlanHousingSupport: '有',
+  supportPlanLifeContractSupport: '有',
+  supportPlanLivingInfoProvision: '有',
+  supportPlanProcedureAccompany: '有',
+  supportPlanJapaneseLearning: '有',
+  supportPlanConsultationResponse: '有',
+  supportPlanExchangePromotion: '有',
+  supportPlanJobChangeSupport: '有',
+  supportPlanPeriodicInterview: '有',
+  supportPlanCopyProvided: '有',
+  supportPlanFieldSpecificMatters: '有',
+  supportPlanContentAppropriate: '有',
+  supportPlanFieldSpecificCriteria: '有',
   rsoName: '', rsoCorporateNo: '', rsoInsuranceNo: '', rsoAddress: '', rsoPhone: '',
   rsoRepresentative: '', rsoRegNo: '', rsoRegDate: '',
   rsoSupportBusinessName: '', rsoSupportBusinessAddress: '',

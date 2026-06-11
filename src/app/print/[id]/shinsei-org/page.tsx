@@ -1,10 +1,11 @@
 /**
- * 所属機関等作成用 PDF（計4ページ）
+ * 所属機関等作成用 PDF（計5ページ）
  * ─────────────────────────────────
  * Page 1: 所属機関等作成用 １ V — 雇用契約・所属機関
  * Page 2: 所属機関等作成用 2 V — 派遣先・職業紹介事業者・取次機関
  * Page 3: 所属機関等作成用 3 V — コンプライアンス確認（(11)〜(21)）
- * Page 4: 所属機関等作成用 4 V — コンプライアンス確認（(22)〜(33)）＋ 所属機関署名
+ * Page 4: 所属機関等作成用 4 V — コンプライアンス確認（(22)〜(33)）
+ * Page 5: 所属機関等作成用 4 V — 1号特定技能外国人支援計画（(34)〜(42)・4(1)〜(16)）＋ 所属機関署名
  */
 import { notFound } from "next/navigation";
 import {
@@ -30,7 +31,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
         <style>{PRINT_STYLES}</style>
       </head>
       <body>
-        <ShinseiPrintToolbar applicationId={id} label="所属機関等作成用（4ページ）" />
+        <ShinseiPrintToolbar applicationId={id} label="所属機関等作成用（5ページ）" />
 
         {/* ══════════════════════════════════════════════════════════════════════
             Page 1: 所属機関等作成用 １ V — 雇用契約・所属機関
@@ -487,6 +488,104 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
               </td>
               <td style={{ textAlign: "center", width: "18%" }}>{fmtYesNo(form.orgFieldSpecificContractCriteria)}</td>
             </tr>
+          </tbody></table>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            Page 5: 所属機関等作成用 4 V — 1号特定技能外国人支援計画（(34)〜(42)・4(1)〜(16)）＋ 取次者・署名
+            ════════════════════════════════════════════════════════════════════ */}
+        <div className="page">
+          <FormHeader
+            partLabel="所属機関等作成用　５"
+            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
+            partLabelEn={`For organization, Part 4 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)") — Support plan`}
+          />
+
+          <div className="item-title">
+            1号特定技能外国人支援計画（(34)〜(42)）
+            <span className="bilingual">　Support plan for Specified Skilled Worker (i)</span>
+          </div>
+          <table className="v-tbl"><tbody>
+            <tr>
+              <td className="lbl lbl-wrap" style={{ width: "82%", fontSize: "8.5px", lineHeight: "1.25" }}>(34) 役員又は職員の中から支援責任者を選任していることの有無</td>
+              <td style={{ textAlign: "center", width: "18%", fontSize: "9.5px" }}>{fmtYesNo(form.supportManagerAppointed)}</td>
+            </tr>
+            <tr>
+              <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(35) 役員又は職員の中から，活動をさせる事業所ごとに1名以上の支援担当者を選任していることの有無</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportStaffAppointed)}</td>
+            </tr>
+            <tr>
+              <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>
+                (36) 中長期在留者の受入れ・管理実績等のいずれかに該当することの有無
+                {yes(form.supportExperienceCriteria) && (
+                  <div style={{ fontSize: "8px", color: "#333", marginTop: "2px" }}>
+                    {form.supportExperienceCriteriaItem1 && <>①受入れ・管理実績　</>}
+                    {form.supportExperienceCriteriaItem2 && <>②生活相談等の従事経験　</>}
+                    {form.supportExperienceCriteriaItem3 && <>③その他（{fmt(form.supportExperienceCriteriaItem3Detail)}）</>}
+                  </div>
+                )}
+              </td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportExperienceCriteria)}</td>
+            </tr>
+            <tr>
+              <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(37) 1号特定技能外国人支援計画に基づく支援を，外国人が十分に理解することができる言語によって行うことができる体制を有していることの有無</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportLanguageCapability)}</td>
+            </tr>
+            <tr>
+              <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(38) 1号特定技能外国人支援の状況に関する文書を作成し，1年以上備えて置くこととしていることの有無</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportDocumentKept)}</td>
+            </tr>
+            <tr>
+              <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(39) 支援責任者及び支援担当者が，1号特定技能外国人支援計画の中立な実施を行うことができる立場の者であることの有無</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportNeutralPosition)}</td>
+            </tr>
+            <tr>
+              <td className="lbl lbl-wrap" style={{ width: "82%", fontSize: "8.5px", lineHeight: "1.25" }}>(40) 特定技能雇用契約締結の日前5年以内又は契約締結の日以後に適合1号特定技能外国人支援計画に基づく支援を怠ったことの有無</td>
+              <td style={{ textAlign: "center", width: "18%", fontSize: "9.5px" }}>
+                {fmtYesNo(form.supportFailureHistory)}
+                {yes(form.supportFailureHistory) && form.supportFailureHistoryDetail ? (
+                  <><br /><span style={{ fontSize: "8px", color: "#333" }}>{form.supportFailureHistoryDetail}</span></>
+                ) : null}
+              </td>
+            </tr>
+            <tr>
+              <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(41) 支援責任者又は支援担当者が外国人及びその監督をする立場にある者と定期的な面談を実施できる体制を有していることの有無</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportPeriodicInterviewCapability)}</td>
+            </tr>
+            <tr>
+              <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(42) 適合1号特定技能外国人支援計画の適正な実施の確保につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportImplementationFieldCriteria)}</td>
+            </tr>
+          </tbody></table>
+
+          <div className="item-title" style={{ marginTop: "6px" }}>
+            4　1号特定技能外国人支援計画の内容（(1)〜(16)）
+            <span className="bilingual">　Contents of the support plan</span>
+          </div>
+          <table className="v-tbl"><tbody>
+            {([
+              { has: form.supportPlanInfoProvision, label: "(1) 在留に当たって留意すべき事項に関する情報提供（十分に理解できる言語）" },
+              { has: form.supportPlanInfoProvisionMethod, label: "(2) (1)を対面又はテレビ電話装置その他の方法により実施" },
+              { has: form.supportPlanAirportTransfer, label: "(3) 出入国時の港又は飛行場への送迎" },
+              { has: form.supportPlanHousingSupport, label: "(4) 適切な住居の確保に係る支援" },
+              { has: form.supportPlanLifeContractSupport, label: "(5) 預金口座等の開設・携帯電話契約等の生活に必要な契約に係る支援" },
+              { has: form.supportPlanLivingInfoProvision, label: "(6) 在留資格変更後の生活一般・各種手続・相談連絡先等に関する情報提供（十分に理解できる言語）" },
+              { has: form.supportPlanProcedureAccompany, label: "(7) 国又は地方公共団体の機関への届出等の手続への同行その他必要な措置" },
+              { has: form.supportPlanJapaneseLearning, label: "(8) 日本語を学習する機会の提供" },
+              { has: form.supportPlanConsultationResponse, label: "(9) 相談又は苦情への遅滞ない適切な対応・必要な措置（十分に理解できる言語）" },
+              { has: form.supportPlanExchangePromotion, label: "(10) 外国人と日本人の交流の促進に係る支援" },
+              { has: form.supportPlanJobChangeSupport, label: "(11) 責めに帰すべき事由によらない契約解除の場合の転職支援" },
+              { has: form.supportPlanPeriodicInterview, label: "(12) 支援責任者又は支援担当者による定期的な面談・問題発生時の関係行政機関への通報" },
+              { has: form.supportPlanCopyProvided, label: "(13) 支援計画を日本語及び外国人が理解できる言語で作成し写しを交付" },
+              { has: form.supportPlanFieldSpecificMatters, label: "(14) 特定産業分野に特有の事情に鑑みて告示で定められる事項の記載（当該事項が定められている場合）" },
+              { has: form.supportPlanContentAppropriate, label: "(15) 支援内容が外国人の適正な在留に資し，適切に実施できるものであること" },
+              { has: form.supportPlanFieldSpecificCriteria, label: "(16) 特定産業分野に特有の事情に鑑みて告示で定められる基準への適合（当該基準が定められている場合）" },
+            ] as const).map((item, i) => (
+              <tr key={i}>
+                <td className="lbl lbl-wrap" style={{ width: "82%", fontSize: "8.5px", lineHeight: "1.25" }}>{item.label}</td>
+                <td style={{ textAlign: "center", width: "18%", fontSize: "9.5px" }}>{fmtYesNo(item.has)}</td>
+              </tr>
+            ))}
           </tbody></table>
 
           {/* ── 取次者 ── */}

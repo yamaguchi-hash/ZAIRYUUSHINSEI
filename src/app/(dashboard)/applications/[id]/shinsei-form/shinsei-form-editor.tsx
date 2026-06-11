@@ -2132,6 +2132,21 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="orgSupportCostNotBurdened" value={o} checked={form.orgSupportCostNotBurdened === o} onChange={() => set("orgSupportCostNotBurdened", o)} disabled={is2Go || isSkip("org26")} />{o}</label>)}
                     </div>
                   </div>
+                  <div className="rounded-lg p-2 bg-blue-50 border border-blue-100">
+                    <p className="text-xs text-blue-700">（以下(27)，(28)は外国人を労働者派遣の対象とする場合に記入）</p>
+                  </div>
+                  {[
+                    { hasKey: "orgDispatchMeetsCondition" as const, detailKey: "orgDispatchConditionDetail" as const, label: "(27) 派遣先が，①特定産業分野に係る業務を行っていること，②地方公共団体等が出資していること，③地方公共団体等が業務執行に関与していること，④国家戦略特区の特定機関であること，のいずれかに該当することの有無", note: "【労働者派遣の場合のみ】" },
+                    { hasKey: "orgDispatchMeetsCompliance" as const, detailKey: "orgDispatchComplianceDetail" as const, label: "(28) 労働者派遣をすることとしている派遣先が(11)から(22)に該当していることの有無", note: "【労働者派遣の場合のみ】" },
+                  ].map(({ hasKey, detailKey, label, note }) => (
+                    <div key={hasKey} className="border rounded-lg p-3 bg-gray-50">
+                      <p className="text-xs font-medium text-gray-700 mb-2">{label}<span className="ml-1 font-normal text-orange-600">{note}</span></p>
+                      <div className="flex gap-4 mb-2">
+                        {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name={hasKey} value={o} checked={form[hasKey] === o} onChange={() => set(hasKey, o)} />{o}</label>)}
+                      </div>
+                      {form[hasKey] === "有" && <input className={inputCls} value={form[detailKey]} onChange={e => set(detailKey, e.target.value)} placeholder="該当する項目・内容を記入" />}
+                    </div>
+                  ))}
                   <div className="border rounded-lg p-3 bg-gray-50">
                     <p className="text-xs font-medium text-gray-700 mb-2">(32) 特定技能雇用契約の当事者である外国人に関し，地方公共団体からの共生社会関係施策に対する協力要請に対し，必要な協力をすることとしていることの有無</p>
                     <div className="flex gap-4 mb-3">
@@ -2178,9 +2193,112 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     <Field label="支援責任者 氏名"><input className={inputCls} value={form.supportManagerName} onChange={e => set("supportManagerName", e.target.value)} disabled={is2Go || isSkip("supportStaff")} /></Field>
                     <Field label="役職・部署"><input className={inputCls} value={form.supportManagerTitle} onChange={e => set("supportManagerTitle", e.target.value)} disabled={is2Go || isSkip("supportStaff")} /></Field>
                   </div>
+                  <div className="border rounded-lg p-2 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-700 mb-1">(34) 役員又は職員の中から支援責任者を選任していることの有無</p>
+                    <div className="flex gap-4">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="supportManagerAppointed" value={o} checked={form.supportManagerAppointed === o} onChange={() => set("supportManagerAppointed", o)} disabled={is2Go || isSkip("supportStaff")} />{o}</label>)}
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="支援担当者 氏名"><input className={inputCls} value={form.supportStaffName} onChange={e => set("supportStaffName", e.target.value)} disabled={is2Go || isSkip("supportStaff")} /></Field>
                     <Field label="役職・部署"><input className={inputCls} value={form.supportStaffTitle} onChange={e => set("supportStaffTitle", e.target.value)} disabled={is2Go || isSkip("supportStaff")} /></Field>
+                  </div>
+                  <div className="border rounded-lg p-2 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-700 mb-1">(35) 役員又は職員の中から，活動をさせる事業所ごとに1名以上の支援担当者を選任していることの有無</p>
+                    <div className="flex gap-4">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="supportStaffAppointed" value={o} checked={form.supportStaffAppointed === o} onChange={() => set("supportStaffAppointed", o)} disabled={is2Go || isSkip("supportStaff")} />{o}</label>)}
+                    </div>
+                  </div>
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-700 mb-2">(36) 次のいずれかに該当することの有無（有の場合は該当するものを選択）</p>
+                    <div className="flex gap-4 mb-2">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="supportExperienceCriteria" value={o} checked={form.supportExperienceCriteria === o} onChange={() => set("supportExperienceCriteria", o)} disabled={is2Go || isSkip("supportStaff")} />{o}</label>)}
+                    </div>
+                    {form.supportExperienceCriteria === "有" && (
+                      <div className="space-y-2 pl-3 border-l-2 border-blue-200">
+                        <label className="flex items-start gap-1.5 text-xs cursor-pointer"><input type="checkbox" className="mt-0.5" checked={form.supportExperienceCriteriaItem1} onChange={e => set("supportExperienceCriteriaItem1", e.target.checked)} disabled={is2Go || isSkip("supportStaff")} />①過去2年間において中長期在留者の受入れ又は管理を適正に行った実績を有すること</label>
+                        <label className="flex items-start gap-1.5 text-xs cursor-pointer"><input type="checkbox" className="mt-0.5" checked={form.supportExperienceCriteriaItem2} onChange={e => set("supportExperienceCriteriaItem2", e.target.checked)} disabled={is2Go || isSkip("supportStaff")} />②支援責任者及び支援担当者が過去2年以内に中長期在留者の生活相談等に従事した経験を有すること</label>
+                        <label className="flex items-start gap-1.5 text-xs cursor-pointer"><input type="checkbox" className="mt-0.5" checked={form.supportExperienceCriteriaItem3} onChange={e => set("supportExperienceCriteriaItem3", e.target.checked)} disabled={is2Go || isSkip("supportStaff")} />③その他支援業務を適正に実施できる事情を有すること</label>
+                        {form.supportExperienceCriteriaItem3 && (
+                          <input className={inputCls} value={form.supportExperienceCriteriaItem3Detail} onChange={e => set("supportExperienceCriteriaItem3Detail", e.target.value)} placeholder="内容" disabled={is2Go || isSkip("supportStaff")} />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {[
+                    { key: "supportLanguageCapability" as const, label: "(37) 1号特定技能外国人支援計画に基づく支援を，外国人が十分に理解することができる言語によって行うことができる体制を有していることの有無" },
+                    { key: "supportDocumentKept" as const, label: "(38) 1号特定技能外国人支援の状況に関する文書を作成し，1号特定技能外国人支援を行う事務所に特定技能雇用契約終了の日から1年以上備えて置くこととしていることの有無" },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="border rounded-lg p-2 bg-gray-50">
+                      <p className="text-xs font-medium text-gray-700 mb-1">{label}</p>
+                      <div className="flex gap-4">
+                        {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name={key} value={o} checked={form[key] === o} onChange={() => set(key, o)} disabled={is2Go || isSkip("supportStaff")} />{o}</label>)}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* (39)〜(42) 1号特定技能外国人支援の実施体制 ＋ 4 支援計画の内容 (1)〜(16) */}
+              <Card className={cn((is2Go || isSkip("supportStaff")) && "opacity-50")}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">1号特定技能外国人支援計画（実施体制・支援内容）<span className="ml-2 text-xs font-normal text-orange-600">【特定技能1号の場合のみ記入】</span></CardTitle>
+                    <Skip1GoOnlyToggle auto={is2Go} manual={isSkip("supportStaff")} onToggleManual={() => toggle1go("supportStaff")} />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-700 mb-2">(39) 支援責任者及び支援担当者が，1号特定技能外国人支援計画の中立な実施を行うことができる立場の者であることの有無</p>
+                    <div className="flex gap-4">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="supportNeutralPosition" value={o} checked={form.supportNeutralPosition === o} onChange={() => set("supportNeutralPosition", o)} disabled={is2Go || isSkip("supportStaff")} />{o}</label>)}
+                    </div>
+                  </div>
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-700 mb-2">(40) 特定技能雇用契約締結の日前5年以内又は契約締結の日以後に適合1号特定技能外国人支援計画に基づく1号特定技能外国人支援を怠ったことの有無</p>
+                    <div className="flex gap-4 mb-2">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="supportFailureHistory" value={o} checked={form.supportFailureHistory === o} onChange={() => set("supportFailureHistory", o)} disabled={is2Go || isSkip("supportStaff")} />{o}</label>)}
+                    </div>
+                    {form.supportFailureHistory === "有" && <input className={inputCls} value={form.supportFailureHistoryDetail} onChange={e => set("supportFailureHistoryDetail", e.target.value)} placeholder="内容" disabled={is2Go || isSkip("supportStaff")} />}
+                  </div>
+                  {[
+                    { key: "supportPeriodicInterviewCapability" as const, label: "(41) 支援責任者又は支援担当者が外国人及びその監督をする立場にある者と定期的な面談を実施できる体制を有していることの有無" },
+                    { key: "supportImplementationFieldCriteria" as const, label: "(42) 適合1号特定技能外国人支援計画の適正な実施の確保につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）" },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="border rounded-lg p-2 bg-gray-50">
+                      <p className="text-xs font-medium text-gray-700 mb-1">{label}</p>
+                      <div className="flex gap-4">
+                        {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name={key} value={o} checked={form[key] === o} onChange={() => set(key, o)} disabled={is2Go || isSkip("supportStaff")} />{o}</label>)}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="border-t pt-3 mt-1">
+                    <p className="text-sm font-semibold text-gray-700 mb-2">4　1号特定技能外国人支援計画の内容</p>
+                    {[
+                      { key: "supportPlanInfoProvision" as const, label: "(1) 在留資格変更申請前に，特定技能雇用契約の内容，本邦において行うことができる活動の内容，上陸及び在留のための条件その他の本邦に上陸し在留するに当たって留意すべき事項に関する情報の提供を外国人が十分に理解することができる言語により実施することとしていることの有無" },
+                      { key: "supportPlanInfoProvisionMethod" as const, label: "(2) 上記(1)について，対面により，又はテレビ電話装置その他の方法により行うこととしていることの有無" },
+                      { key: "supportPlanAirportTransfer" as const, label: "(3) 出入国時に港又は飛行場への送迎をすることとしていることの有無" },
+                      { key: "supportPlanHousingSupport" as const, label: "(4) 適切な住居の確保に係る支援をすることとしていることの有無" },
+                      { key: "supportPlanLifeContractSupport" as const, label: "(5) 金融機関における預金口座等の開設及び携帯電話の利用に関する契約その他の生活に必要な契約に係る支援をすることとしていることの有無" },
+                      { key: "supportPlanLivingInfoProvision" as const, label: "(6) 在留資格変更後に，本邦での生活一般に関する事項，国又は地方公共団体の機関への届出その他の手続，相談又は苦情の申出に関する連絡先，医療機関に関する事項，防災・防犯，緊急時対応，外国人の法的保護に必要な事項に関する情報の提供を外国人が十分に理解することができる言語により実施することとしていることの有無" },
+                      { key: "supportPlanProcedureAccompany" as const, label: "(7) 外国人が国又は地方公共団体の機関への届出その他の手続を履行するに当たり，必要に応じ，関係機関への同行その他の必要な措置を講ずることとしていることの有無" },
+                      { key: "supportPlanJapaneseLearning" as const, label: "(8) 日本語を学習する機会を提供することとしていることの有無" },
+                      { key: "supportPlanConsultationResponse" as const, label: "(9) 外国人が十分に理解することができる言語により，相談又は苦情の申出に対して，遅滞なく，適切に応じるとともに，必要な措置を講ずることとしていることの有無" },
+                      { key: "supportPlanExchangePromotion" as const, label: "(10) 外国人と日本人の交流の促進に係る支援をすることとしていることの有無" },
+                      { key: "supportPlanJobChangeSupport" as const, label: "(11) 外国人が，その責めに帰すべき事由によらずに特定技能雇用契約を解除される場合は，転職支援をすることとしていることの有無" },
+                      { key: "supportPlanPeriodicInterview" as const, label: "(12) 支援責任者又は支援担当者が外国人及びその監督をする立場にある者と定期的な面談を実施し，問題の発生を知ったときは，その旨を関係行政機関に通報することとしていることの有無" },
+                      { key: "supportPlanCopyProvided" as const, label: "(13) 1号特定技能外国人支援計画を日本語及び外国人が十分に理解することができる言語により作成し，当該外国人にその写しを交付することとしていることの有無" },
+                      { key: "supportPlanFieldSpecificMatters" as const, label: "(14) 特定産業分野に特有の事情に鑑みて告示で定められる事項を1号特定技能外国人支援計画に記載していることの有無（当該事項が定められている場合に記入）" },
+                      { key: "supportPlanContentAppropriate" as const, label: "(15) 支援の内容が外国人の適正な在留に資するものであって，かつ，支援を実施する者において適切に実施することができるものであることの有無" },
+                      { key: "supportPlanFieldSpecificCriteria" as const, label: "(16) 1号特定技能外国人支援計画の内容につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）" },
+                    ].map(({ key, label }) => (
+                      <div key={key} className="border rounded-lg p-2 bg-gray-50 mb-2">
+                        <p className="text-xs font-medium text-gray-700 mb-1">{label}</p>
+                        <div className="flex gap-4">
+                          {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name={key} value={o} checked={form[key] === o} onChange={() => set(key, o)} disabled={is2Go || isSkip("supportStaff")} />{o}</label>)}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>

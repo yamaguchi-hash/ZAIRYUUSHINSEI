@@ -532,7 +532,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
               { has: form.orgDispatchMeetsCompliance, detail: form.orgDispatchComplianceDetail, label: "(28) 労働者派遣の場合，派遣先が(11)〜(22)に該当しないこと", en: "Dispatch destination compliance" },
               { has: form.orgAccidentInsurance, detail: form.orgAccidentInsuranceDetail, label: "(29) 労災保険関係の成立の届出等の措置を講じていること", en: "Workers' compensation insurance" },
               { has: form.orgContinuousPerformance, detail: null, label: "(30) 特定技能雇用契約を継続して履行する体制が適切に整備されていること", en: "Continuous contract performance system" },
-              { has: form.orgSalaryPaymentVerifiable, detail: null, label: "(31) 報酬を預貯金口座への振込等により支払うこととしていること", en: "Salary payment via bank transfer" },
+              { has: form.orgSalaryPaymentVerifiable, detail: null, label: "(31) 外国人の報酬を，当該外国人の指定する銀行その他の金融機関に対する振込み又は現実に支払われた額を確認できる方法によって支払われることとしており，かつ，後者の場合には，出入国在留管理庁長官に報酬の支払を裏付ける客観的な資料を提出し，その確認を受けることとしていることの有無", en: "Remuneration paid by wire transfer or verifiable method" },
             ] as const).map((item, i) => (
               <tr key={i}>
                 <td className="lbl lbl-wrap" style={{ width: "82%", fontSize: "8.5px", lineHeight: "1.25" }}>
@@ -549,27 +549,39 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             ))}
           </tbody></table>
 
-          {/* (32) 共生社会への協力 */}
+          {/* (32) 共生社会関係施策への協力 */}
           <table className="v-tbl" style={{ marginTop: "4px" }}><tbody>
             <tr>
               <td className="lbl lbl-wrap" style={{ width: "82%", fontSize: "8.5px", lineHeight: "1.25" }}>
-                (32) 分野横断的な協議会に参加し，必要な協力を行う旨の同意について
-                <span className="bilingual-block">Consent to participate in cross-sector council</span>
+                (32) 特定技能雇用契約の当事者である外国人に関し，地方公共団体からの共生社会関係施策に対する協力要請に対し，必要な協力をすることとしていることの有無
+                <span className="bilingual-block">Necessary cooperation for harmonious coexistence measures requested by local governments</span>
               </td>
               <td style={{ textAlign: "center", width: "18%" }}>{fmtYesNo(form.orgCoexistenceCooperation)}</td>
             </tr>
-            {form.orgCoexistenceWorkplaceCityName && (
-              <tr>
-                <td className="lbl" style={{ paddingLeft: "12px" }}>勤務地市区町村への協力確認書提出</td>
-                <td>{fmt(form.orgCoexistenceWorkplaceCityName)}（{fmtDate(form.orgCoexistenceWorkplaceCityDate)}）</td>
-              </tr>
-            )}
-            {form.orgCoexistenceResidenceCityName && (
-              <tr>
-                <td className="lbl" style={{ paddingLeft: "12px" }}>住居地市区町村への協力確認書提出</td>
-                <td>{fmt(form.orgCoexistenceResidenceCityName)}（{fmtDate(form.orgCoexistenceResidenceCityDate)}）</td>
-              </tr>
-            )}
+            <tr>
+              <td className="lbl lbl-wrap" style={{ paddingLeft: "12px", fontSize: "8.5px", lineHeight: "1.25" }}>
+                ○ 当該外国人に活動をさせる事業所の所在地の市町村の長に対する協力確認書の提出の有無
+                <span className="bilingual-block">Letter of confirmation of cooperation submitted to the mayor of the municipality of the place of business</span>
+              </td>
+              <td style={{ textAlign: "center" }}>
+                {fmtYesNo(form.orgCoexistenceWorkplaceCity)}
+                {yes(form.orgCoexistenceWorkplaceCity) && form.orgCoexistenceWorkplaceCityName ? (
+                  <><br /><span style={{ fontSize: "8px", color: "#333" }}>{fmt(form.orgCoexistenceWorkplaceCityName)}（{fmtDate(form.orgCoexistenceWorkplaceCityDate)}）</span></>
+                ) : null}
+              </td>
+            </tr>
+            <tr>
+              <td className="lbl lbl-wrap" style={{ paddingLeft: "12px", fontSize: "8.5px", lineHeight: "1.25" }}>
+                ○ 当該外国人の住居地の市町村の長に対する協力確認書の提出の有無
+                <span className="bilingual-block">Letter of confirmation of cooperation submitted to the mayor of the municipality where the foreign national lives</span>
+              </td>
+              <td style={{ textAlign: "center" }}>
+                {fmtYesNo(form.orgCoexistenceResidenceCity)}
+                {yes(form.orgCoexistenceResidenceCity) && form.orgCoexistenceResidenceCityName ? (
+                  <><br /><span style={{ fontSize: "8px", color: "#333" }}>{fmt(form.orgCoexistenceResidenceCityName)}（{fmtDate(form.orgCoexistenceResidenceCityDate)}）</span></>
+                ) : null}
+              </td>
+            </tr>
           </tbody></table>
 
           <table className="v-tbl" style={{ marginTop: "4px" }}><tbody>

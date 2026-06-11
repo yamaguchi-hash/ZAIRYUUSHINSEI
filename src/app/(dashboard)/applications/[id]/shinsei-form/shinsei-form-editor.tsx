@@ -2183,30 +2183,27 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
               <Card>
                 <CardHeader><CardTitle className="text-base">追加確認事項（(22)〜(33)）</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <p className="text-xs font-medium text-gray-700 mb-2">(22) 暴力団員又は5年以内に暴力団員であった者がその事業活動を支配する者であることの有無</p>
-                    <div className="flex gap-4 mb-2">
-                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="orgGangsterControl" value={o} checked={form.orgGangsterControl === o} onChange={() => set("orgGangsterControl", o)} />{o}</label>)}
-                    </div>
-                    {form.orgGangsterControl === "有" && <input className={inputCls} value={form.orgGangsterControlDetail} onChange={e => set("orgGangsterControlDetail", e.target.value)} placeholder="内容" />}
-                  </div>
+                  {/* (22)〜(25) — 原本の連番どおりに表示（有の場合は内容を記入） */}
                   {[
-                    { key: "orgActivityDocumentKept" as const, label: "(23) 外国人の活動内容に関する文書を作成し，活動をさせる事務所に特定技能雇用契約終了の日から１年以上備えて置くこととしていることの有無" },
-                    { key: "orgContinuousPerformance" as const, label: "(30) 特定技能雇用契約を継続して履行する体制が適切に整備されていることの有無" },
-                    { key: "orgSalaryPaymentVerifiable" as const, label: "(31) 外国人の報酬を，当該外国人の指定する銀行その他の金融機関に対する振込み又は現実に支払われた額を確認できる方法によって支払われることとしていることの有無" },
-                    { key: "orgFieldSpecificContractCriteria" as const, label: "(33) 特定技能雇用契約の適正な履行の確保につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）" },
-                  ].map(({ key, label }) => (
-                    <div key={key} className="border rounded-lg p-2 bg-gray-50">
-                      <p className="text-xs font-medium text-gray-700 mb-1">{label}</p>
-                      <div className="flex gap-4">
-                        {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name={key} value={o} checked={form[key] === o} onChange={() => set(key, o)} />{o}</label>)}
+                    { hasKey: "orgGangsterControl" as const, detailKey: "orgGangsterControlDetail" as const, label: "(22) 暴力団員又は5年以内に暴力団員であった者がその事業活動を支配する者であることの有無" },
+                  ].map(({ hasKey, detailKey, label }) => (
+                    <div key={hasKey} className="border rounded-lg p-3 bg-gray-50">
+                      <p className="text-xs font-medium text-gray-700 mb-2">{label}</p>
+                      <div className="flex gap-4 mb-2">
+                        {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name={hasKey} value={o} checked={form[hasKey] === o} onChange={() => set(hasKey, o)} />{o}</label>)}
                       </div>
+                      {form[hasKey] === "有" && <input className={inputCls} value={form[detailKey]} onChange={e => set(detailKey, e.target.value)} placeholder="内容" />}
                     </div>
                   ))}
+                  <div className="border rounded-lg p-2 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-700 mb-1">(23) 外国人の活動内容に関する文書を作成し，活動をさせる事務所に特定技能雇用契約終了の日から１年以上備えて置くこととしていることの有無</p>
+                    <div className="flex gap-4">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="orgActivityDocumentKept" value={o} checked={form.orgActivityDocumentKept === o} onChange={() => set("orgActivityDocumentKept", o)} />{o}</label>)}
+                    </div>
+                  </div>
                   {[
                     { hasKey: "orgAwareOfDeposit" as const, detailKey: "orgAwareOfDepositDetail" as const, label: "(24) 特定技能雇用契約に係る保証金の徴収その他財産管理又は違約金等の支払契約があることを認識して特定技能雇用契約を締結していることの有無" },
                     { hasKey: "orgPenaltyContractExists" as const, detailKey: "orgPenaltyContractDetail" as const, label: "(25) 特定技能雇用契約の不履行について違約金等の支払契約を締結していることの有無" },
-                    { hasKey: "orgAccidentInsurance" as const, detailKey: "orgAccidentInsuranceDetail" as const, label: "(29) 労災保険加入等の措置の有無" },
                   ].map(({ hasKey, detailKey, label }) => (
                     <div key={hasKey} className="border rounded-lg p-3 bg-gray-50">
                       <p className="text-xs font-medium text-gray-700 mb-2">{label}</p>
@@ -2241,6 +2238,26 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       {form[hasKey] === "有" && <input className={inputCls} value={form[detailKey]} onChange={e => set(detailKey, e.target.value)} placeholder="該当する項目・内容を記入" />}
                     </div>
                   ))}
+                  {/* (29) 労災保険 */}
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-700 mb-2">(29) 労災保険加入等の措置の有無</p>
+                    <div className="flex gap-4 mb-2">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="orgAccidentInsurance" value={o} checked={form.orgAccidentInsurance === o} onChange={() => set("orgAccidentInsurance", o)} />{o}</label>)}
+                    </div>
+                    {form.orgAccidentInsurance === "有" && <input className={inputCls} value={form.orgAccidentInsuranceDetail} onChange={e => set("orgAccidentInsuranceDetail", e.target.value)} placeholder="内容" />}
+                  </div>
+                  {/* (30)・(31) 有無のみ */}
+                  {[
+                    { key: "orgContinuousPerformance" as const, label: "(30) 特定技能雇用契約を継続して履行する体制が適切に整備されていることの有無" },
+                    { key: "orgSalaryPaymentVerifiable" as const, label: "(31) 外国人の報酬を，当該外国人の指定する銀行その他の金融機関に対する振込み又は現実に支払われた額を確認できる方法によって支払われることとしており，かつ，後者の場合には，出入国在留管理庁長官に報酬の支払を裏付ける客観的な資料を提出し，その確認を受けることとしていることの有無" },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="border rounded-lg p-2 bg-gray-50">
+                      <p className="text-xs font-medium text-gray-700 mb-1">{label}</p>
+                      <div className="flex gap-4">
+                        {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name={key} value={o} checked={form[key] === o} onChange={() => set(key, o)} />{o}</label>)}
+                      </div>
+                    </div>
+                  ))}
                   <div className="border rounded-lg p-3 bg-gray-50">
                     <p className="text-xs font-medium text-gray-700 mb-2">(32) 特定技能雇用契約の当事者である外国人に関し，地方公共団体からの共生社会関係施策に対する協力要請に対し，必要な協力をすることとしていることの有無</p>
                     <div className="flex gap-4 mb-3">
@@ -2248,7 +2265,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     </div>
                     {form.orgCoexistenceCooperation === "有" && (
                       <div className="space-y-2 pl-3 border-l-2 border-blue-200">
-                        <p className="text-xs font-medium text-gray-600">勤務先事業所所在地の市区町村への協力確認書</p>
+                        <p className="text-xs font-medium text-gray-600">○ 当該外国人に活動をさせる事業所の所在地の市町村の長に対する協力確認書の提出の有無</p>
                         <div className="flex gap-4 mb-1">
                           {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="radio" name="orgCoexistenceWorkplaceCity" value={o} checked={form.orgCoexistenceWorkplaceCity === o} onChange={() => set("orgCoexistenceWorkplaceCity", o)} />{o}</label>)}
                         </div>
@@ -2258,7 +2275,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                             <Field label="提出先市区町村名"><input className={inputCls} value={form.orgCoexistenceWorkplaceCityName} onChange={e => set("orgCoexistenceWorkplaceCityName", e.target.value)} /></Field>
                           </div>
                         )}
-                        <p className="text-xs font-medium text-gray-600 mt-2">外国人住居地の市区町村への協力確認書</p>
+                        <p className="text-xs font-medium text-gray-600 mt-2">○ 当該外国人の住居地の市町村の長に対する協力確認書の提出の有無</p>
                         <div className="flex gap-4 mb-1">
                           {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="radio" name="orgCoexistenceResidenceCity" value={o} checked={form.orgCoexistenceResidenceCity === o} onChange={() => set("orgCoexistenceResidenceCity", o)} />{o}</label>)}
                         </div>
@@ -2270,6 +2287,13 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                         )}
                       </div>
                     )}
+                  </div>
+                  {/* (33) 分野別基準 */}
+                  <div className="border rounded-lg p-2 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-700 mb-1">(33) 特定技能雇用契約の適正な履行の確保につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無<span className="ml-1 font-normal text-orange-600">【当該基準が定められている場合に記入】</span></p>
+                    <div className="flex gap-4">
+                      {["有", "無"].map(o => <label key={o} className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" name="orgFieldSpecificContractCriteria" value={o} checked={form.orgFieldSpecificContractCriteria === o} onChange={() => set("orgFieldSpecificContractCriteria", o)} />{o}</label>)}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

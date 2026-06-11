@@ -543,9 +543,14 @@ const SECTION_CONFIG: Record<
   "orgAwareOfDeposit": "保証金・財産管理等契約を認識しての締結（有 または 無）",
   "orgPenaltyContractExists": "不履行についての違約金支払契約の有無（有 または 無）",
   "orgSupportCostNotBurdened": "支援費用を外国人に負担させないこと（有 または 無）",
+  "orgDispatchMeetsCondition": "労働者派遣の場合，派遣先が法定要件のいずれかに該当（有 または 無）",
+  "orgDispatchConditionDetail": "該当する項目・内容（有の場合のみ）",
+  "orgDispatchMeetsCompliance": "労働者派遣の場合，派遣先が(11)〜(22)に該当していることの有無（有 または 無）",
+  "orgDispatchComplianceDetail": "詳細（有の場合のみ）",
   "orgAccidentInsurance": "労災保険加入等の措置（有 または 無）",
   "orgContinuousPerformance": "雇用契約を継続して履行する体制（有 または 無）",
-  "orgSalaryPaymentVerifiable": "報酬の支払を客観的方法で確認できること（有 または 無）",
+  "orgSalaryPaymentVerifiable": "報酬の支払を口座振込等の客観的方法で確認できること（有 または 無）",
+  "orgCoexistenceCooperation": "地方公共団体からの共生社会関係施策への協力要請に必要な協力をすること（有 または 無）",
   "orgFieldSpecificContractCriteria": "分野別雇用契約適正履行基準への適合（有 または 無）"
 }`,
     responseSchema: {

@@ -1058,7 +1058,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     { has: form.orgDispatchMeetsCompliance, detail: form.orgDispatchComplianceDetail, label: "(28) 労働者派遣の場合，派遣先が(11)〜(22)に該当しないこと" },
                     { has: form.orgAccidentInsurance, detail: form.orgAccidentInsuranceDetail, label: "(29) 労災保険関係の成立の届出等の措置を講じていること" },
                     { has: form.orgContinuousPerformance, detail: null, label: "(30) 特定技能雇用契約を継続して履行する体制が適切に整備されていること" },
-                    { has: form.orgSalaryPaymentVerifiable, detail: null, label: "(31) 報酬を預貯金口座への振込等により支払うこととしていること" },
+                    { has: form.orgSalaryPaymentVerifiable, detail: null, label: "(31) 外国人の報酬を，指定する金融機関への振込み又は現実に支払われた額を確認できる方法によって支払うこととしていること（後者の場合は入管庁長官の確認を受けること）" },
                   ] as const).map((item, i) => (
                     <tr key={i}>
                       <td className="lbl lbl-wrap" style={{width:'82%'}}>{item.label}</td>
@@ -1066,11 +1066,11 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     </tr>
                   ))}
                 </tbody></table>
-                {/* (32) 共生社会への協力 */}
+                {/* (32) 共生社会関係施策への協力 */}
                 <table className="v-tbl" style={{marginTop:'4px'}}><tbody>
-                  <tr><td className="lbl lbl-wrap" style={{width:'82%'}}>(32) 分野横断的な協議会に参加し，必要な協力を行う旨の同意について</td><td style={{textAlign:'center',width:'18%'}}>{fmtYesNo(form.orgCoexistenceCooperation)}</td></tr>
-                  {form.orgCoexistenceWorkplaceCityName && <tr><td className="lbl">　勤務地市区町村への協力確認書提出</td><td>{fmt(form.orgCoexistenceWorkplaceCityName)}（{fmtDate(form.orgCoexistenceWorkplaceCityDate)}）</td></tr>}
-                  {form.orgCoexistenceResidenceCityName && <tr><td className="lbl">　住居地市区町村への協力確認書提出</td><td>{fmt(form.orgCoexistenceResidenceCityName)}（{fmtDate(form.orgCoexistenceResidenceCityDate)}）</td></tr>}
+                  <tr><td className="lbl lbl-wrap" style={{width:'82%'}}>(32) 特定技能雇用契約の当事者である外国人に関し，地方公共団体からの共生社会関係施策に対する協力要請に対し，必要な協力をすることとしていることの有無</td><td style={{textAlign:'center',width:'18%'}}>{fmtYesNo(form.orgCoexistenceCooperation)}</td></tr>
+                  <tr><td className="lbl lbl-wrap">　○ 事業所所在地の市町村の長に対する協力確認書の提出の有無</td><td style={{textAlign:'center'}}>{fmtYesNo(form.orgCoexistenceWorkplaceCity)}{yes(form.orgCoexistenceWorkplaceCity) && form.orgCoexistenceWorkplaceCityName ? <><br/><span style={{fontSize:'9px',color:'#333'}}>{fmt(form.orgCoexistenceWorkplaceCityName)}（{fmtDate(form.orgCoexistenceWorkplaceCityDate)}）</span></> : null}</td></tr>
+                  <tr><td className="lbl lbl-wrap">　○ 当該外国人の住居地の市町村の長に対する協力確認書の提出の有無</td><td style={{textAlign:'center'}}>{fmtYesNo(form.orgCoexistenceResidenceCity)}{yes(form.orgCoexistenceResidenceCity) && form.orgCoexistenceResidenceCityName ? <><br/><span style={{fontSize:'9px',color:'#333'}}>{fmt(form.orgCoexistenceResidenceCityName)}（{fmtDate(form.orgCoexistenceResidenceCityDate)}）</span></> : null}</td></tr>
                 </tbody></table>
                 <table className="v-tbl" style={{marginTop:'4px'}}><tbody>
                   <tr><td className="lbl lbl-wrap" style={{width:'82%'}}>(33) 分野に特有の基準に適合していること（特定産業分野に特有の事情に鑑みて告示で定める基準がある場合）</td><td style={{textAlign:'center',width:'18%'}}>{fmtYesNo(form.orgFieldSpecificContractCriteria)}</td></tr>

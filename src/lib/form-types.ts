@@ -341,24 +341,39 @@ export interface ApplicationFormData {
   // V型 Item 2: 雇用契約
   orgContractStartDate: string;       // 雇用契約期間（始）
   orgContractEndDate: string;         // 雇用契約期間（終）
+  orgContractRenewal: string;         // 雇用契約期間 更新の有無・内容（雇用条件書より）
   orgSpecifiedIndustrialField: string; // (2) 特定産業分野
   orgWorkCategory: string;            // (2) 業務区分
   orgOccupationNumber: string;        // (2) 主職種番号
   orgOccupationNumberAdditional: string[]; // (2) 追加職種番号（複数選択・配列）
+  orgVWorkplaceName: string;          // 就業の場所（名称）（雇用条件書より）
+  orgVWorkplaceAddress: string;       // 就業の場所（所在地）（雇用条件書より）
   orgWorkHoursWeekly: string;         // (3) 所定労働時間（週平均）
   orgWorkHoursMonthly: string;        // (3) 所定労働時間（月平均）
+  orgWorkDaysWeekly: string;          // 所定労働日数（週・雇用条件書より）
   orgWorkHoursEquivalent: string;     // (3) 正規労働者と同等か 有/無
   orgTimeConvertedBasicSalary: string; // (4) 基本給の時間換算額
   orgJapaneseEquivalentSalary: string; // (4) 同種業務日本人の月額報酬
   orgSalaryEqualToJapanese: string;   // (4) 日本人同等以上か 有/無
+  orgAllowancesDetail: string;        // 諸手当の名称・金額の内訳（雇用条件書より）
+  orgMonthlyTotalEstimate: string;    // 1か月当たりの支払概算額合計（雇用条件書より）
+  orgSalaryEqualityExplanation: string; // 報酬が日本人と同等以上であることの説明・支給要件
+  orgOvertimeRate: string;            // 時間外労働の割増賃金率（%）
+  orgHolidayRate: string;             // 休日労働の割増賃金率（%）
+  orgNightShiftRate: string;          // 深夜労働の割増賃金率（%）
+  orgSalaryClosingDate: string;       // 賃金締切日
+  orgSalaryPaymentDate: string;       // 賃金支払日
   orgSalaryPaymentCash: string;       // (5) 現金払い 有/無
   orgSalaryPaymentBank: string;       // (5) 銀行振込 有/無
+  orgDeductionItems: string;          // 賃金支払時に控除する項目（宿舎費・水道光熱費・食費等）の内訳
   orgForeignTreatmentDifference: string; // (6) 外国人差別的扱い 有/無
   orgForeignTreatmentDetail: string;   // (6) 差別的扱いの詳細
   orgPaidHolidayForReturn: string;    // (7) 一時帰国有給休暇 有/無
   orgFieldSpecificEmploymentCriteria: string; // (8) 分野別雇用基準 有/無
   orgReturnTravelExpenses: string;    // (9) 帰国旅費負担 有/無
+  orgReturnTravelExpenseDetail: string; // 帰国旅費負担の規定内容・負担者（雇用条件書より）
   orgHealthCheck: string;             // (10) 健康状況確認 有/無
+  orgHealthCheckCostBurden: string;   // 健康診断の受診費用負担に関する記述（雇用条件書より）
   orgProperResidenceCriteria: string; // (11) 適正在留基準 有/無
 
   // V型 Item 3: 所属機関情報（既存のorg系フィールドを共用）
@@ -675,15 +690,21 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   homeCountryProcedureComplied: '有', regularExpensesUnderstood: '有',
   technologyTransferEffortV: '有', ssfSpecificFieldCriteriaMet: '有',
   // 所属機関 V型固有
-  orgContractStartDate: '', orgContractEndDate: '',
+  orgContractStartDate: '', orgContractEndDate: '', orgContractRenewal: '',
   orgSpecifiedIndustrialField: '', orgWorkCategory: '',
   orgOccupationNumber: '', orgOccupationNumberAdditional: [],
-  orgWorkHoursWeekly: '', orgWorkHoursMonthly: '', orgWorkHoursEquivalent: '有',
+  orgVWorkplaceName: '', orgVWorkplaceAddress: '',
+  orgWorkHoursWeekly: '', orgWorkHoursMonthly: '', orgWorkDaysWeekly: '', orgWorkHoursEquivalent: '有',
   orgTimeConvertedBasicSalary: '', orgJapaneseEquivalentSalary: '', orgSalaryEqualToJapanese: '有',
+  orgAllowancesDetail: '', orgMonthlyTotalEstimate: '', orgSalaryEqualityExplanation: '',
+  orgOvertimeRate: '', orgHolidayRate: '', orgNightShiftRate: '',
+  orgSalaryClosingDate: '', orgSalaryPaymentDate: '',
   orgSalaryPaymentCash: '無', orgSalaryPaymentBank: '有',
+  orgDeductionItems: '',
   orgForeignTreatmentDifference: '無', orgForeignTreatmentDetail: '',
   orgPaidHolidayForReturn: '有', orgFieldSpecificEmploymentCriteria: '有',
-  orgReturnTravelExpenses: '有', orgHealthCheck: '有', orgProperResidenceCriteria: '有',
+  orgReturnTravelExpenses: '有', orgReturnTravelExpenseDetail: '',
+  orgHealthCheck: '有', orgHealthCheckCostBurden: '', orgProperResidenceCriteria: '有',
   orgLaborInsuranceNo: '', orgHealthInsuranceMet: '有', orgLaborInsuranceMet: '有',
   orgPlacementProviderName: '', orgPlacementProviderCorporateNo: '', orgPlacementProviderInsuranceNo: '',
   orgPlacementProviderAddress: '', orgPlacementProviderPhone: '',

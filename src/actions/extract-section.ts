@@ -25,6 +25,7 @@ export type SectionKey =
   | "org"         // 所属機関情報
   | "orgV"        // 特定技能 雇用契約・所属機関詳細（V型）
   | "orgVCompliance" // 特定技能 所属機関コンプライアンス確認（V型）
+  | "orgEmploymentConditions" // 雇用条件書（参考様式第1-6号）からの特定技能雇用契約 (1)〜(11) 抽出
   | "rso";        // 登録支援機関（V型）
 
 // ─── セクション別プロンプト定義 ───────────────────────────────────────────────
@@ -33,7 +34,7 @@ const S = (desc: string) => ({ type: Type.STRING, description: desc, nullable: t
 
 const SECTION_CONFIG: Record<
   SectionKey,
-  { label: string; sources: string; jsonTemplate: string; responseSchema: any }
+  { label: string; sources: string; jsonTemplate: string; responseSchema: any; extraInstructions?: string }
 > = {
   basic: {
     label: "基本情報",
@@ -594,6 +595,123 @@ const SECTION_CONFIG: Record<
     },
   },
 
+  orgEmploymentConditions: {
+    label: "雇用条件書（特定技能雇用契約 (1)〜(11)）",
+    sources: "雇用条件書（参考様式第1-6号）・別紙「賃金の支払に関する書面」・特定技能雇用契約書",
+    jsonTemplate: `{
+  "orgContractStartDate": "(1) 雇用契約期間の開始日（YYYY-MM-DD）",
+  "orgContractEndDate": "(1) 雇用契約期間の満了日（YYYY-MM-DD）",
+  "orgContractRenewal": "(1) 契約更新の有無・内容（自動的に更新する／更新する場合があり得る／契約の更新はしない 等）",
+  "orgVWorkplaceName": "(2) 就業の場所の名称",
+  "orgVWorkplaceAddress": "(2) 就業の場所の所在地（住所）",
+  "orgWorkCategory": "(3) 業務区分（特定産業分野の業務区分。例：飲食料品製造、機械金属加工 等）",
+  "orgWorkHoursWeekly": "(4) 所定労働時間（週・数値のみ・時間）",
+  "orgWorkHoursMonthly": "(4) 所定労働時間（月・数値のみ・時間）",
+  "orgWorkDaysWeekly": "(4) 所定労働日数（週・数値のみ・日）",
+  "salary": "(5) 基本賃金（月給・日給・時給等の額。数値のみ・円、カンマ除去）",
+  "orgAllowancesDetail": "(5) 諸手当の名称と金額の一覧（例：役職手当 10000円、技能手当 5000円。複数は読点区切り）",
+  "orgMonthlyTotalEstimate": "(5) 1か月当たりの支払概算額の合計（数値のみ・円、カンマ除去）",
+  "orgSalaryEqualityExplanation": "(6) 報酬が日本人と同等以上であることの説明・支給要件・決定理由（諸手当の支給要件等から抽出）",
+  "orgOvertimeRate": "(7) 所定時間外（時間外）労働の割増賃金率（数値のみ・%）",
+  "orgHolidayRate": "(7) 休日労働の割増賃金率（数値のみ・%）",
+  "orgNightShiftRate": "(7) 深夜労働の割増賃金率（数値のみ・%）",
+  "orgSalaryClosingDate": "(8) 賃金締切日（例：毎月20日）",
+  "orgSalaryPaymentDate": "(8) 賃金支払日（例：翌月10日、当月末日）",
+  "orgSalaryPaymentCash": "(8) 通貨払いの有無（有 または 無）",
+  "orgSalaryPaymentBank": "(8) 口座振込の有無（有 または 無）",
+  "orgDeductionItems": "(9) 賃金支払時に控除する項目と金額（宿舎費・水道光熱費・食費等。例：寮費 20000円、水道光熱費 5000円）",
+  "orgHealthCheckCostBurden": "(10) 健康診断の受診費用負担に関する記述（例：特定技能所属機関が全額負担）",
+  "orgReturnTravelExpenses": "(11) 帰国旅費負担規定の有無（有 または 無）",
+  "orgReturnTravelExpenseDetail": "(11) 帰国旅費の負担に関する規定内容・負担者（例：乙が負担できないときは甲が負担する）"
+}`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        orgContractStartDate:        S("(1) 雇用契約期間の開始日 YYYY-MM-DD"),
+        orgContractEndDate:          S("(1) 雇用契約期間の満了日 YYYY-MM-DD"),
+        orgContractRenewal:          S("(1) 契約更新の有無・内容"),
+        orgVWorkplaceName:           S("(2) 就業の場所の名称"),
+        orgVWorkplaceAddress:        S("(2) 就業の場所の所在地"),
+        orgWorkCategory:             S("(3) 業務区分"),
+        orgWorkHoursWeekly:          S("(4) 所定労働時間（週・数値のみ・時間）"),
+        orgWorkHoursMonthly:         S("(4) 所定労働時間（月・数値のみ・時間）"),
+        orgWorkDaysWeekly:           S("(4) 所定労働日数（週・数値のみ・日）"),
+        salary:                      S("(5) 基本賃金（月額・数値のみ・円）"),
+        orgAllowancesDetail:         S("(5) 諸手当の名称・金額の一覧"),
+        orgMonthlyTotalEstimate:     S("(5) 1か月当たりの支払概算額合計（数値のみ・円）"),
+        orgSalaryEqualityExplanation: S("(6) 報酬が日本人と同等以上であることの説明・支給要件"),
+        orgOvertimeRate:             S("(7) 時間外労働の割増賃金率（数値のみ・%）"),
+        orgHolidayRate:              S("(7) 休日労働の割増賃金率（数値のみ・%）"),
+        orgNightShiftRate:           S("(7) 深夜労働の割増賃金率（数値のみ・%）"),
+        orgSalaryClosingDate:        S("(8) 賃金締切日"),
+        orgSalaryPaymentDate:        S("(8) 賃金支払日"),
+        orgSalaryPaymentCash:        S("(8) 通貨払い（有 または 無）"),
+        orgSalaryPaymentBank:        S("(8) 口座振込（有 または 無）"),
+        orgDeductionItems:           S("(9) 控除項目（宿舎費・水道光熱費・食費等）の内訳"),
+        orgHealthCheckCostBurden:    S("(10) 健康診断の受診費用負担に関する記述"),
+        orgReturnTravelExpenses:     S("(11) 帰国旅費負担規定の有無（有 または 無）"),
+        orgReturnTravelExpenseDetail: S("(11) 帰国旅費負担の規定内容・負担者"),
+      },
+    },
+    extraInstructions: `
+【雇用条件書（参考様式第1-6号）専用 公式様式マッピングルール】
+書類は「雇用条件書」（本紙）と別紙「賃金の支払に関する書面」で構成されることが多い。以下の対応表に基づき、PDF内の日本語見出しをアンカー（目印）として、その直後に記載されている数値・テキスト・チェック状態を抽出すること。
+
+(1) 雇用契約期間（開始日・終了日・更新の有無）
+　・参照箇所: 1ページ目「I．雇用契約期間」
+　・「１．雇用契約期間」の開始日と満了日（年月日）→ orgContractStartDate / orgContractEndDate（YYYY-MM-DD）
+　・「２．契約の更新の有無」のチェック状態（自動的に更新する／更新する場合があり得る／契約の更新はしない 等）→ orgContractRenewal にそのまま記載のテキストで出力
+
+(2) 就業の場所（名称・所在地）
+　・参照箇所: 2ページ目「II．就業の場所」
+　・「名称」→ orgVWorkplaceName、「所在地」（住所）→ orgVWorkplaceAddress にテキストのまま抽出
+
+(3) 業務区分
+　・参照箇所: 2ページ目「III．従事する業務の内容」の「２．業務区分（　　）」
+　・カッコ内に記載されている正式な業務区分名（例：飲食料品製造、機械金属加工 等）を orgWorkCategory に抽出
+
+(4) 労働時間等（所定労働時間・所定労働日数）
+　・参照箇所: 3ページ目「IV．労働時間等」の「３．所定労働時間数」「４．所定労働日数」
+　・週の所定労働時間（例：週40時間）→ orgWorkHoursWeekly、月平均の所定労働時間→ orgWorkHoursMonthly、週の所定労働日数（例：週5日）→ orgWorkDaysWeekly に数値のみで抽出
+
+(5) 報酬の額（基本給・諸手当・月額概算合計）
+　・参照箇所: 5ページ目「VII．賃金」の１・２項、または別紙7〜8ページ目「１．基本賃金」「２．諸手当の額」「３．１か月当たりの支払概算額」
+　・基本給（月給／日給／時給の額）→ salary
+　・各諸手当（役職手当・技能手当等）の名称と金額→ orgAllowancesDetail（「名称 金額円」を読点区切りで列挙）
+　・最終的な「１か月当たりの支払概算額（合計）」→ orgMonthlyTotalEstimate
+　・いずれもカンマを除去した整数で出力すること
+
+(6) 報酬が日本人と同等以上であることの説明・比較対象
+　・参照箇所: 別紙7〜8ページ目「基本賃金・諸手当の決定理由、支給要件」
+　・手当の支給要件・決定理由として記載されているテキスト（例：「経験・能力を考慮して決定」「〇〇資格保持者に支給」等）、および賃金比較資料の記述から、日本人と同等以上であることの根拠説明を orgSalaryEqualityExplanation に抽出
+
+(7) 割増賃金率（時間外・休日・深夜）
+　・参照箇所: 5ページ目「VII．賃金」の「３．所定時間外，休日又は深夜労働に対して支払われる割増賃金率」
+　・①時間外→ orgOvertimeRate、②休日→ orgHolidayRate、③深夜→ orgNightShiftRate にそれぞれ数値（%）のみで抽出
+
+(8) 報酬の支払方法及び支払時期
+　・参照箇所: 5ページ目「VII．賃金」の「４．賃金締切日」「５．賃金支払日」「６．賃金支払方法」
+　・締め日（例：毎月20日）→ orgSalaryClosingDate、支払日（例：当月末日）→ orgSalaryPaymentDate
+　・支払方法のチェック状態から口座振込→ orgSalaryPaymentBank、通貨（現金）払→ orgSalaryPaymentCash を「有」または「無」で判定
+
+(9) 宿舎の確保や生計維持に要する費用の負担（控除項目）
+　・参照箇所: 5ページ目「７．労使協定に基づく賃金支払時の控除」、または別紙9ページ目「４．賃金支払時に控除する項目」
+　・外国人が負担（給与から控除）する宿舎費（家賃）・水道光熱費・食費等の名目と金額を orgDeductionItems に「名目 金額円」を読点区切りで列挙
+
+(10) 健康診断の受診費用の負担
+　・参照箇所: 6ページ目「２．雇入れ時の健康診断」「３．初回の定期健康診断」または「IX．その他」
+　・健康診断費用の負担に関する記述（通常「特定技能所属機関が全額負担」「甲が負担」等）をそのまま orgHealthCheckCostBurden に抽出
+
+(11) 帰国旅費の負担
+　・参照箇所: 6ページ目「IX．その他」の「５．本契約終了後に乙が帰国するに当たり…」
+　・条文内の帰国旅費負担に関する規定（「乙が負担することができないときは、甲（特定技能所属機関）が当該旅費を負担する」等）の有無→ orgReturnTravelExpenses（有/無）、規定内容・負担者→ orgReturnTravelExpenseDetail にテキストで抽出
+
+【データ形式の注意（再掲・本セクション特有）】
+・チェックボックス（□／☑／■）はチェック済みの選択肢のテキストをそのまま採用すること
+・割増賃金率や金額は「25%」「250,000円」のような表記からカンマ・円・%記号を除去し、数値のみを出力すること
+・該当箇所が複数ページにまたがる場合（本紙と別紙）、両方を確認して情報を補完すること`,
+  },
+
   rso: {
     label: "登録支援機関",
     sources: "登録支援機関概要書・支援委託契約書",
@@ -780,7 +898,7 @@ ${applicantNameContext}
 
 【抽出対象フィールド】
 ${config.jsonTemplate}
-
+${config.extraInstructions ?? ""}
 【データ形式に関する注意】
 ・入力データがExcelから出力されたCSV形式の場合、大量のカンマ（,,,）、空白セル、改行、日本語と英語の併記が含まれることがあります。
 ・項目名の前後・周辺にあるデータや、離れたセル位置にある数値も文脈から慎重に紐づけて抽出してください。

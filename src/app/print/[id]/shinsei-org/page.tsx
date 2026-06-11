@@ -86,6 +86,12 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
               <td className="lbl" style={{ width: "30%" }}>(1) 雇用契約期間<br /><span className="bilingual">Contract period</span></td>
               <td colSpan={3}>{fmt(form.orgContractStartDate)} 〜 {fmt(form.orgContractEndDate)}</td>
             </tr>
+            {form.orgContractRenewal && (
+              <tr>
+                <td className="lbl lbl-wrap" style={{ paddingLeft: "12px" }}>契約の更新の有無・内容</td>
+                <td colSpan={3}>{fmt(form.orgContractRenewal)}</td>
+              </tr>
+            )}
             <tr>
               <td className="lbl">(2) 従事すべき業務の内容<br /><span className="bilingual">Description of work</span></td>
               <td colSpan={3}>&nbsp;</td>
@@ -102,12 +108,24 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
               <td className="lbl">追加職種番号</td>
               <td>{fmtAdditionalOccupations(form.orgOccupationNumberAdditional)}</td>
             </tr>
+            {(form.orgVWorkplaceName || form.orgVWorkplaceAddress) && (
+              <tr>
+                <td className="lbl lbl-wrap" style={{ paddingLeft: "12px" }}>就業の場所<br /><span className="bilingual">Place of work</span></td>
+                <td colSpan={3}>{fmt(form.orgVWorkplaceName)}{form.orgVWorkplaceName && form.orgVWorkplaceAddress ? "　" : ""}{fmtAddr(form.orgVWorkplaceAddress)}</td>
+              </tr>
+            )}
             <tr>
               <td className="lbl">(3) 所定労働時間（週平均）<br /><span className="bilingual">Working hours (weekly)</span></td>
               <td>{fmt(form.orgWorkHoursWeekly)}時間</td>
               <td className="lbl">月平均</td>
               <td>{fmt(form.orgWorkHoursMonthly)}時間</td>
             </tr>
+            {form.orgWorkDaysWeekly && (
+              <tr>
+                <td className="lbl lbl-wrap" style={{ paddingLeft: "12px" }}>所定労働日数（週）</td>
+                <td colSpan={3}>{fmt(form.orgWorkDaysWeekly)}日</td>
+              </tr>
+            )}
             <tr>
               <td className="lbl lbl-wrap" colSpan={3} style={{ paddingLeft: "12px" }}>
                 所定労働時間が通常の労働者の所定労働時間と同等であることの有無
@@ -127,10 +145,48 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
               <td className="lbl lbl-wrap">日本人同等以上か</td>
               <td>{fmtYesNo(form.orgSalaryEqualToJapanese)}</td>
             </tr>
+            {form.orgAllowancesDetail && (
+              <tr>
+                <td className="lbl lbl-wrap" style={{ paddingLeft: "12px" }}>諸手当の内訳</td>
+                <td colSpan={3}>{fmt(form.orgAllowancesDetail)}</td>
+              </tr>
+            )}
+            {form.orgMonthlyTotalEstimate && (
+              <tr>
+                <td className="lbl lbl-wrap" style={{ paddingLeft: "12px" }}>1か月当たりの支払概算額（合計）</td>
+                <td colSpan={3}>{fmtMoney(form.orgMonthlyTotalEstimate)}</td>
+              </tr>
+            )}
+            {form.orgSalaryEqualityExplanation && (
+              <tr>
+                <td className="lbl lbl-wrap" style={{ paddingLeft: "12px" }}>報酬が日本人と同等以上であることの説明</td>
+                <td colSpan={3}>{fmt(form.orgSalaryEqualityExplanation)}</td>
+              </tr>
+            )}
+            {(form.orgOvertimeRate || form.orgHolidayRate || form.orgNightShiftRate) && (
+              <tr>
+                <td className="lbl lbl-wrap" style={{ paddingLeft: "12px" }}>割増賃金率（時間外・休日・深夜）</td>
+                <td colSpan={3}>
+                  時間外 {fmt(form.orgOvertimeRate)}%　休日 {fmt(form.orgHolidayRate)}%　深夜 {fmt(form.orgNightShiftRate)}%
+                </td>
+              </tr>
+            )}
             <tr>
               <td className="lbl">(5) 報酬の支払方法<br /><span className="bilingual">Method of payment</span></td>
               <td colSpan={3}>{yes(form.orgSalaryPaymentCash) ? '通貨払　' : ''}{yes(form.orgSalaryPaymentBank) ? '口座振込み' : ''}</td>
             </tr>
+            {(form.orgSalaryClosingDate || form.orgSalaryPaymentDate) && (
+              <tr>
+                <td className="lbl lbl-wrap" style={{ paddingLeft: "12px" }}>賃金締切日・支払日</td>
+                <td colSpan={3}>{fmt(form.orgSalaryClosingDate)}　{fmt(form.orgSalaryPaymentDate)}</td>
+              </tr>
+            )}
+            {form.orgDeductionItems && (
+              <tr>
+                <td className="lbl lbl-wrap" style={{ paddingLeft: "12px" }}>賃金支払時の控除項目</td>
+                <td colSpan={3}>{fmt(form.orgDeductionItems)}</td>
+              </tr>
+            )}
           </tbody></table>
 
           {/* 項目(6)〜(11) */}

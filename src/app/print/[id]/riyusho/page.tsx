@@ -107,12 +107,20 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
           }
 
           /* ── 画面表示用 ──────────────────────────────────── */
+          /* 理由書専用の上下余白。この .riyusho-page は本ファイル内のみで使用するクラスのため、
+             他の申請書（申請人用・所属機関用等）のレイアウトには影響しない。 */
           .riyusho-page {
             max-width: 210mm;
             margin: 60px auto 40px;
             background: white;
-            padding: 25mm 25mm 20mm 25mm;
+            padding: 30mm 25mm 25mm 25mm;
             box-shadow: 0 0 12px rgba(0,0,0,0.08);
+          }
+          @media screen {
+            /* 画面表示時のみ、固定ツールバー(PrintTrigger)との重なりを避けるための追加オフセット */
+            .riyusho-page {
+              padding-top: calc(30mm + 56px);
+            }
           }
 
           /* 宛先 */
@@ -182,7 +190,7 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
             body { background: white !important; margin: 0; }
             .riyusho-page {
               margin: 0;
-              padding: 20mm 25mm 15mm 25mm;
+              padding: 30mm 25mm 25mm 25mm;
               box-shadow: none;
               max-width: 100%;
             }
@@ -196,7 +204,7 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
       <body>
         <PrintTrigger applicationId={id} />
 
-        <div className="riyusho-page" style={{ paddingTop: "56px" }}>
+        <div className="riyusho-page">
           {/* 宛先 */}
           <div className="bureau">
             {bureauFull}　殿

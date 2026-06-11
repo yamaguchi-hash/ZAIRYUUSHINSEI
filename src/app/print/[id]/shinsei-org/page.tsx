@@ -11,6 +11,7 @@ import {
   loadShinseiData, PRINT_STYLES,
   fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes,
   fmtAdditionalOccupations, buildAddress,
+  FormHeader, SignatureSection,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
 
@@ -35,15 +36,11 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 1: 所属機関等作成用 １ V — 雇用契約・所属機関
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          <div className="form-header">
-            <div className="part-label">所属機関等作成用　１</div>
-            <div className="part-label-v">
-              Ｖ（「特定技能（１号）」・「特定技能（２号）」）
-            </div>
-            <div className="part-label-en" style={{ fontSize: "7.5px" }}>
-              For organization, Part 1 V &nbsp;("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")
-            </div>
-          </div>
+          <FormHeader
+            partLabel="所属機関等作成用　１"
+            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
+            partLabelEn={`For organization, Part 1 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+          />
 
           {/* 1. 雇用している外国人の氏名 */}
           <div className="item-title">
@@ -207,15 +204,11 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 2: 所属機関等作成用 2 V — 派遣先・職業紹介事業者・取次機関
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          <div className="form-header">
-            <div className="part-label">所属機関等作成用　２</div>
-            <div className="part-label-v">
-              Ｖ（「特定技能（１号）」・「特定技能（２号）」）
-            </div>
-            <div className="part-label-en" style={{ fontSize: "7.5px" }}>
-              For organization, Part 2 V &nbsp;("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")
-            </div>
-          </div>
+          <FormHeader
+            partLabel="所属機関等作成用　２"
+            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
+            partLabelEn={`For organization, Part 2 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+          />
 
           {/* 4. 派遣先 */}
           <div className="item-title">
@@ -381,15 +374,11 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 3: 所属機関等作成用 3 V — コンプライアンス確認（(11)〜(21)）
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          <div className="form-header">
-            <div className="part-label">所属機関等作成用　３</div>
-            <div className="part-label-v">
-              Ｖ（「特定技能（１号）」・「特定技能（２号）」）
-            </div>
-            <div className="part-label-en" style={{ fontSize: "7.5px" }}>
-              For organization, Part 3 V &nbsp;("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")
-            </div>
-          </div>
+          <FormHeader
+            partLabel="所属機関等作成用　３"
+            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
+            partLabelEn={`For organization, Part 3 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+          />
 
           <div className="item-title">
             コンプライアンス確認事項（(11)〜(21)）
@@ -429,15 +418,11 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 4: 所属機関等作成用 4 V — コンプライアンス(22)〜(33) ＋ 所属機関署名
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          <div className="form-header">
-            <div className="part-label">所属機関等作成用　４</div>
-            <div className="part-label-v">
-              Ｖ（「特定技能（１号）」・「特定技能（２号）」）
-            </div>
-            <div className="part-label-en" style={{ fontSize: "7.5px" }}>
-              For organization, Part 4 V &nbsp;("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")
-            </div>
-          </div>
+          <FormHeader
+            partLabel="所属機関等作成用　４"
+            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
+            partLabelEn={`For organization, Part 4 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+          />
 
           <div className="item-title">
             コンプライアンス確認事項（(22)〜(33)）
@@ -524,60 +509,13 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             </tr>
           </tbody></table>
 
-          {/* ══════════════════════════════════════════════════════════════════
-              所属機関署名欄（自動記名 — 会社名・代表者役職・代表者氏名 ＋ 角印余白）
-              ══════════════════════════════════════════════════════════════════ */}
-          <table className="sign-table" style={{ marginTop: "14px" }}>
-            <tbody>
-              <tr>
-                <td colSpan={4} style={{
-                  fontWeight: "bold", fontSize: "9px", textAlign: "center",
-                  background: "#f0f0f0", letterSpacing: "0.03em", padding: "4px",
-                }}>
-                  以上の記載内容は事実と相違ありません。
-                  <span className="bilingual-block">I hereby declare that the statement given above is true and correct.</span>
-                </td>
-              </tr>
-              <tr>
-                <td className="lbl" style={{ width: "32%", verticalAlign: "top", paddingTop: "4px" }}>
-                  <div style={{ fontSize: "9px", fontWeight: "bold" }}>
-                    特定技能所属機関名，代表者氏名の記名／申請書作成年月日
-                  </div>
-                  <div className="bilingual" style={{ marginTop: "2px" }}>
-                    Name of the organization and its representative / Date of filling in this form
-                  </div>
-                </td>
-                <td style={{ width: "38%", verticalAlign: "middle", padding: "6px 10px", height: "70px" }}>
-                  {/* 自動記名エリア ── 会社名 + 代表者役職 + 代表者氏名 */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ flex: "1 1 auto" }}>
-                      <div style={{ fontSize: "11px", fontWeight: "bold", letterSpacing: "0.05em", marginBottom: "4px" }}>
-                        {fmt(org?.nameJa) || fmt(form.orgName)}
-                      </div>
-                      <div style={{ fontSize: "10.5px", marginTop: "6px" }}>
-                        {fmt(org?.representativeTitle)}{org?.representativeTitle && org?.representativeName ? "　" : ""}
-                        {fmt(org?.representativeName)}
-                      </div>
-                    </div>
-                    {/* 角印スペース（右側余白） */}
-                    <div style={{
-                      flex: "0 0 60px",
-                      width: "60px", height: "60px",
-                      border: "0.5px dashed #bbb",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "7px", color: "#bbb", marginLeft: "10px",
-                    }}>
-                      印
-                    </div>
-                  </div>
-                </td>
-                <td className="lbl" style={{ width: "12%", textAlign: "center", fontSize: "9px" }}>
-                  年月日<br /><span className="bilingual">Date</span>
-                </td>
-                <td className="sign-date" style={{ width: "18%", fontSize: "9px" }}>　　　年　　月　　日</td>
-              </tr>
-            </tbody>
-          </table>
+          {/* ── 【所属機関署名欄】（共通コンポーネント・自動記名＋角印枠） ── */}
+          <SignatureSection
+            role="organization"
+            orgName={fmt(org?.nameJa) || fmt(form.orgName)}
+            representativeTitle={fmt(org?.representativeTitle)}
+            representativeName={fmt(org?.representativeName) || fmt(form.position)}
+          />
         </div>
 
       </body>

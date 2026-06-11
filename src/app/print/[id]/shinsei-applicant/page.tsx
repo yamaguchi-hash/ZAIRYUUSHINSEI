@@ -10,6 +10,7 @@ import {
   loadShinseiData, PRINT_STYLES,
   fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes,
   fmtAdditionalOccupations, buildAddress,
+  FormHeader, SignatureSection,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
 
@@ -34,19 +35,15 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             Page 1: 別記第三十号様式（第二十条関係）申請人等作成用 １
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page" style={{ paddingTop: "50px" }}>
-          {/* ── ヘッダー ── */}
-          <div className="form-header">
-            <div className="gov">日本国政府法務省　Ministry of Justice, Government of Japan</div>
-            <div className="form-number">別記第三十号様式（第二十条関係）</div>
-            <div className="form-title-box">
-              在留資格変更許可申請書
-              <div className="form-title-en">APPLICATION FOR CHANGE OF STATUS OF RESIDENCE</div>
-            </div>
-            <div className="part-label">
-              申請人等作成用　１
-              <span className="part-label-en">　For applicant, Part 1</span>
-            </div>
-          </div>
+          {/* ── ヘッダー（共通コンポーネント） ── */}
+          <FormHeader
+            showGov
+            formNumber="別記第三十号様式（第二十条関係）"
+            title="在留資格変更許可申請書"
+            titleEn="APPLICATION FOR CHANGE OF STATUS OF RESIDENCE"
+            partLabel="申請人等作成用　１"
+            partLabelEn="For applicant, Part 1"
+          />
 
           <p style={{ fontSize: "8px", color: "#333", textAlign: "center", marginBottom: "6px" }}>
             出入国管理及び難民認定法第20条第2項の規定に基づき，次のとおり在留資格の変更を申請します。
@@ -228,15 +225,11 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             Page 2: 申請人等作成用 ２ V（「特定技能（１号）」・「特定技能（２号）」）
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          <div className="form-header">
-            <div className="part-label">申請人等作成用　２</div>
-            <div className="part-label-v">
-              Ｖ（「特定技能（１号）」・「特定技能（２号）」）
-            </div>
-            <div className="part-label-en" style={{ fontSize: "7.5px" }}>
-              For applicant, Part 2 V &nbsp;("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")
-            </div>
-          </div>
+          <FormHeader
+            partLabel="申請人等作成用　２"
+            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
+            partLabelEn={`For applicant, Part 2 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+          />
 
           {/* 17. 特定技能所属機関 */}
           <div className="item-title">
@@ -361,15 +354,11 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             Page 3: 申請人等作成用 ３ V（「特定技能（１号）」・「特定技能（２号）」）
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          <div className="form-header">
-            <div className="part-label">申請人等作成用　３</div>
-            <div className="part-label-v">
-              Ｖ（「特定技能（１号）」・「特定技能（２号）」）
-            </div>
-            <div className="part-label-en" style={{ fontSize: "7.5px" }}>
-              For applicant, Part 3 V &nbsp;("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")
-            </div>
-          </div>
+          <FormHeader
+            partLabel="申請人等作成用　３"
+            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
+            partLabelEn={`For applicant, Part 3 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+          />
 
           {/* 確認事項（22〜27） */}
           <table className="v-tbl"><tbody>
@@ -431,37 +420,8 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             </tr>
           </tbody></table>
 
-          {/* ── 申請人署名欄（空白 — 手書き用） ── */}
-          <table className="sign-table" style={{ marginTop: "14px" }}>
-            <tbody>
-              <tr>
-                <td colSpan={4} style={{
-                  fontWeight: "bold", fontSize: "9px", textAlign: "center",
-                  background: "#f0f0f0", letterSpacing: "0.03em", padding: "4px",
-                }}>
-                  以上の記載内容は事実と相違ありません。
-                  <span className="bilingual-block">I hereby declare that the statement given above is true and correct.</span>
-                </td>
-              </tr>
-              <tr>
-                <td className="lbl" style={{ width: "32%", verticalAlign: "top", paddingTop: "4px", height: "50px" }}>
-                  <div style={{ fontSize: "9px", fontWeight: "bold" }}>
-                    申請人（法定代理人）の署名／申請書作成年月日
-                  </div>
-                  <div className="bilingual" style={{ marginTop: "2px" }}>
-                    Signature of the applicant (arrow legal representative) / Date of filling in this form
-                  </div>
-                </td>
-                <td style={{ width: "38%" }}>
-                  {/* 署名スペース（空白） */}
-                </td>
-                <td className="lbl" style={{ width: "12%", textAlign: "center", fontSize: "9px" }}>
-                  年月日<br /><span className="bilingual">Date</span>
-                </td>
-                <td className="sign-date" style={{ width: "18%", fontSize: "9px" }}>　　　年　　月　　日</td>
-              </tr>
-            </tbody>
-          </table>
+          {/* ── 【申請人署名欄】（共通コンポーネント・手書き署名用） ── */}
+          <SignatureSection role="applicant" />
         </div>
 
       </body>

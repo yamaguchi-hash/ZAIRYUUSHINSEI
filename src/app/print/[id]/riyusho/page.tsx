@@ -181,6 +181,38 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
             padding: 40px 0;
           }
 
+          /* ── 署名欄 ──────────────────────────────────────── */
+          .closing-section {
+            margin-top: 40px;
+            text-align: right;
+          }
+          .sign-date-line {
+            font-size: 11pt;
+            margin-bottom: 32px;
+          }
+          .sign-name-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: baseline;
+            gap: 6px;
+          }
+          .sign-name-label {
+            font-size: 11pt;
+          }
+          .sign-name-line {
+            display: inline-block;
+            width: 220px;
+            border-bottom: 1px solid #000;
+            height: 1.4em;
+          }
+
+          /* 署名日（令和 年 月 日）の表示/非表示切り替え（ツールバーのトグルと連動） */
+          .sign-date { transition: visibility 0s; }
+          body.hide-sign-date .sign-date { visibility: hidden; }
+          @media print {
+            body.hide-sign-date .sign-date { visibility: hidden !important; }
+          }
+
           /* ── ツールバー非表示用 ──────────────────────────── */
           .no-print {}
 
@@ -248,6 +280,17 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
             ) : (
               <p className="empty-note">（理由書本文が入力されていません）</p>
             )}
+          </div>
+
+          {/* 署名欄 */}
+          <div className="closing-section">
+            <div className="sign-date-line">
+              <span className="sign-date">令和　　年　　月　　日</span>
+            </div>
+            <div className="sign-name-row">
+              <span className="sign-name-label">署　名</span>
+              <span className="sign-name-line"></span>
+            </div>
           </div>
 
         </div>

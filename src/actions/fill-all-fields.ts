@@ -11,6 +11,7 @@ import { EMPTY_FORM_DATA } from "@/lib/form-types";
 import { cleanseMasterCodes } from "@/lib/master-cleansing";
 import { normalizeFamilyMembers, mergeFamilyMembers } from "@/lib/family-schema";
 import { STAGE1_RESPONSE_SCHEMA, STAGE2_RESPONSE_SCHEMA, schemaToFieldList } from "@/lib/shinsei-ai-schemas";
+import { mapWithConcurrency } from "@/lib/concurrency";
 
 // プロンプト用フィールド定義リスト（モジュールロード時に1回だけ生成）
 const STAGE1_FIELD_LIST = schemaToFieldList(STAGE1_RESPONSE_SCHEMA);
@@ -233,17 +234,23 @@ export async function fillAllFieldsFromDocs(
     }
 
     // ── 3. 全書類を個別にGeminiで読み取り（Stage 1）────────────────────────────
-    const ocrPerDoc: { name: string; data: Record<string, any> }[] = [];
-    let docsRead = 0;
-    const docErrors: string[] = [];
+    // 逐次実行だとVercelの関数タイムアウト（300秒）を超過するため、
+    // 複数書類を並行処理してウォールクロック時間を短縮する。
+    type DocResult =
+      | { ok: true; name: string; data: Record<string, any> }
+      | { ok: false; name: string; error: string };
 
-    for (const doc of submitted.slice(0, 20)) {
+    const STAGE1_CONCURRENCY = 4;
+
+    const docResults: DocResult[] = await mapWithConcurrency(
+      submitted.slice(0, 20),
+      STAGE1_CONCURRENCY,
+      async (doc): Promise<DocResult> => {
       const file = await fileToBase64(doc.fileUrl!, doc.mimeType);
       if (!file) {
         const reason = `ファイル取得失敗 (mime=${doc.mimeType}, url=${doc.fileUrl?.slice(0, 80)}...)`;
         console.error(`[fillAllFields] skip "${doc.documentName}": ${reason}`);
-        docErrors.push(`${doc.documentName}: ${reason}`);
-        continue;
+        return { ok: false, name: doc.documentName, error: reason };
       }
 
       try {
@@ -298,28 +305,38 @@ ${STAGE1_FIELD_LIST}
         const txt = resp.text ?? "{}";
         try {
           const data = JSON.parse(txt);
-          ocrPerDoc.push({ name: doc.documentName, data });
-          docsRead++;
+          return { ok: true, name: doc.documentName, data };
         } catch (parseErr: any) {
           console.error(`[fillAllFields] JSON parse error for "${doc.documentName}":`, parseErr?.message, "raw:", txt.slice(0, 500));
           const m = txt.match(/```json?\s*([\s\S]*?)```/) ?? txt.match(/(\{[\s\S]*\})/);
           if (m) {
             try {
               const data = JSON.parse(m[1] ?? m[0]);
-              ocrPerDoc.push({ name: doc.documentName, data });
-              docsRead++;
+              return { ok: true, name: doc.documentName, data };
             } catch (e2: any) {
-              docErrors.push(`${doc.documentName}: JSONパース失敗`);
               console.error(`[fillAllFields] fallback parse also failed for "${doc.documentName}":`, e2?.message);
+              return { ok: false, name: doc.documentName, error: "JSONパース失敗" };
             }
-          } else {
-            docErrors.push(`${doc.documentName}: JSONパース失敗`);
           }
+          return { ok: false, name: doc.documentName, error: "JSONパース失敗" };
         }
       } catch (geminiErr: any) {
         const msg = geminiErr?.message ?? String(geminiErr);
         console.error(`[fillAllFields] Gemini Stage1 error for "${doc.documentName}":`, msg);
-        docErrors.push(`${doc.documentName}: ${msg.slice(0, 200)}`);
+        return { ok: false, name: doc.documentName, error: msg.slice(0, 200) };
+      }
+      }
+    );
+
+    const ocrPerDoc: { name: string; data: Record<string, any> }[] = [];
+    let docsRead = 0;
+    const docErrors: string[] = [];
+    for (const r of docResults) {
+      if (r.ok) {
+        ocrPerDoc.push({ name: r.name, data: r.data });
+        docsRead++;
+      } else {
+        docErrors.push(`${r.name}: ${r.error}`);
       }
     }
 

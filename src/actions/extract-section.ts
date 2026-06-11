@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db, applications, applicationDocumentChecklist, applicationAttachments, applicantMaster } from "@/lib/db";
 import { cleanseMasterCodes } from "@/lib/master-cleansing";
 import { FAMILY_IN_JAPAN_SCHEMA, normalizeFamilyMembers, mergeFamilyMembers } from "@/lib/family-schema";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import { eq, and } from "drizzle-orm";
 import { Type } from "@google/genai";
 
@@ -732,9 +733,6 @@ export async function extractSectionFromDocs(
     const { GoogleGenAI } = await import("@google/genai");
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-    const result: Record<string, any> = {};
-    let docsChecked = 0;
-
     // supporter / family セクション専用: 申請人氏名を取得して区別コンテキストに使用
     let applicantNameContext = "";
     let applicantNames: string[] = [];
@@ -797,68 +795,83 @@ ${config.jsonTemplate}
 ・性別は「男」または「女」（M/Fは使用しない）
 ・有無は「有」または「無」（英語不可）`;
 
-    // 全提出済み書類を順に処理
-    for (const doc of submitted.slice(0, 15)) {
-      const file = await fetchAsBase64(doc.fileUrl!, doc.mimeType);
-      if (!file) continue;
+    // 全提出済み書類を並行処理（逐次実行だとVercelの関数タイムアウト300秒を超過するため）
+    type SectionDocResult = { fileOk: boolean; extracted: Record<string, any> | null };
+    const SECTION_CONCURRENCY = 4;
 
-      docsChecked++;
+    const docResults = await mapWithConcurrency(
+      submitted.slice(0, 15),
+      SECTION_CONCURRENCY,
+      async (doc): Promise<SectionDocResult> => {
+        const file = await fetchAsBase64(doc.fileUrl!, doc.mimeType);
+        if (!file) return { fileOk: false, extracted: null };
 
-      try {
-        const docPrompt = prompt.replace("{DOC_NAME}", doc.documentName);
-
-        const resp = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: [{
-            parts: [
-              { inlineData: { mimeType: file.useMime, data: file.base64 } },
-              { text: docPrompt },
-            ],
-          }],
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: config.responseSchema,
-          },
-        });
-
-        const txt = resp.text ?? "{}";
-        let extracted: Record<string, any>;
         try {
-          extracted = JSON.parse(txt);
+          const docPrompt = prompt.replace("{DOC_NAME}", doc.documentName);
+
+          const resp = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{
+              parts: [
+                { inlineData: { mimeType: file.useMime, data: file.base64 } },
+                { text: docPrompt },
+              ],
+            }],
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: config.responseSchema,
+            },
+          });
+
+          const txt = resp.text ?? "{}";
+          try {
+            return { fileOk: true, extracted: JSON.parse(txt) };
+          } catch {
+            // フォールバック: マークダウンコードフェンスが含まれる場合
+            const m = txt.match(/```json?\s*([\s\S]*?)```/) ?? txt.match(/(\{[\s\S]*\})/);
+            if (!m) return { fileOk: true, extracted: null };
+            return { fileOk: true, extracted: JSON.parse(m[1] ?? m[0]) };
+          }
         } catch {
-          // フォールバック: マークダウンコードフェンスが含まれる場合
-          const m = txt.match(/```json?\s*([\s\S]*?)```/) ?? txt.match(/(\{[\s\S]*\})/);
-          if (!m) continue;
-          extracted = JSON.parse(m[1] ?? m[0]);
+          // 1書類のエラーは無視
+          return { fileOk: true, extracted: null };
         }
+      }
+    );
 
-        // 空でない値をマージ（既に取得済みのフィールドは上書きしない）
-        for (const [k, v] of Object.entries(extracted)) {
-          if (!result[k] && v !== null && v !== undefined && v !== "") {
-            result[k] = v;
-          }
+    // 結果を元の書類順でマージ（同一フィールドは先勝ち、family/workHistoryは蓄積マージ）
+    const result: Record<string, any> = {};
+    let docsChecked = 0;
+
+    for (const { fileOk, extracted } of docResults) {
+      if (!fileOk) continue;
+      docsChecked++;
+      if (!extracted) continue;
+
+      // 空でない値をマージ（既に取得済みのフィールドは上書きしない）
+      for (const [k, v] of Object.entries(extracted)) {
+        if (!result[k] && v !== null && v !== undefined && v !== "") {
+          result[k] = v;
         }
+      }
 
-        // workHistory は配列なので特別処理
-        if (sectionKey === "workhistory" && extracted.workHistory && Array.isArray(extracted.workHistory)) {
-          if (!result.workHistory || result.workHistory.length === 0) {
-            result.workHistory = extracted.workHistory.filter(
-              (w: any) => w.employer || w.joinDate
-            );
-          }
-        }
-
-        // familyInJapan は複数書類（親族ごとの在留カード等）から蓄積マージ
-        if (sectionKey === "family" && extracted.familyInJapan && Array.isArray(extracted.familyInJapan)) {
-          const newMembers = normalizeFamilyMembers(extracted.familyInJapan);
-          result.familyInJapan = mergeFamilyMembers(
-            (result.familyInJapan ?? []) as any[],
-            newMembers,
-            applicantNames,
+      // workHistory は配列なので特別処理
+      if (sectionKey === "workhistory" && extracted.workHistory && Array.isArray(extracted.workHistory)) {
+        if (!result.workHistory || result.workHistory.length === 0) {
+          result.workHistory = extracted.workHistory.filter(
+            (w: any) => w.employer || w.joinDate
           );
         }
-      } catch {
-        // 1書類のエラーは無視
+      }
+
+      // familyInJapan は複数書類（親族ごとの在留カード等）から蓄積マージ
+      if (sectionKey === "family" && extracted.familyInJapan && Array.isArray(extracted.familyInJapan)) {
+        const newMembers = normalizeFamilyMembers(extracted.familyInJapan);
+        result.familyInJapan = mergeFamilyMembers(
+          (result.familyInJapan ?? []) as any[],
+          newMembers,
+          applicantNames,
+        );
       }
     }
 

@@ -1,9 +1,12 @@
 /**
- * 申請人等作成用 PDF（計3ページ）
+ * 申請人等作成用 PDF（最大3ページ）
  * ─────────────────────────────────
- * Page 1: 別記第三十号様式（第二十条関係）申請人等作成用 １
- * Page 2: 申請人等作成用 ２ V（「特定技能（１号）」・「特定技能（２号）」）
- * Page 3: 申請人等作成用 ３ V（「特定技能（１号）」・「特定技能（２号）」）
+ * Page 1: 別記第三十号様式（第二十条関係）申請人等作成用 １（全在留資格共通）
+ * Page 2: 申請人等作成用 ２ V（「特定技能（１号）」・「特定技能（２号）」） ※特定技能のみ
+ * Page 3: 申請人等作成用 ３ V（「特定技能（１号）」・「特定技能（２号）」） ※特定技能のみ
+ *
+ * Page 2・3 は在留資格カテゴリが V（特定技能）の場合のみ出力する。
+ * それ以外の在留資格では Page 1 のみを出力し、末尾に署名欄を付す。
  */
 import { notFound } from "next/navigation";
 import {
@@ -19,7 +22,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
   const data = await loadShinseiData(id);
   if (!data) notFound();
 
-  const { app, applicant, org, form, familyMembers, workHistory, today, isChange } = data;
+  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, isVtype } = data;
 
   return (
     <html lang="ja">
@@ -64,7 +67,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
                 <td className="lbl" style={{ width: "25%" }}>
                   2 生年月日<br /><span className="bilingual">Date of birth</span>
                 </td>
-                <td style={{ width: "25%" }}><span className="dob-value">{fmtDate(form.dateOfBirth)}</span></td>
+                <td style={{ width: "25%" }}>{fmtDate(form.dateOfBirth)}</td>
               </tr>
               <tr>
                 <td className="lbl">
@@ -210,7 +213,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
               <tbody>
                 {familyMembers.map((m, i) => (
                   <tr key={i}>
-                    <td>{m.relationship}</td><td>{m.name}</td><td><span className="dob-value">{fmtDate(m.dateOfBirth)}</span></td>
+                    <td>{m.relationship}</td><td>{m.name}</td><td>{fmtDate(m.dateOfBirth)}</td>
                     <td>{m.nationality}</td><td>{m.placeOfEmployment}</td>
                     <td style={{ textAlign: "center" }}>{m.residingTogether ? "○" : "×"}</td>
                     <td>{m.residenceCardNumber}</td>
@@ -219,11 +222,17 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
               </tbody>
             </table>
           )}
+
+          {/* ── 【申請人署名欄】（V型以外はPage1で完結するためここに配置） ── */}
+          {!isVtype && <SignatureSection role="applicant" />}
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════════
-            Page 2: 申請人等作成用 ２ V（「特定技能（１号）」・「特定技能（２号）」）
+            Page 2〜3: 特定技能（V型）専用ページ
             ════════════════════════════════════════════════════════════════════ */}
+        {isVtype && (
+        <>
+        {/* Page 2: 申請人等作成用 ２ V（「特定技能（１号）」・「特定技能（２号）」） */}
         <div className="page">
           <FormHeader
             partLabel="申請人等作成用　２"
@@ -423,6 +432,8 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
           {/* ── 【申請人署名欄】（共通コンポーネント・手書き署名用） ── */}
           <SignatureSection role="applicant" />
         </div>
+        </>
+        )}
 
       </body>
     </html>

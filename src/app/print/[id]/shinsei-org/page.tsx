@@ -6,6 +6,9 @@
  * Page 3: 所属機関等作成用 3 V — コンプライアンス確認（(11)〜(21)）
  * Page 4: 所属機関等作成用 4 V — コンプライアンス確認（(22)〜(33)）
  * Page 5: 所属機関等作成用 4 V — 1号特定技能外国人支援計画（(34)〜(42)・4(1)〜(16)）＋ 所属機関署名
+ *
+ * 本書類は在留資格カテゴリが V（特定技能）の場合のみ作成が必要なため、
+ * isVtype が false の場合は何も出力しない（画面上に案内のみ表示）。
  */
 import { notFound } from "next/navigation";
 import {
@@ -21,7 +24,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
   const data = await loadShinseiData(id);
   if (!data) notFound();
 
-  const { app, applicant, org, form, familyMembers, workHistory, today, isChange } = data;
+  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, isVtype } = data;
 
   return (
     <html lang="ja">
@@ -33,6 +36,15 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
       <body>
         <ShinseiPrintToolbar applicationId={id} label="所属機関等作成用（5ページ）" />
 
+        {!isVtype && (
+          <div className="no-print" style={{ padding: "60px 24px", textAlign: "center", color: "#64748b", fontSize: "14px", lineHeight: "1.8" }}>
+            この書類（所属機関等作成用）は、在留資格区分が「特定技能」の場合のみ作成されます。<br />
+            現在の申請内容では、この書類は出力されません。
+          </div>
+        )}
+
+        {isVtype && (
+        <>
         {/* ══════════════════════════════════════════════════════════════════════
             Page 1: 所属機関等作成用 １ V — 雇用契約・所属機関
             ════════════════════════════════════════════════════════════════════ */}
@@ -616,6 +628,8 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             representativeName={fmt(org?.representativeName) || fmt(form.position)}
           />
         </div>
+        </>
+        )}
 
       </body>
     </html>

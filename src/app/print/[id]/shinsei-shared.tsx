@@ -57,6 +57,16 @@ export interface ShinseiData {
   workHistory: WorkHistoryEntry[];
   today: string;
   isChange: boolean;
+  /** 在留資格カテゴリ（N/L/I/T/R/P/V） */
+  cat: string;
+  isNtype: boolean;
+  isTtype: boolean;
+  isRtype: boolean;
+  isPtype: boolean;
+  /** 特定技能（１号・２号） */
+  isVtype: boolean;
+  /** 所属機関情報の記載が必要な区分か */
+  needsOrg: boolean;
 }
 
 export async function loadShinseiData(id: string): Promise<ShinseiData | null> {
@@ -87,14 +97,32 @@ export async function loadShinseiData(id: string): Promise<ShinseiData | null> {
   const now = new Date();
   const today = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
 
+  // 在留資格カテゴリ
+  const cat = form.visaFormCategory ?? 'N';
+  const isNtype = ['N', 'L', 'I'].includes(cat);
+  const isTtype = cat === 'T';
+  const isRtype = cat === 'R';
+  const isPtype = cat === 'P';
+  const isVtype = cat === 'V';   // 特定技能（１号・２号）
+  const needsOrg = VISA_CATEGORY_NEEDS_ORG[cat as keyof typeof VISA_CATEGORY_NEEDS_ORG] ?? false;
+
   return {
     app, applicant, org, form,
     familyMembers: (form.familyInJapan ?? []) as FamilyMember[],
     workHistory: (form.workHistory ?? []) as WorkHistoryEntry[],
     today,
     isChange,
+    cat, isNtype, isTtype, isRtype, isPtype, isVtype, needsOrg,
   };
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PDF/印刷の幅設定
+// ─────────────────────────────────────────────────────────────────────────────
+// 申請書PDFのレイアウト幅を一括調整したい場合は、この値を変更するだけでよい。
+// PRINT_STYLES内の `--pdf-print-width` CSS変数として全ページの .page に反映される。
+// ═════════════════════════════════════════════════════════════════════════════
+export const PDF_PRINT_WIDTH = "210mm";
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 共通UIデザインシステム（全申請書フォーマット統一CSS）
@@ -104,6 +132,11 @@ export async function loadShinseiData(id: string): Promise<ShinseiData | null> {
 //   （強制改ページなし。改行は行単位の break-inside: avoid で制御）
 // ═════════════════════════════════════════════════════════════════════════════
 export const PRINT_STYLES = `
+  /* ── PDF/印刷の幅調整: ここを変更すると全体の幅が追従する ── */
+  :root{
+    --pdf-print-width: ${PDF_PRINT_WIDTH};
+  }
+
   *{box-sizing:border-box;margin:0;padding:0;}
   body{
     font-family:"MS Mincho","ＭＳ 明朝","Hiragino Mincho ProN","游明朝",serif;
@@ -113,7 +146,7 @@ export const PRINT_STYLES = `
 
   /* ── 画面表示: A4カードとしてプレビュー ── */
   .page{
-    background:#fff;width:210mm;margin:0 auto;
+    background:#fff;width:var(--pdf-print-width);max-width:var(--pdf-print-width);margin:0 auto;
     padding:8mm 12mm;min-height:297mm;position:relative;
   }
   @media screen{
@@ -127,8 +160,8 @@ export const PRINT_STYLES = `
     .no-print{display:none!important;}
     /* A4固定・強制改ページを解除し、内容量に応じて自然に流す */
     .page{
-      width:auto;max-width:100%;min-height:0;
-      padding:0;margin:0;box-shadow:none;border-radius:0;
+      width:var(--pdf-print-width);max-width:var(--pdf-print-width);min-height:0;
+      padding:0;margin:0 auto;box-shadow:none;border-radius:0;
       page-break-after:auto;break-after:auto;
     }
     .page + .page{margin-top:5mm;}
@@ -229,11 +262,6 @@ export const PRINT_STYLES = `
   .sign-date{transition:visibility 0s;white-space:nowrap;}
   body.hide-sign-date .sign-date{visibility:hidden;}
   @media print{body.hide-sign-date .sign-date{visibility:hidden!important;}}
-
-  /* ── 生年月日の表示/非表示切り替え ── */
-  .dob-value{transition:visibility 0s;}
-  body.hide-dob .dob-value{visibility:hidden;}
-  @media print{body.hide-dob .dob-value{visibility:hidden!important;}}
 `;
 
 // ═════════════════════════════════════════════════════════════════════════════

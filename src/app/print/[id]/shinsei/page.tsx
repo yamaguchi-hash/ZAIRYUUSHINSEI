@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import type { ApplicationFormData, FamilyMember, WorkHistoryEntry } from "@/lib/form-types";
 import { FORM_TYPE_LABELS, VISA_CATEGORY_NEEDS_ORG, VISA_CATEGORY_PART2, OCCUPATION_TYPES } from "@/lib/form-types";
 import { PrintTrigger } from "../print-trigger";
+import { PDF_PRINT_WIDTH } from "../shinsei-shared";
 
 function fmt(v: string | null | undefined) { return v || "　"; }
 /** 住所文字列から「〒1234567|」プレフィックスを解析し、「〒123-4567　住所」形式で表示 */
@@ -126,17 +127,22 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
         <meta charSet="utf-8" />
         <title>申請書 - {form.familyNameEn} {form.givenNameEn}</title>
         <style>{`
+          /* ── PDF/印刷の幅調整: ここを変更すると全体の幅が追従する ── */
+          :root{
+            --pdf-print-width: ${PDF_PRINT_WIDTH};
+          }
+
           *{box-sizing:border-box;margin:0;padding:0;}
           body{
             font-family:"MS Mincho","ＭＳ 明朝","Hiragino Mincho ProN","游明朝",serif;
             font-size:11px;color:#000;background:#f3f4f6;line-height:1.5;
           }
-          .page{background:#fff;max-width:210mm;margin:0 auto;padding:14mm 16mm;min-height:297mm;}
+          .page{background:#fff;max-width:var(--pdf-print-width);margin:0 auto;padding:14mm 16mm;min-height:297mm;}
           @media screen{.page{margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.12);border-radius:4px;}}
           @media print{
             body{background:#fff;}
             *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
-            .page{padding:10mm 13mm;max-width:100%;min-height:auto;}
+            .page{padding:10mm 13mm;max-width:var(--pdf-print-width);min-height:auto;}
             .no-print{display:none!important;}
           }
 

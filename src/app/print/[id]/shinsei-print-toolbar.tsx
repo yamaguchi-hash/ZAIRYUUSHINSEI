@@ -5,7 +5,6 @@
  * ─────────────────────────────────────────
  * ・「署名日を印刷する」チェックボックス: body.hide-sign-date を切り替え、
  *   署名欄の「令和　年　月　日」の表示/非表示を画面・印刷の両方で制御
- * ・「生年月日を印刷する」チェックボックス: body.hide-dob を切り替え
  * ・印刷ボタン: window.print() でブラウザの印刷ダイアログ（PDF保存）を起動
  * ・ツールバー全体は .no-print のため印刷時は自動非表示
  */
@@ -14,7 +13,6 @@ import Link from "next/link";
 
 export function ShinseiPrintToolbar({ applicationId, label }: { applicationId: string; label: string }) {
   const [printSignDate, setPrintSignDate] = useState(true);
-  const [printDob, setPrintDob] = useState(true);
 
   // 自動印刷（800ms後）
   useEffect(() => {
@@ -26,11 +24,6 @@ export function ShinseiPrintToolbar({ applicationId, label }: { applicationId: s
   useEffect(() => {
     document.body.classList.toggle("hide-sign-date", !printSignDate);
   }, [printSignDate]);
-
-  // 生年月日の表示/非表示
-  useEffect(() => {
-    document.body.classList.toggle("hide-dob", !printDob);
-  }, [printDob]);
 
   return (
     <div className="no-print" style={{
@@ -54,14 +47,6 @@ export function ShinseiPrintToolbar({ applicationId, label }: { applicationId: s
             onChange={setPrintSignDate}
             label="署名日を印刷する"
             title="署名欄の「令和　年　月　日」を印刷に含めるかを切り替えます"
-          />
-
-          {/* 生年月日を印刷する チェックボックス */}
-          <CheckToggle
-            checked={printDob}
-            onChange={setPrintDob}
-            label="生年月日を印刷する"
-            title="申請人・在日親族の生年月日を印刷に含めるかを切り替えます"
           />
 
           <span style={{ fontSize: "13px", color: "#cbd5e1" }}>|</span>

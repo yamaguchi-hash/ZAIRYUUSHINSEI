@@ -1,7 +1,9 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { db, applications, applicationDocumentChecklist, applicantMaster } from "@/lib/db";
+import { db, applications, applicationDocumentChecklist, applicationAttachments, applicantMaster } from "@/lib/db";
+import { cleanseMasterCodes } from "@/lib/master-cleansing";
+import { FAMILY_IN_JAPAN_SCHEMA, normalizeFamilyMembers, mergeFamilyMembers } from "@/lib/family-schema";
 import { eq, and } from "drizzle-orm";
 import { Type } from "@google/genai";
 
@@ -14,6 +16,7 @@ export type SectionKey =
   | "employer"    // 勤務先情報（N型）
   | "education"   // 学歴（N型）
   | "workhistory" // 職歴（N型）
+  | "family"      // 在日親族及び同居者（全申請種別共通・項目16/21）
   | "marriage"    // 婚姻・出生・縁組届出（R型 項目17）
   | "supporter"   // 扶養者情報（R型）
   | "spouse"      // 配偶者情報（T型）
@@ -200,6 +203,30 @@ const SECTION_CONFIG: Record<
             },
           },
         },
+      },
+    },
+  },
+
+  family: {
+    label: "在日親族及び同居者",
+    sources: "親族の在留カード・親族情報のメモ・住民票・戸籍謄本",
+    jsonTemplate: `{
+  "familyInJapan": [
+    {
+      "relationship": "申請人との続柄（父/母/配偶者/子/兄/姉/弟/妹/祖父/祖母/その他）",
+      "name": "氏名（在留カード記載のローマ字または漢字）",
+      "dateOfBirth": "生年月日（YYYY-MM-DD形式）",
+      "nationality": "国籍・地域",
+      "placeOfEmployment": "勤務先・通学先の名称",
+      "residingTogether": "同居の有無（有 または 無）",
+      "residenceCardNumber": "在留カード番号（例：AB12345678CD）"
+    }
+  ]
+}`,
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        familyInJapan: FAMILY_IN_JAPAN_SCHEMA,
       },
     },
   },
@@ -670,18 +697,34 @@ export async function extractSectionFromDocs(
       .limit(1);
     if (!app) return { success: false, error: "申請案件が見つかりません" };
 
-    // 提出済み書類を取得
+    // 添付書類を取得（主: application_attachments / 互換: 旧チェックリスト）
+    const attachmentRows = await db
+      .select()
+      .from(applicationAttachments)
+      .where(eq(applicationAttachments.applicationId, applicationId));
     const checklist = await db
       .select()
       .from(applicationDocumentChecklist)
       .where(eq(applicationDocumentChecklist.applicationId, applicationId));
+    const legacySubmitted = checklist.filter((c) => c.fileUrl && c.status === "submitted");
 
-    const submitted = checklist.filter((c) => c.fileUrl && c.status === "submitted");
+    const submitted: { documentName: string; fileUrl: string; mimeType: string | null }[] = [
+      ...attachmentRows.map((a) => ({
+        documentName: a.documentLabel ?? a.documentType,
+        fileUrl: a.fileUrl,
+        mimeType: a.mimeType,
+      })),
+      ...legacySubmitted.map((c) => ({
+        documentName: c.documentName,
+        fileUrl: c.fileUrl!,
+        mimeType: c.mimeType,
+      })),
+    ];
 
     if (submitted.length === 0) {
       return {
         success: false,
-        error: "提出済みの書類がありません。必要書類をアップロードしてから実行してください。",
+        error: "添付書類がありません。「申請書作成用 添付書類」パネルから書類をアップロードしてから実行してください。",
         label: config.label,
       };
     }
@@ -692,9 +735,10 @@ export async function extractSectionFromDocs(
     const result: Record<string, any> = {};
     let docsChecked = 0;
 
-    // supporter セクション専用: 申請人氏名を取得して区別コンテキストに使用
+    // supporter / family セクション専用: 申請人氏名を取得して区別コンテキストに使用
     let applicantNameContext = "";
-    if (sectionKey === "supporter") {
+    let applicantNames: string[] = [];
+    if (sectionKey === "supporter" || sectionKey === "family") {
       const [applicant] = await db
         .select()
         .from(applicantMaster)
@@ -703,13 +747,24 @@ export async function extractSectionFromDocs(
       if (applicant) {
         const nameEn = [applicant.familyNameEn, applicant.givenNameEn].filter(Boolean).join(" ");
         const nameJa = [applicant.familyNameJa, applicant.givenNameJa].filter(Boolean).join(" ");
-        applicantNameContext = `
+        applicantNames = [nameEn, nameJa].filter(Boolean);
+        if (sectionKey === "supporter") {
+          applicantNameContext = `
 【重要】この申請は家族滞在ビザの更新申請です。
 ・申請人（家族滞在ビザ所持者）の氏名：${nameEn}${nameJa ? `（${nameJa}）` : ""}
 ・扶養者とは申請人の配偶者や親など、メインのビザ（就労・永住等）を持つ人物です。
 ・この書類に申請人と扶養者の両方の情報がある場合は、申請人以外の人物（扶養者）の情報を抽出してください。
 ・在留カードが複数ある場合は、申請人のもの以外が扶養者の在留カードです。
 ・在留期間満了日（supporterPeriodExpiry）は扶養者の在留カードに記載されている満了日です。必ず日付を読み取ってください。`;
+        } else {
+          applicantNameContext = `
+【重要】「在日親族及び同居者」の抽出です。
+・申請人本人の氏名：${nameEn}${nameJa ? `（${nameJa}）` : ""}
+・申請人本人は絶対に familyInJapan に含めないでください。
+・親族の在留カードからは、氏名・生年月日・国籍・在留カード番号を読み取ってください。
+・メモ・住民票等に続柄（父/母/配偶者/子 等）や勤務先・同居の有無が記載されていれば合わせて読み取ってください。
+・複数人の親族が記載されている場合は全員分を配列で出力してください。`;
+        }
       }
     }
 
@@ -792,10 +847,23 @@ ${config.jsonTemplate}
             );
           }
         }
+
+        // familyInJapan は複数書類（親族ごとの在留カード等）から蓄積マージ
+        if (sectionKey === "family" && extracted.familyInJapan && Array.isArray(extracted.familyInJapan)) {
+          const newMembers = normalizeFamilyMembers(extracted.familyInJapan);
+          result.familyInJapan = mergeFamilyMembers(
+            (result.familyInJapan ?? []) as any[],
+            newMembers,
+            applicantNames,
+          );
+        }
       } catch {
         // 1書類のエラーは無視
       }
     }
+
+    // 業種・職種マスタ照合クレンジング（表記ゆれ→コード変換、不正値→空）
+    cleanseMasterCodes(result);
 
     const hasAnyValue = Object.values(result).some((v) =>
       Array.isArray(v) ? v.length > 0 : v !== "" && v !== null && v !== undefined

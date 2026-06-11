@@ -18,7 +18,6 @@ import {
   XCircle,
   Clock,
   FileText,
-  AlertTriangle,
   User,
   Building2,
   Shield,
@@ -27,7 +26,6 @@ import Link from "next/link";
 import { WorkflowStepper } from "@/components/applications/workflow-stepper";
 import { DocumentChecklist } from "@/components/applications/document-checklist";
 import { DocumentSelector } from "@/components/applications/document-selector";
-import { ConsistencyCheckPanel } from "@/components/applications/consistency-check-panel";
 import { ApproveButton } from "@/components/applications/approve-button";
 import { QuestionnairePanel } from "@/components/applications/questionnaire-panel";
 import { getDocumentRequirements } from "@/actions/applications";
@@ -43,8 +41,9 @@ import { CaseNotesPanel } from "@/components/applications/case-notes-panel";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { NoufushoPanel } from "@/components/applications/noufusho-panel";
 import { AzukariPanel } from "@/components/applications/azukari-panel";
-import { db, applicantDocuments } from "@/lib/db";
-import { eq } from "drizzle-orm";
+import { db, applicantDocuments, applicationAttachments } from "@/lib/db";
+import { eq, desc } from "drizzle-orm";
+import { AttachmentUploadPanel } from "@/components/applications/attachment-upload-panel";
 
 // 8ステップのワークフロー
 const WORKFLOW_STEPS = [
@@ -87,7 +86,6 @@ export default async function ApplicationDetailPage({
   if (!data) notFound();
 
   const { application, applicant, organization, checklist, questionnaire } = data;
-  const checkResult = application.consistencyCheckResult as any;
 
   // 書類マスター取得（ビザ種別・申請種別でフィルタ）
   // masterDocuments: Date オブジェクトを持つフィールドを除外して RSC シリアライズを安全にする
@@ -123,7 +121,6 @@ export default async function ApplicationDetailPage({
   } catch (e) {
     console.error("[ApplicationDetailPage] getDocumentRequirements failed:", e);
   }
-  const issues = checkResult?.issues ?? [];
 
   // 申請人マスターのアップロード書類を取得（預証用）
   let azukariImages: { residenceCardFrontUrl?: string; residenceCardBackUrl?: string; passportUrl?: string } = {};
@@ -141,6 +138,30 @@ export default async function ApplicationDetailPage({
     }
   } catch (e) {
     console.error("[ApplicationDetailPage] applicantDocuments fetch failed:", e);
+  }
+
+  // 入管提出用添付書類を取得
+  let attachmentsList: {
+    id: string; documentType: string; documentLabel: string | null;
+    fileUrl: string; fileName: string; fileSize: number | null;
+    mimeType: string | null; uploadedAt: string;
+  }[] = [];
+  try {
+    const rows = await db.select().from(applicationAttachments)
+      .where(eq(applicationAttachments.applicationId, application.id))
+      .orderBy(desc(applicationAttachments.uploadedAt));
+    attachmentsList = rows.map(r => ({
+      id: r.id,
+      documentType: r.documentType,
+      documentLabel: r.documentLabel,
+      fileUrl: r.fileUrl,
+      fileName: r.fileName,
+      fileSize: r.fileSize,
+      mimeType: r.mimeType,
+      uploadedAt: r.uploadedAt.toISOString(),
+    }));
+  } catch (e) {
+    console.error("[ApplicationDetailPage] applicationAttachments fetch failed:", e);
   }
 
   const currentStepIndex = WORKFLOW_STEPS.findIndex((s) => s.key === application.status);
@@ -391,24 +412,6 @@ export default async function ApplicationDetailPage({
                 </dd>
               </div>
               <div>
-                <dt className="text-gray-500">整合性チェック</dt>
-                <dd>
-                  {checkResult ? (
-                    issues.length === 0 ? (
-                      <span className="text-green-600 font-medium flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" /> 問題なし
-                      </span>
-                    ) : (
-                      <span className="text-red-600 font-medium flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> {issues.length}件の問題
-                      </span>
-                    )
-                  ) : (
-                    <span className="text-gray-400">未チェック</span>
-                  )}
-                </dd>
-              </div>
-              <div>
                 <dt className="text-gray-500">質問書</dt>
                 <dd>{questionnaire.length}件</dd>
               </div>
@@ -416,18 +419,6 @@ export default async function ApplicationDetailPage({
           </CardContent>
         </Card>
       </div>
-
-      {/* 整合性チェック */}
-      {issues.length > 0 && (
-        <CollapsibleSection
-          title="整合性チェック結果"
-          badge={`${issues.length}件の問題`}
-          defaultOpen={true}
-          accentClass="bg-amber-400"
-        >
-          <ConsistencyCheckPanel issues={issues} applicationId={application.id} />
-        </CollapsibleSection>
-      )}
 
       {/* 事件メモ（全ステータスで表示） */}
       <CollapsibleSection
@@ -559,6 +550,21 @@ export default async function ApplicationDetailPage({
         accentClass="bg-indigo-400"
       >
         <RasensXmlPanel applicationId={application.id} />
+      </CollapsibleSection>
+
+      {/* 入管提出用添付書類（申請書作成用アップロード） */}
+      <CollapsibleSection
+        title="申請書作成用 添付書類（入管提出用）"
+        badge={attachmentsList.length > 0 ? `${attachmentsList.length}件` : undefined}
+        defaultOpen={true}
+        accentClass="bg-green-500"
+      >
+        <div className="p-4">
+          <AttachmentUploadPanel
+            applicationId={application.id}
+            initialAttachments={attachmentsList}
+          />
+        </div>
       </CollapsibleSection>
 
       {/* 必要書類チェックリスト */}

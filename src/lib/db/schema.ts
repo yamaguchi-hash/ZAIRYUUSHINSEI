@@ -244,6 +244,23 @@ export const pdfFieldMapping = pgTable("pdf_field_mapping", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ─── Application attachments（入管提出用添付書類） ─────────────────────────────
+// 申請案件ごとにアップロードされた添付書類（パスポート写し・雇用契約書等）を
+// 永続保存し、AI抽出のソースおよび提出用Zipパッケージの素材として管理する
+export const applicationAttachments = pgTable("application_attachments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  applicationId: uuid("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+  documentType: text("document_type").notNull(),   // passport | residence_card | employment_contract | ...
+  documentLabel: text("document_label"),           // 表示用書類名
+  fileUrl: text("file_url").notNull(),             // Blob URL（applications/{appId}/ 配下）
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
+  uploadedBy: uuid("uploaded_by").references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+});
+
 // ─── Applicant documents ──────────────────────────────────────────────────────
 export const applicantDocuments = pgTable("applicant_documents", {
   id: uuid("id").defaultRandom().primaryKey(),

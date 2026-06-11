@@ -61,6 +61,11 @@ export function ShinseiPrintToolbar({ applicationId, label }: { applicationId: s
           </button>
         </div>
       </div>
+
+      {/* 日付・URLの印字をオフにする案内 */}
+      <div style={{ marginTop: "6px", fontSize: "11px", color: "#94a3b8" }}>
+        ※ 印刷ダイアログの「詳細設定」→「ヘッダーとフッター」のチェックを外すと、日付やURLが印刷されなくなります
+      </div>
     </div>
   );
 }

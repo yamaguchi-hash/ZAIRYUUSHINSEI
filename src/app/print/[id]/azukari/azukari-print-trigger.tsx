@@ -22,37 +22,43 @@ export function AzukariPrintTrigger({ applicantName }: { applicantName: string }
       <span style={{ fontSize: "13px" }}>
         在留カード預証 — {applicantName}
       </span>
-      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-        <button
-          onClick={() => window.print()}
-          style={{
-            background: "#3b82f6",
-            color: "white",
-            border: "none",
-            padding: "8px 20px",
-            borderRadius: "6px",
-            fontSize: "14px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          🖨️ 印刷 / PDF保存
-        </button>
-        <button
-          onClick={() => window.close()}
-          style={{
-            background: "#64748b",
-            color: "white",
-            border: "none",
-            padding: "8px 20px",
-            borderRadius: "6px",
-            fontSize: "14px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          閉じる
-        </button>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button
+            onClick={() => window.print()}
+            style={{
+              background: "#3b82f6",
+              color: "white",
+              border: "none",
+              padding: "8px 20px",
+              borderRadius: "6px",
+              fontSize: "14px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            🖨️ 印刷 / PDF保存
+          </button>
+          <button
+            onClick={() => window.close()}
+            style={{
+              background: "#64748b",
+              color: "white",
+              border: "none",
+              padding: "8px 20px",
+              borderRadius: "6px",
+              fontSize: "14px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            閉じる
+          </button>
+        </div>
+        {/* 日付・URLの印字をオフにする案内 */}
+        <div style={{ fontSize: "11px", color: "#cbd5e1" }}>
+          ※ 印刷ダイアログの「詳細設定」→「ヘッダーとフッター」のチェックを外すと、日付やURLが印刷されなくなります
+        </div>
       </div>
     </div>
   );

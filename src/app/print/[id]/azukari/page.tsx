@@ -86,6 +86,9 @@ export default async function AzukariPrintPage({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>在留カード預証 - {applicantNameEn || applicantNameJa}</title>
         <style>{`
+          /* 在留カード預証（本ファイル）専用のページ設定。固定A4サイズを採用しており、
+             --pdf-print-width（shinsei-applicant/shinsei-org等）とは独立しているため、
+             その変更による影響は受けない。 */
           @page {
             size: A4 portrait;
             margin: 15mm 20mm;

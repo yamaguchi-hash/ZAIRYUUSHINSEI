@@ -28,8 +28,6 @@ interface ChecklistItem {
   documentName: string;
   isRequiredByExpert: boolean;
   status: string;
-  fileUrl: string | null;
-  fileName: string | null;
   expertNotes: string | null;
   ocrExtractedData?: Record<string, any> | null;
   masterDescription?: string | null;
@@ -137,8 +135,6 @@ export function DocumentChecklist({
           documentRequirementId: null,
           isRequiredByExpert: true,
           status: "not_submitted",
-          fileUrl: null,
-          fileName: null,
           expertNotes: null,
           ocrExtractedData: null,
           masterDescription: null,

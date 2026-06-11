@@ -580,8 +580,6 @@ export default async function ApplicationDetailPage({
             documentName: c.documentName,
             isRequiredByExpert: c.isRequiredByExpert,
             status: c.status,
-            fileUrl: c.fileUrl,
-            fileName: c.fileName,
             expertNotes: c.expertNotes,
             ocrExtractedData: c.ocrExtractedData as Record<string, any> | null,
             masterDescription: c.masterDescription,

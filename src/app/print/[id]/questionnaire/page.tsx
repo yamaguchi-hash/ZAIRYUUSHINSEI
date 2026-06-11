@@ -53,6 +53,8 @@ export default async function QuestionnairePrintPage({
         <meta charSet="utf-8" />
         <title>顧客確認質問書 — {applicantName}</title>
         <style>{`
+          /* 顧客確認質問書（本ファイル）専用のページ設定。固定A4サイズ(210mm)を採用しており、
+             --pdf-print-width（shinsei-applicant/shinsei-org等）とは独立している。 */
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body { font-family: "MS Gothic", "Hiragino Kaku Gothic ProN", sans-serif; font-size: 11px; color: #111; background: #f3f4f6; }
           .page { background: #fff; max-width: 210mm; margin: 0 auto; padding: 14mm 16mm; min-height: 297mm; }

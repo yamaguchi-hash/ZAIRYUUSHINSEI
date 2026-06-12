@@ -485,10 +485,11 @@ export default async function ApplicationDetailPage({
         </CollapsibleSection>
       )}
 
-      {/* 預証作成（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
+      {/* 預証作成（submitted 以降・変更/更新申請のみ） */}
+      {(application.status === "submitted" || application.status === "completed") &&
+        (application.applicationType === "change" || application.applicationType === "renewal") && (
         <CollapsibleSection
-          title="在留カード預証"
+          title="パスポート・在留カード預証（預書）"
           defaultOpen={!((application.draftData as any)?._azukari?.residenceCardFrontUrl)}
           accentClass="bg-violet-500"
         >

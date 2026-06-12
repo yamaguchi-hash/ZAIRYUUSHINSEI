@@ -2093,11 +2093,23 @@ export async function saveNoufushoData(
   }
 }
 
-// ─── 預証データ保存（パスポート含めるトグルのみ保存） ─────────────────────────
+// ─── 預証データ保存（お預かり書類の選択・区分・返却ステータス） ─────────────────
+// draftData._azukari に保持する。部分更新（既存値とのマージ）に対応。
 export async function saveAzukariData(
   applicationId: string,
   azukariData: {
+    /** パスポートを預かるか（在留カードは常に必須のため保持しない） */
     includePassport?: boolean;
+    /** 在留カードの区分（原本 または 写し） */
+    residenceCardKind?: "原本" | "写し";
+    /** パスポートの区分（原本 または 写し） */
+    passportKind?: "原本" | "写し";
+    /** お預かり状況（未発行=preparing / 預かり中=deposited / 返却済み=returned） */
+    status?: "preparing" | "deposited" | "returned";
+    /** 預かり日（YYYY-MM-DD） */
+    depositedAt?: string;
+    /** 返却日（YYYY-MM-DD） */
+    returnedAt?: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -2112,12 +2124,18 @@ export async function saveAzukariData(
       .limit(1);
     if (!app) return { success: false, error: "申請案件が見つかりません" };
 
+    // 預書は変更・更新申請のみ対象
+    if (app.applicationType !== "change" && app.applicationType !== "renewal") {
+      return { success: false, error: "預書は在留資格変更許可申請・在留期間更新許可申請の場合のみ発行できます" };
+    }
+
     const existing = (app.draftData as Record<string, any>) ?? {};
+    const existingAzukari = (existing._azukari as Record<string, any>) ?? {};
 
     await db
       .update(applications)
       .set({
-        draftData: { ...existing, _azukari: azukariData },
+        draftData: { ...existing, _azukari: { ...existingAzukari, ...azukariData } },
         updatedAt: new Date(),
       })
       .where(eq(applications.id, applicationId));

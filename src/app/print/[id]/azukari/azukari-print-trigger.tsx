@@ -1,6 +1,6 @@
 "use client";
 
-export function AzukariPrintTrigger({ applicantName }: { applicantName: string }) {
+export function AzukariPrintTrigger({ applicantName, title = "在留カード預証" }: { applicantName: string; title?: string }) {
   return (
     <div
       style={{
@@ -20,7 +20,7 @@ export function AzukariPrintTrigger({ applicantName }: { applicantName: string }
       className="no-print"
     >
       <span style={{ fontSize: "13px" }}>
-        在留カード預証 — {applicantName}
+        {title} — {applicantName}
       </span>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>

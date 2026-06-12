@@ -13,6 +13,7 @@ import { normalizeFamilyMembers, mergeFamilyMembers } from "@/lib/family-schema"
 import { STAGE1_RESPONSE_SCHEMA, STAGE2_RESPONSE_SCHEMA, schemaToFieldList } from "@/lib/shinsei-ai-schemas";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
+import { cleanseNumeric } from "@/lib/numeric-cleansing";
 
 // プロンプト用フィールド定義リスト（モジュールロード時に1回だけ生成）
 const STAGE1_FIELD_LIST = schemaToFieldList(STAGE1_RESPONSE_SCHEMA);
@@ -72,7 +73,8 @@ const NUMERIC_FIELDS = new Set([
   'salary','orgCapital','orgAnnualSales','orgEmployeeCount',
   'orgForeignEmployeeCount','orgTechInternCount',
   'orgTimeConvertedBasicSalary','orgJapaneseEquivalentSalary',
-  'orgWorkHoursWeekly','orgWorkHoursMonthly',
+  'orgWorkHoursWeekly','orgWorkHoursMonthly','orgWorkDaysWeekly',
+  'orgMonthlyTotalEstimate','orgOvertimeRate','orgHolidayRate','orgNightShiftRate',
   'annualTuition','fundingAmount','scholarshipAmount',
   'supporterAnnualIncome','businessExperienceYears',
   'pastEntryCount','pastCoeCount','pastCoeNonIssuanceCount',
@@ -96,7 +98,9 @@ function validateAndClean(data: Record<string, any>): Record<string, any> {
       if (v && !['有','無'].includes(v)) data[k] = '';
     }
     if (NUMERIC_FIELDS.has(k)) {
-      if (v) data[k] = v.replace(/[^0-9]/g, '');
+      // 単純な数字以外除去だと「160時間30分」→"16030"、「160.5」→"1605"、
+      // 全角「１６０」→"" の誤変換が起きるため cleanseNumeric で正規化する
+      if (v) data[k] = cleanseNumeric(v);
     }
   }
   return data;

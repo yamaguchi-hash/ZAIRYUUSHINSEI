@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { db, applications, applicationDocumentChecklist, applicationAttachments, applicantMaster } from "@/lib/db";
 import { cleanseMasterCodes } from "@/lib/master-cleansing";
+import { cleanseNumeric } from "@/lib/numeric-cleansing";
 import { FAMILY_IN_JAPAN_SCHEMA, normalizeFamilyMembers, mergeFamilyMembers } from "@/lib/family-schema";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import { eq, and } from "drizzle-orm";
@@ -31,6 +32,19 @@ export type SectionKey =
 // ─── セクション別プロンプト定義 ───────────────────────────────────────────────
 /** 文字列型nullable のショートカット */
 const S = (desc: string) => ({ type: Type.STRING, description: desc, nullable: true });
+
+// 数値クレンジング対象（<input type="number"> へバインドされるフィールド）
+const NUMERIC_FIELDS_BY_SECTION: Partial<Record<SectionKey, string[]>> = {
+  orgEmploymentConditions: [
+    "orgWorkHoursWeekly", "orgWorkHoursMonthly", "orgWorkDaysWeekly",
+    "salary", "orgMonthlyTotalEstimate",
+    "orgOvertimeRate", "orgHolidayRate", "orgNightShiftRate",
+  ],
+  orgV: [
+    "orgWorkHoursWeekly", "orgWorkHoursMonthly",
+    "salary", "orgTimeConvertedBasicSalary", "orgJapaneseEquivalentSalary",
+  ],
+};
 
 const SECTION_CONFIG: Record<
   SectionKey,
@@ -677,7 +691,11 @@ const SECTION_CONFIG: Record<
 
 (4) 労働時間等（所定労働時間・所定労働日数）
 　・参照箇所: 3ページ目「IV．労働時間等」の「３．所定労働時間数」「４．所定労働日数」
-　・週の所定労働時間（例：週40時間）→ orgWorkHoursWeekly、月平均の所定労働時間→ orgWorkHoursMonthly、週の所定労働日数（例：週5日）→ orgWorkDaysWeekly に数値のみで抽出
+　・「３．所定労働時間数」は「①週（　時間　分）」「②月（　時間　分）」「③年（　時間　分）」の形式で記載されている。
+　　「①週（」の直後の数値→ orgWorkHoursWeekly、「②月（」の直後の数値→ orgWorkHoursMonthly に抽出すること（②月の値は見落としやすいので必ず確認する）
+　・週の所定労働日数（例：週5日）→ orgWorkDaysWeekly に数値のみで抽出
+　・この様式は日本語の下にベトナム語・英語等の翻訳が併記されていることが多い。翻訳行の数値ではなく、日本語の記入欄に書かれた数値を抽出すること
+　・「160時間00分」のように分が併記されている場合は、分を時間に換算した10進数で出力する（例：160時間30分 → 160.5、160時間00分 → 160）
 
 (5) 報酬の額（基本給・諸手当・月額概算合計）
 　・参照箇所: 5ページ目「VII．賃金」の１・２項、または別紙7〜8ページ目「１．基本賃金」「２．諸手当の額」「３．１か月当たりの支払概算額」
@@ -1000,6 +1018,14 @@ ${config.extraInstructions ?? ""}
 
     // 業種・職種マスタ照合クレンジング（表記ゆれ→コード変換、不正値→空）
     cleanseMasterCodes(result);
+
+    // 数値フィールドの正規化（「160時間00分」「250,000円」「25%」「全角数字」→ 数値のみ）
+    // <input type="number"> は非数値文字列を表示できず空欄に見えるため必須
+    for (const key of NUMERIC_FIELDS_BY_SECTION[sectionKey] ?? []) {
+      if (result[key] !== undefined && result[key] !== null && result[key] !== "") {
+        result[key] = cleanseNumeric(result[key]);
+      }
+    }
 
     const hasAnyValue = Object.values(result).some((v) =>
       Array.isArray(v) ? v.length > 0 : v !== "" && v !== null && v !== undefined

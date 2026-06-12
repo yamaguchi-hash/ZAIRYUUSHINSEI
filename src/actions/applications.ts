@@ -16,6 +16,7 @@ import {
 import { eq, and, ne, inArray, desc, ilike, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
+import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
 
 function requireTenantId(tenantId: string | undefined | null): string {
   if (!tenantId) throw new Error("テナントIDが不正です");
@@ -356,42 +357,6 @@ export async function updateDocumentStatus(
   revalidatePath("/applications");
 }
 
-/** アップロード済みファイルを取り消してアップロード前の状態に戻す */
-export async function clearChecklistFile(
-  checklistItemId: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const session = await auth();
-    if (!session?.user) return { success: false, error: "認証が必要です" };
-
-    const [item] = await db
-      .select({ applicationId: applicationDocumentChecklist.applicationId })
-      .from(applicationDocumentChecklist)
-      .where(eq(applicationDocumentChecklist.id, checklistItemId))
-      .limit(1);
-    if (!item) return { success: false, error: "アイテムが見つかりません" };
-
-    await db
-      .update(applicationDocumentChecklist)
-      .set({
-        fileUrl:          null,
-        fileName:         null,
-        fileSize:         null,
-        mimeType:         null,
-        ocrExtractedData: null,
-        status:           "not_submitted" as const,
-        submittedAt:      null,
-        updatedAt:        new Date(),
-      })
-      .where(eq(applicationDocumentChecklist.id, checklistItemId));
-
-    revalidatePath(`/applications/${item.applicationId}`);
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message ?? "取り消しに失敗しました" };
-  }
-}
-
 export async function updateChecklistNotes(
   checklistItemId: string,
   notes: string
@@ -603,190 +568,6 @@ export async function removeDocumentFromChecklist(
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message ?? "削除に失敗しました" };
-  }
-}
-
-// ── チェックリスト書類のアップロード＋Gemini自動解析 ────────────────────────
-export async function saveChecklistDocumentAndOcr(
-  checklistItemId: string,
-  fileUrl: string,
-  fileName: string,
-  fileSize: number | undefined,
-  mimeType: string,
-  documentName: string
-): Promise<{ success: boolean; error?: string; extracted?: Record<string, any>; summary?: string }> {
-  try {
-    const session = await auth();
-    if (!session?.user) return { success: false, error: "認証が必要です" };
-
-    // ファイル情報を保存・ステータスを「提出済」に更新
-    await db
-      .update(applicationDocumentChecklist)
-      .set({
-        fileUrl,
-        fileName,
-        fileSize: fileSize ?? null,
-        mimeType,
-        status: "submitted",
-        submittedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(applicationDocumentChecklist.id, checklistItemId));
-
-    // Gemini APIキーがなければここで返す
-    if (!process.env.GEMINI_API_KEY) {
-      const [item] = await db.select({ applicationId: applicationDocumentChecklist.applicationId })
-        .from(applicationDocumentChecklist).where(eq(applicationDocumentChecklist.id, checklistItemId)).limit(1);
-      if (item) revalidatePath(`/applications/${item.applicationId}`);
-      return { success: true };
-    }
-
-    // Gemini で書類内容を解析
-    const { GoogleGenAI } = await import("@google/genai");
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-    let base64: string;
-    let imageMimeType: string;
-
-    if (fileUrl.startsWith("data:")) {
-      const commaIdx = fileUrl.indexOf(",");
-      base64 = fileUrl.slice(commaIdx + 1);
-      imageMimeType = fileUrl.slice(5, commaIdx).split(";")[0];
-    } else {
-      // Vercel Blob URL など外部 URL からファイルを取得
-      // 失敗してもアップロード自体は成功扱いにする（OCR のみスキップ）
-      let fetchRes: Response;
-      try {
-        fetchRes = await fetch(fileUrl, { signal: AbortSignal.timeout(15000) });
-      } catch (fetchErr: any) {
-        console.error("[OCR] Blob fetch failed:", fetchErr?.message);
-        // ファイル保存は成功済み。OCR のみスキップして正常終了
-        const [item2] = await db.select({ applicationId: applicationDocumentChecklist.applicationId })
-          .from(applicationDocumentChecklist).where(eq(applicationDocumentChecklist.id, checklistItemId)).limit(1);
-        if (item2) revalidatePath(`/applications/${item2.applicationId}`);
-        return { success: true };
-      }
-      if (!fetchRes.ok) {
-        console.error("[OCR] Blob fetch not ok:", fetchRes.status);
-        const [item2] = await db.select({ applicationId: applicationDocumentChecklist.applicationId })
-          .from(applicationDocumentChecklist).where(eq(applicationDocumentChecklist.id, checklistItemId)).limit(1);
-        if (item2) revalidatePath(`/applications/${item2.applicationId}`);
-        return { success: true }; // OCR のみスキップ
-      }
-      const buf = await fetchRes.arrayBuffer();
-      base64 = Buffer.from(buf).toString("base64");
-      imageMimeType = mimeType;
-    }
-
-    const supportedImageTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
-    const isPdf = imageMimeType === "application/pdf";
-    const isImage = supportedImageTypes.includes(imageMimeType);
-    if (!isImage && !isPdf) {
-      return { success: true }; // 非対応形式はスキップ
-    }
-
-    const prompt = `あなたは在留資格申請書類の読み取り専門家です。
-この書類は「${documentName}」です。
-
-書類から読み取れる全ての重要な情報をJSON形式で抽出してください。
-以下の項目が含まれる場合は必ず抽出してください：
-- full_name_ja: 氏名（日本語）
-- full_name_en: 氏名（英語・ローマ字）
-- family_name_en: 姓（ローマ字）
-- given_name_en: 名（ローマ字）
-- nationality: 国籍・地域
-- date_of_birth: 生年月日（YYYY-MM-DD形式）
-- gender: 性別（M または F）
-- company_name: 会社名・機関名・組織名
-- company_name_en: 会社名（英語）
-- corporate_number: 法人番号（13桁）
-- position: 役職・職種・業務内容
-- employment_start: 雇用開始日・在籍開始日（YYYY-MM-DD形式）
-- employment_end: 雇用終了日（YYYY-MM-DD形式、現職はnull）
-- annual_salary: 年収・報酬（数値のみ、単位：円）
-- monthly_salary: 月収（数値のみ、単位：円）
-- school_name: 学校名・大学名
-- major: 学部・学科・専攻
-- degree: 学位（学士・修士・博士等）
-- graduation_date: 卒業日（YYYY-MM-DD形式）
-- qualification: 資格・免許・称号
-- address: 住所
-- passport_number: パスポート番号
-- residence_card_number: 在留カード番号
-- current_visa_type: 在留資格（日本語で。例：家族滞在、技術・人文知識・国際業務）
-- current_period_of_stay: 在留期間の長さ（例：3年、1年、3年6月。数字＋単位で記載）
-- current_visa_expiry: 在留期間満了日（YYYY-MM-DD形式）
-- issue_date: 発行日（YYYY-MM-DD形式）
-- expiry_date: 有効期限（YYYY-MM-DD形式）
-- marriage_date: 婚姻年月日（YYYY-MM-DD形式）
-- marriage_notification_place_japan: 日本国での婚姻・出生・縁組の届出先（市区町村役場名。例：東京都新宿区役所）
-- marriage_notification_date_japan: 日本国での届出年月日（YYYY-MM-DD形式）
-- marriage_notification_place_foreign: 本国等での婚姻・出生・縁組の届出先・登録機関名（例：中国民政局、韓国家族関係登録事務所）
-- marriage_notification_date_foreign: 本国等での届出年月日（YYYY-MM-DD形式）
-- notes: その他の重要事項
-
-【在留カードの場合】
-在留カード表面に記載の「在留期間」（例：3年、1年）を必ず current_period_of_stay に抽出すること。
-在留期間の満了日（例：2026年10月15日）は current_visa_expiry に YYYY-MM-DD形式で抽出すること。
-
-【婚姻届受理証明書・戸籍謄本・戸籍抄本の場合】
-日本の市区町村に届け出た情報を marriage_notification_place_japan と marriage_notification_date_japan に抽出すること。
-
-【外国の婚姻証明書・出生証明書・縁組証明書の場合】
-本国等の登録機関名を marriage_notification_place_foreign、登録年月日を marriage_notification_date_foreign に抽出すること。
-
-読み取れない項目はnullにしてください（省略不要）。
-JSONのみを返し、説明文は不要です。`;
-
-    let extracted: Record<string, any> = {};
-    try {
-      // PDF は "application/pdf"、画像は実際の mimeType を使用
-      const inlineMime = isPdf ? "application/pdf" : imageMimeType;
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [{
-          parts: [
-            { inlineData: { mimeType: inlineMime, data: base64 } },
-            { text: prompt },
-          ],
-        }],
-      });
-
-      const text = response.text ?? "{}";
-      const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
-      if (jsonMatch) {
-        try { extracted = JSON.parse(jsonMatch[1] ?? jsonMatch[0]); } catch { extracted = {}; }
-      }
-    } catch (ocrErr: any) {
-      console.error("[OCR] checklist doc error:", ocrErr?.message);
-      // OCRエラーでもファイル保存は成功扱い
-    }
-
-    // 非nullフィールドのサマリー生成
-    const summaryParts: string[] = [];
-    if (extracted.company_name) summaryParts.push(`会社: ${extracted.company_name}`);
-    if (extracted.position) summaryParts.push(`役職: ${extracted.position}`);
-    if (extracted.annual_salary) summaryParts.push(`年収: ${Number(extracted.annual_salary).toLocaleString()}円`);
-    if (extracted.monthly_salary && !extracted.annual_salary) summaryParts.push(`月収: ${Number(extracted.monthly_salary).toLocaleString()}円`);
-    if (extracted.school_name) summaryParts.push(`学校: ${extracted.school_name}`);
-    if (extracted.degree) summaryParts.push(`学位: ${extracted.degree}`);
-    if (extracted.graduation_date) summaryParts.push(`卒業: ${extracted.graduation_date}`);
-    if (extracted.qualification) summaryParts.push(`資格: ${extracted.qualification}`);
-    const summary = summaryParts.join(" / ");
-
-    // 解析結果をDBに保存
-    await db
-      .update(applicationDocumentChecklist)
-      .set({ ocrExtractedData: extracted, updatedAt: new Date() })
-      .where(eq(applicationDocumentChecklist.id, checklistItemId));
-
-    const [item] = await db.select({ applicationId: applicationDocumentChecklist.applicationId })
-      .from(applicationDocumentChecklist).where(eq(applicationDocumentChecklist.id, checklistItemId)).limit(1);
-    if (item) revalidatePath(`/applications/${item.applicationId}`);
-
-    return { success: true, extracted, summary };
-  } catch (err: any) {
-    return { success: false, error: err.message ?? "アップロードに失敗しました" };
   }
 }
 
@@ -1731,16 +1512,8 @@ notes(その他重要事項)
       residenceCardNumber:      applicant?.residenceCardNumber ?? existingForm.residenceCardNumber ?? '',
       // 申請情報
       desiredStatusOfResidence: VISA_TYPE_LABELS[app.visaType] ?? app.visaType ?? existingForm.desiredStatusOfResidence ?? '',
-      // 組織マスター
-      employerName:             org?.nameJa ?? existingForm.employerName ?? '',
-      employerAddress:          [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join('') || existingForm.employerAddress || '',
-      employerPhone:            org?.phone ?? existingForm.employerPhone ?? '',
-      orgName:                  org?.nameJa ?? existingForm.orgName ?? '',
-      orgCorporateNumber:       org?.corporateNumber ?? existingForm.orgCorporateNumber ?? '',
-      orgAddress:               [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join('') || existingForm.orgAddress || '',
-      orgPhone:                 org?.phone ?? existingForm.orgPhone ?? '',
-      orgCapital:               org?.capital ? String(org.capital) : existingForm.orgCapital ?? '',
-      orgEmployeeCount:         org?.employeeCount ? String(org.employeeCount) : existingForm.orgEmployeeCount ?? '',
+      // 組織マスター（全申請書共通の企業基本情報のみ。値がある項目だけ上書き）
+      ...mapOrganizationToFormData(org),
       // 取次者固定
       agentName:         '山口忠士',
       agentOrganization: '兵庫県行政書士会',
@@ -2320,11 +2093,23 @@ export async function saveNoufushoData(
   }
 }
 
-// ─── 預証データ保存（パスポート含めるトグルのみ保存） ─────────────────────────
+// ─── 預証データ保存（お預かり書類の選択・区分・返却ステータス） ─────────────────
+// draftData._azukari に保持する。部分更新（既存値とのマージ）に対応。
 export async function saveAzukariData(
   applicationId: string,
   azukariData: {
+    /** パスポートを預かるか（在留カードは常に必須のため保持しない） */
     includePassport?: boolean;
+    /** 在留カードの区分（原本 または 写し） */
+    residenceCardKind?: "原本" | "写し";
+    /** パスポートの区分（原本 または 写し） */
+    passportKind?: "原本" | "写し";
+    /** お預かり状況（未発行=preparing / 預かり中=deposited / 返却済み=returned） */
+    status?: "preparing" | "deposited" | "returned";
+    /** 預かり日（YYYY-MM-DD） */
+    depositedAt?: string;
+    /** 返却日（YYYY-MM-DD） */
+    returnedAt?: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -2339,12 +2124,18 @@ export async function saveAzukariData(
       .limit(1);
     if (!app) return { success: false, error: "申請案件が見つかりません" };
 
+    // 預書は変更・更新申請のみ対象
+    if (app.applicationType !== "change" && app.applicationType !== "renewal") {
+      return { success: false, error: "預書は在留資格変更許可申請・在留期間更新許可申請の場合のみ発行できます" };
+    }
+
     const existing = (app.draftData as Record<string, any>) ?? {};
+    const existingAzukari = (existing._azukari as Record<string, any>) ?? {};
 
     await db
       .update(applications)
       .set({
-        draftData: { ...existing, _azukari: azukariData },
+        draftData: { ...existing, _azukari: { ...existingAzukari, ...azukariData } },
         updatedAt: new Date(),
       })
       .where(eq(applications.id, applicationId));

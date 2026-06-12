@@ -3,6 +3,7 @@ import { db, applications, applicantMaster, applicantDocuments } from "@/lib/db"
 import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { APPLICATION_TYPE_LABELS } from "@/lib/utils";
+import { AGENT_MASTER } from "@/lib/agent-master";
 import { AzukariPrintTrigger } from "./azukari-print-trigger";
 
 function formatDateJaLong(dateStr?: string | null): string {
@@ -35,6 +36,11 @@ export default async function AzukariPrintPage({
     .limit(1);
   if (!application) notFound();
 
+  // 預書は在留資格変更許可申請・在留期間更新許可申請の場合のみ発行可能
+  if (application.applicationType !== "change" && application.applicationType !== "renewal") {
+    notFound();
+  }
+
   const [applicant] = await db
     .select()
     .from(applicantMaster)
@@ -66,6 +72,8 @@ export default async function AzukariPrintPage({
   }
 
   const includePassport = azukari.includePassport ?? false;
+  const residenceCardKind: string = azukari.residenceCardKind ?? "原本";
+  const passportKind: string = azukari.passportKind ?? "原本";
   // 申請日・申請番号は⑦の記録から自動引用
   const applicationDate = submission.applicationDate ?? "";
   const applicationNumber = submission.applicationNumber
@@ -74,6 +82,9 @@ export default async function AzukariPrintPage({
 
   // 申請種別テキスト
   const appTypeLabel = APPLICATION_TYPE_LABELS[application.applicationType] ?? application.applicationType;
+
+  // タイトル（パスポートを含むかで動的に切替）
+  const docTitle = includePassport ? "パスポート及び在留カード預証" : "在留カード預証";
 
   // 申請人名
   const applicantNameJa = [applicant?.familyNameJa, applicant?.givenNameJa].filter(Boolean).join("　") || "";
@@ -84,8 +95,11 @@ export default async function AzukariPrintPage({
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>在留カード預証 - {applicantNameEn || applicantNameJa}</title>
+        <title>{docTitle} - {applicantNameEn || applicantNameJa}</title>
         <style>{`
+          /* 在留カード預証（本ファイル）専用のページ設定。固定A4サイズを採用しており、
+             --pdf-print-width（shinsei-applicant/shinsei-org等）とは独立しているため、
+             その変更による影響は受けない。 */
           @page {
             size: A4 portrait;
             margin: 15mm 20mm;
@@ -115,9 +129,38 @@ export default async function AzukariPrintPage({
             text-align: center;
             font-size: 26px;
             font-weight: bold;
-            letter-spacing: 8px;
-            margin-bottom: 30px;
+            letter-spacing: 6px;
+            margin-bottom: 20px;
             color: #000;
+          }
+
+          /* ── 対象外国人情報 ─────────────────────── */
+          .applicant-info {
+            width: fit-content;
+            margin: 0 auto 18px;
+            font-size: 14px;
+            line-height: 2;
+          }
+          .applicant-info .row { display: flex; }
+          .applicant-info .lbl {
+            width: 7.5em;
+            font-weight: bold;
+            flex-shrink: 0;
+          }
+
+          /* ── お預かり対象物 ─────────────────────── */
+          .deposit-items {
+            width: fit-content;
+            margin: 0 auto 20px;
+            font-size: 14px;
+            line-height: 2;
+            border: 1px solid #999;
+            border-radius: 4px;
+            padding: 8px 24px;
+          }
+          .deposit-items .heading {
+            font-weight: bold;
+            margin-bottom: 2px;
           }
 
           /* ── カード画像エリア ──────────────────── */
@@ -227,11 +270,37 @@ export default async function AzukariPrintPage({
       </head>
       <body>
         {/* 印刷ボタンバー（クライアントコンポーネント） */}
-        <AzukariPrintTrigger applicantName={applicantNameEn || applicantNameJa} />
+        <AzukariPrintTrigger applicantName={applicantNameEn || applicantNameJa} title={docTitle} />
 
         <div className="page">
-          {/* タイトル */}
-          <div className="title">在留カード預証</div>
+          {/* タイトル（パスポートを含むかで動的に切替） */}
+          <div className="title">{docTitle}</div>
+
+          {/* 対象外国人情報（案件DBから自動マージ） */}
+          <div className="applicant-info">
+            <div className="row">
+              <span className="lbl">氏　名</span>
+              <span>
+                {applicantNameEn}
+                {applicantNameJa ? `（${applicantNameJa}）` : ""}
+              </span>
+            </div>
+            <div className="row">
+              <span className="lbl">国籍・地域</span>
+              <span>{applicant?.nationality ?? ""}</span>
+            </div>
+            <div className="row">
+              <span className="lbl">生年月日</span>
+              <span>{formatDateJaLong(applicant?.dateOfBirth)}</span>
+            </div>
+          </div>
+
+          {/* お預かり対象物（選択結果に応じて■/□・区分を表示） */}
+          <div className="deposit-items">
+            <div className="heading">お預かりする対象物</div>
+            <div>■　在留カード（{residenceCardKind}）</div>
+            <div>{includePassport ? "■" : "□"}　パスポート（{includePassport ? passportKind : "　　"}）</div>
+          </div>
 
           {/* 在留カード画像 */}
           <div className="card-images">
@@ -262,10 +331,10 @@ export default async function AzukariPrintPage({
               上記記載の外国人は、現在オンラインで{appTypeLabel}中である。
             </div>
             <div className="detail-line">
-              オンラインシステム利用者（取次者）氏名　山口　忠士　（職業：行政書士）
+              オンラインシステム利用者（取次者）氏名　{AGENT_MASTER.name}　（職業：{AGENT_MASTER.occupation}）
             </div>
             <div className="detail-line">
-              オンラインシステム利用者（取次者）の連絡先　090-2596-0128
+              オンラインシステム利用者（取次者）の連絡先　{AGENT_MASTER.phone}
             </div>
             <div className="detail-line">
               申請受付日　{applicationDate ? formatDateJaLong(applicationDate) : "　　年　　月　　日"}

@@ -89,6 +89,8 @@ export default async function ChecklistPrintPage({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>必要書類チェックリスト - {applicantName}</title>
         <style>{`
+          /* 必要書類チェックリスト（本ファイル）専用のページ設定。固定A4サイズ(210mm)を採用しており、
+             --pdf-print-width（shinsei-applicant/shinsei-org等）とは独立している。 */
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif; font-size: 12px; color: #111; background: #f3f4f6; }
           .page { background: white; max-width: 210mm; margin: 0 auto; padding: 16mm 18mm; min-height: 297mm; }

@@ -47,6 +47,8 @@ export default async function NoufushoPrintPage({
         <meta charSet="utf-8" />
         <title>手数料納付書</title>
         <style>{`
+/* 手数料納付書（本ファイル）専用のページ設定。法務省様式に合わせた固定サイズ(174mm)を
+   採用しており、--pdf-print-width（shinsei-applicant/shinsei-org等）とは独立している。 */
 @page{size:A4 portrait;margin:19mm 18mm 18mm 18mm}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"MS PMincho","ＭＳ Ｐ明朝","Yu Mincho","YuMincho","Hiragino Mincho ProN",serif;

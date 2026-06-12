@@ -107,12 +107,20 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
           }
 
           /* ── 画面表示用 ──────────────────────────────────── */
+          /* 理由書専用の上下余白。この .riyusho-page は本ファイル内のみで使用するクラスのため、
+             他の申請書（申請人用・所属機関用等）のレイアウトには影響しない。 */
           .riyusho-page {
             max-width: 210mm;
             margin: 60px auto 40px;
             background: white;
-            padding: 25mm 25mm 20mm 25mm;
+            padding: 30mm 25mm 25mm 25mm;
             box-shadow: 0 0 12px rgba(0,0,0,0.08);
+          }
+          @media screen {
+            /* 画面表示時のみ、固定ツールバー(PrintTrigger)との重なりを避けるための追加オフセット */
+            .riyusho-page {
+              padding-top: calc(30mm + 56px);
+            }
           }
 
           /* 宛先 */
@@ -173,6 +181,38 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
             padding: 40px 0;
           }
 
+          /* ── 署名欄 ──────────────────────────────────────── */
+          .closing-section {
+            margin-top: 40px;
+            text-align: right;
+          }
+          .sign-date-line {
+            font-size: 11pt;
+            margin-bottom: 32px;
+          }
+          .sign-name-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: baseline;
+            gap: 6px;
+          }
+          .sign-name-label {
+            font-size: 11pt;
+          }
+          .sign-name-line {
+            display: inline-block;
+            width: 220px;
+            border-bottom: 1px solid #000;
+            height: 1.4em;
+          }
+
+          /* 署名日（令和 年 月 日）の表示/非表示切り替え（ツールバーのトグルと連動） */
+          .sign-date { transition: visibility 0s; }
+          body.hide-sign-date .sign-date { visibility: hidden; }
+          @media print {
+            body.hide-sign-date .sign-date { visibility: hidden !important; }
+          }
+
           /* ── ツールバー非表示用 ──────────────────────────── */
           .no-print {}
 
@@ -182,21 +222,25 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
             body { background: white !important; margin: 0; }
             .riyusho-page {
               margin: 0;
-              padding: 20mm 25mm 15mm 25mm;
+              padding: 0;
               box-shadow: none;
               max-width: 100%;
             }
           }
+          /* 理由書（本ファイル）専用のページ余白。@pageのmarginは全ページ（複数ページにまたがる
+             場合も各ページ共通）に適用されるため、.riyusho-pageのpaddingではなくこちらで
+             上下の余白を確保する。他の印刷用ページ（shinsei-shared.tsx等）の@page定義とは
+             独立しており影響しない。 */
           @page {
             size: A4;
-            margin: 0;
+            margin: 30mm 25mm 25mm 25mm;
           }
         `}</style>
       </head>
       <body>
         <PrintTrigger applicationId={id} />
 
-        <div className="riyusho-page" style={{ paddingTop: "56px" }}>
+        <div className="riyusho-page">
           {/* 宛先 */}
           <div className="bureau">
             {bureauFull}　殿
@@ -236,6 +280,17 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
             ) : (
               <p className="empty-note">（理由書本文が入力されていません）</p>
             )}
+          </div>
+
+          {/* 署名欄 */}
+          <div className="closing-section">
+            <div className="sign-date-line">
+              <span className="sign-date">令和　　年　　月　　日</span>
+            </div>
+            <div className="sign-name-row">
+              <span className="sign-name-label">署　名</span>
+              <span className="sign-name-line"></span>
+            </div>
           </div>
 
         </div>

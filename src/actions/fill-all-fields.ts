@@ -2,12 +2,149 @@
 
 import { auth } from "@/lib/auth";
 import {
-  db, applications, applicationDocumentChecklist,
+  db, applications, applicationDocumentChecklist, applicationAttachments,
   applicantMaster, organizationMaster,
 } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 import { EMPTY_FORM_DATA } from "@/lib/form-types";
+import { cleanseMasterCodes } from "@/lib/master-cleansing";
+import { normalizeFamilyMembers, mergeFamilyMembers } from "@/lib/family-schema";
+import { STAGE1_RESPONSE_SCHEMA, STAGE2_RESPONSE_SCHEMA, schemaToFieldList } from "@/lib/shinsei-ai-schemas";
+import { mapWithConcurrency } from "@/lib/concurrency";
+import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
+import { cleanseNumeric, cleanseNumericInt } from "@/lib/numeric-cleansing";
+
+// プロンプト用フィールド定義リスト（モジュールロード時に1回だけ生成）
+const STAGE1_FIELD_LIST = schemaToFieldList(STAGE1_RESPONSE_SCHEMA);
+const STAGE2_FIELD_LIST = schemaToFieldList(STAGE2_RESPONSE_SCHEMA);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ポスト処理バリデーション — ハルシネーション防止
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** 日付フィールド（YYYY-MM-DD 形式のみ許可） */
+const DATE_FIELDS = new Set([
+  'dateOfBirth','passportExpiry','currentPeriodExpiry','scheduledDateOfEntry',
+  'pastEntryLatestFrom','pastEntryLatestTo','deportationLatestDate',
+  'orgContractStartDate','orgContractEndDate',
+  'orgVDispatchStartDate','orgVDispatchEndDate',
+  'orgPlacementProviderLicenseDate',
+  'marriageDate','marriageRegistrationDate',
+  'marriageNotificationDateJapan','marriageNotificationDateForeign',
+  'educationGraduationDate','enrollmentDate','expectedGraduationDate',
+  'employmentStartDate',
+  'spouseDob','supporterDob','supporterPeriodExpiry',
+  'rsoRegDate',
+  'orgCoexistenceWorkplaceCityDate','orgCoexistenceResidenceCityDate',
+]);
+
+/** 有無フィールド（「有」「無」のみ許可） */
+const YESNO_FIELDS = new Set([
+  'maritalStatus','criminalRecord','familyInJapanExists',
+  'pastEntryHistory','pastCoeHistory','deportationHistory',
+  'accompanyingPersons','itQualificationExists',
+  'partTimeWorkExistsR','partTimeWorkPermit','cohabitation',
+  'depositContractExists','overseasExpensesExists',
+  'homeCountryProcedureComplied','regularExpensesUnderstood',
+  'technologyTransferEffortV','ssfSpecificFieldCriteriaMet',
+  'orgWorkHoursEquivalent','orgSalaryEqualToJapanese',
+  'orgSalaryPaymentCash','orgSalaryPaymentBank',
+  'orgForeignTreatmentDifference','orgPaidHolidayForReturn',
+  'orgFieldSpecificEmploymentCriteria','orgReturnTravelExpenses',
+  'orgHealthCheck','orgProperResidenceCriteria',
+  'orgHealthInsuranceMet','orgLaborInsuranceMet',
+  'orgLaborLawViolation','orgInvoluntaryDismissal','orgMissingPerson',
+  'orgCriminalPunishment','orgMentalDisability','orgBankruptcy',
+  'orgTrainingRevoked','orgWasOfficerOfRevoked','orgIllegalActFiveYears',
+  'orgGangsterMember','orgLegalAgentViolation',
+  'orgGangsterControl','orgActivityDocumentKept',
+  'orgAwareOfDeposit','orgPenaltyContractExists',
+  'orgSupportCostNotBurdened',
+  'orgDispatchMeetsCondition','orgDispatchMeetsCompliance',
+  'orgAccidentInsurance','orgContinuousPerformance',
+  'orgSalaryPaymentVerifiable','orgCoexistenceCooperation',
+  'orgCoexistenceWorkplaceCity','orgCoexistenceResidenceCity',
+  'orgFieldSpecificContractCriteria',
+]);
+
+/** 数値のみフィールド（数字以外を除去） */
+const NUMERIC_FIELDS = new Set([
+  'salary','orgCapital','orgAnnualSales','orgEmployeeCount',
+  'orgForeignEmployeeCount','orgTechInternCount',
+  'orgTimeConvertedBasicSalary','orgJapaneseEquivalentSalary',
+  'orgWorkHoursWeekly','orgWorkHoursMonthly','orgWorkDaysWeekly',
+  'orgMonthlyTotalEstimate','orgOvertimeRate','orgHolidayRate','orgNightShiftRate',
+  'annualTuition','fundingAmount','scholarshipAmount',
+  'supporterAnnualIncome','businessExperienceYears',
+  'pastEntryCount','pastCoeCount','pastCoeNonIssuanceCount',
+  'deportationCount','cumulativeStayYears','cumulativeStayMonths',
+  'overseasExpensesAmount','rsoFeePerMonth',
+  'partTimeWorkSalaryR','gaikatsuSalary',
+  'dispatchOrgCapital','dispatchOrgAnnualSales',
+]);
+
+/** AI出力のバリデーション・クリーニング */
+function validateAndClean(data: Record<string, any>): Record<string, any> {
+  for (const k of Object.keys(data)) {
+    const v = data[k];
+    if (v === null || v === undefined) { data[k] = ''; continue; }
+    if (typeof v !== 'string') continue;
+
+    if (DATE_FIELDS.has(k)) {
+      if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) data[k] = '';
+    }
+    if (YESNO_FIELDS.has(k)) {
+      if (v && !['有','無'].includes(v)) data[k] = '';
+    }
+    if (NUMERIC_FIELDS.has(k)) {
+      // 単純な数字以外除去だと「160時間30分」→"16030"、「160.5」→"1605"、
+      // 全角「１６０」→"" の誤変換が起きるため cleanseNumeric で正規化する。
+      // 所定労働時間（週・月）は様式上整数のため四捨五入する
+      if (v) {
+        data[k] = (k === 'orgWorkHoursWeekly' || k === 'orgWorkHoursMonthly')
+          ? cleanseNumericInt(v)
+          : cleanseNumeric(v);
+      }
+    }
+  }
+  return data;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// マスター確定値・AI非対象のフィールドキー
+// ═════════════════════════════════════════════════════════════════════════════
+const MASTER_OVERRIDE_KEYS = new Set([
+  'applicationFormType','visaFormCategory','lastUpdated',
+  'agentName','agentAddress','agentOrganization','agentPhone',
+  'nationality','dateOfBirth','familyNameEn','givenNameEn',
+  'familyNameJa','givenNameJa','sex',
+  'postalCodeInJapan','prefectureInJapan','cityInJapan',
+  'addressLineInJapan','addressInJapan','telephoneNo','cellularPhoneNo',
+  'passportNumber','passportExpiry',
+  'currentStatusOfResidence','currentPeriodExpiry','residenceCardNumber',
+  'desiredStatusOfResidence',
+  'employerName','employerAddress','employerPhone',
+  'orgName','orgCorporateNumber','orgAddress','orgPhone',
+  'orgCapital','orgEmployeeCount','orgEmploymentInsuranceNo',
+]);
+
+/** AI抽出対象外のフィールドキー（ステータス判定で除外） */
+const STATUS_EXEMPT_KEYS = new Set([
+  'applicationFormType','visaFormCategory','lastUpdated',
+  'agentName','agentAddress','agentOrganization','agentPhone',
+  'addressInJapan', // 結合値（自動生成）
+  'freeformPart2Notes','freeformOrgNotes',
+  'riyushoSubmissionBureau','riyushoBody',
+  'gaikatsuNeeded',
+]);
+
+// ─── MIMEタイプ正規化 ────────────────────────────────────────────────────────
+function normalizeMime(m: string): string {
+  const lower = m.toLowerCase().trim();
+  if (lower === "image/jpg" || lower === "image/pjpeg") return "image/jpeg";
+  return lower;
+}
 
 // ─── ファイルをbase64で取得 ───────────────────────────────────────────────────
 async function fileToBase64(
@@ -18,20 +155,31 @@ async function fileToBase64(
     if (fileUrl.startsWith("data:")) {
       const ci = fileUrl.indexOf(",");
       base64 = fileUrl.slice(ci + 1);
-      mime = fileUrl.slice(5, ci).split(";")[0];
+      mime = normalizeMime(fileUrl.slice(5, ci).split(";")[0]);
     } else {
       const res = await fetch(fileUrl, { cache: "no-store" });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        console.error(`[fillAllFields] fetch failed: ${res.status} ${res.statusText} for ${fileUrl.slice(0, 100)}`);
+        return null;
+      }
       base64 = Buffer.from(await res.arrayBuffer()).toString("base64");
-      mime = mimeType ?? "image/jpeg";
+      mime = normalizeMime(mimeType ?? "image/jpeg");
     }
     const ok = ["image/jpeg","image/png","image/webp","image/heic","image/heif","application/pdf"];
-    if (!ok.includes(mime)) return null;
+    if (!ok.includes(mime)) {
+      console.error(`[fillAllFields] unsupported mime: ${mime}`);
+      return null;
+    }
     return { base64, mime };
-  } catch { return null; }
+  } catch (e: any) {
+    console.error(`[fillAllFields] fileToBase64 error: ${e?.message}`);
+    return null;
+  }
 }
 
-// ─── メインアクション ─────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// メインアクション
+// ═════════════════════════════════════════════════════════════════════════════
 export async function fillAllFieldsFromDocs(
   applicationId: string
 ): Promise<{
@@ -69,96 +217,90 @@ export async function fillAllFieldsFromDocs(
     const applicantNameEn = [applicant?.familyNameEn, applicant?.givenNameEn].filter(Boolean).join(" ");
     const applicantNameJa = [applicant?.familyNameJa, applicant?.givenNameJa].filter(Boolean).join(" ");
 
-    // ── 2. 提出済み書類を取得 ─────────────────────────────────────────────────
+    // ── 2. 添付書類を取得 ─────────────────────────────────────────────────────
+    // 主ソース: application_attachments（入管提出用添付書類パネルからのアップロード）
+    // 互換ソース: 旧チェックリストにアップロード済みのファイル
+    const attachmentRows = await db.select().from(applicationAttachments)
+      .where(eq(applicationAttachments.applicationId, applicationId));
     const checklist = await db.select().from(applicationDocumentChecklist)
       .where(eq(applicationDocumentChecklist.applicationId, applicationId));
-    const submitted = checklist.filter(c => c.fileUrl && c.status === "submitted");
+    const legacySubmitted = checklist.filter(c => c.fileUrl && c.status === "submitted");
+
+    const submitted: { documentName: string; fileUrl: string; mimeType: string | null }[] = [
+      ...attachmentRows.map(a => ({
+        documentName: a.documentLabel ?? a.documentType,
+        fileUrl: a.fileUrl,
+        mimeType: a.mimeType,
+      })),
+      ...legacySubmitted.map(c => ({
+        documentName: c.documentName,
+        fileUrl: c.fileUrl!,
+        mimeType: c.mimeType,
+      })),
+    ];
 
     if (submitted.length === 0) {
-      return { success: false, error: "提出済みの書類がありません。書類をアップロードしてから実行してください。" };
+      return { success: false, error: "添付書類がありません。「申請書作成用 添付書類」パネルから書類をアップロードしてから実行してください。" };
     }
 
-    // ── 3. 全書類を個別にGeminiで読み取り ────────────────────────────────────
-    const ocrPerDoc: { name: string; data: Record<string, any> }[] = [];
-    let docsRead = 0;
+    // ── 3. 全書類を個別にGeminiで読み取り（Stage 1）────────────────────────────
+    // 逐次実行だとVercelの関数タイムアウト（300秒）を超過するため、
+    // 複数書類を並行処理してウォールクロック時間を短縮する。
+    type DocResult =
+      | { ok: true; name: string; data: Record<string, any> }
+      | { ok: false; name: string; error: string };
 
-    for (const doc of submitted.slice(0, 20)) {
+    const STAGE1_CONCURRENCY = 4;
+
+    const docResults: DocResult[] = await mapWithConcurrency(
+      submitted.slice(0, 20),
+      STAGE1_CONCURRENCY,
+      async (doc): Promise<DocResult> => {
       const file = await fileToBase64(doc.fileUrl!, doc.mimeType);
-      if (!file) continue;
+      if (!file) {
+        const reason = `ファイル取得失敗 (mime=${doc.mimeType}, url=${doc.fileUrl?.slice(0, 80)}...)`;
+        console.error(`[fillAllFields] skip "${doc.documentName}": ${reason}`);
+        return { ok: false, name: doc.documentName, error: reason };
+      }
 
       try {
-        const ocrPrompt = `【役割】あなたは在留資格申請を専門とする行政書士AIアシスタントです。提出書類から申請書記入に必要な情報を正確に読み取ります。
+        const ocrPrompt = `【役割】あなたは特定技能の在留申請手続きを専門とする行政書士AIアシスタントです。提出書類から申請書記入に必要な情報を正確に読み取ります。
 
 【処理対象】書類「${doc.documentName}」
 
 【申請人の情報】
 申請人氏名: ${applicantNameEn}${applicantNameJa ? `（${applicantNameJa}）` : ""}
 ※この書類に申請人と別人の情報が混在する場合（扶養者の書類等）、それぞれ区別して抽出してください。
+※この書類が申請人以外の親族（在日親族・同居者）の在留カードやメモの場合は、docSubject を「在日親族」とし、その人物の氏名・生年月日・国籍・在留カード番号等を該当フィールドに出力してください。notes に続柄・勤務先・同居の有無など分かる情報を記載してください。
 
 【処理手順】
-1. 書類全体を確認し、書類の種類を特定する
+1. 書類全体を確認し、書類の種類を特定する（パスポート、在留カード、雇用条件書、雇用契約書、登記簿謄本 等）
 2. 申請人の情報か、別人（扶養者・配偶者等）の情報かを判別する
-3. 各フィールドに該当する情報を正確に読み取る
+3. 下記のフィールド定義に該当する情報を正確に読み取る
 4. 日付・数値等のフォーマットを指定形式に変換する
 
-【抽出フィールド】
-{
-  "doc_type": "書類の種類（例：パスポート、在留カード、婚姻届受理証明書）",
-  "subject": "この書類の主体（申請人/扶養者/配偶者/機関など）",
-  "family_name_en": "姓（ローマ字）",
-  "given_name_en": "名（ローマ字）",
-  "family_name_ja": "姓（漢字）",
-  "given_name_ja": "名（漢字）",
-  "nationality": "国籍・地域",
-  "date_of_birth": "生年月日（YYYY-MM-DD）",
-  "gender": "性別（M または F）",
-  "address": "住所",
-  "postal_code": "郵便番号（7桁）",
-  "prefecture": "都道府県",
-  "city": "市区町村",
-  "address_line": "番地・建物・部屋番号",
-  "phone": "電話番号",
-  "passport_number": "パスポート番号",
-  "passport_expiry": "パスポート有効期限（YYYY-MM-DD）",
-  "residence_card_number": "在留カード番号",
-  "visa_type": "在留資格（日本語）",
-  "visa_period": "在留期間（例：3年、1年）",
-  "visa_expiry": "在留期間満了日（YYYY-MM-DD）",
-  "place_of_birth": "出生地",
-  "marital_status": "配偶者の有無（有 または 無）",
-  "occupation": "職業",
-  "home_town": "本国居住地",
-  "company_name": "勤務先・機関名",
-  "company_branch": "支店・事業所名",
-  "corporate_number": "法人番号（13桁）",
-  "company_address": "勤務先所在地",
-  "company_phone": "勤務先電話番号",
-  "position": "役職・職種",
-  "annual_salary": "年収（数値のみ・円）",
-  "monthly_salary": "月収（数値のみ・円）",
-  "employment_start": "雇用開始日（YYYY-MM-DD）",
-  "employment_end": "雇用終了日（YYYY-MM-DD。現職はnull）",
-  "school_name": "学校名",
-  "degree": "学位・区分",
-  "major": "専攻",
-  "graduation_date": "卒業日（YYYY-MM-DD）",
-  "enrollment_date": "入学日（YYYY-MM-DD）",
-  "annual_tuition": "年間学費（数値のみ・円）",
-  "marriage_date": "婚姻年月日（YYYY-MM-DD）",
-  "marriage_notification_place_japan": "日本国届出先（市区町村役場名）",
-  "marriage_notification_date_japan": "日本国届出年月日（YYYY-MM-DD）",
-  "marriage_notification_place_foreign": "本国等届出先（機関名）",
-  "marriage_notification_date_foreign": "本国等届出年月日（YYYY-MM-DD）",
-  "relationship_to_applicant": "申請人との続柄（扶養者書類の場合: 夫/妻/父/母など）",
-  "notes": "その他重要事項"
-}
+【出力フィールド定義】（このキー名のJSONオブジェクトで出力すること。書類に該当情報があるフィールドのみ値を設定し、それ以外は省略してよい）
+${STAGE1_FIELD_LIST}
+
+【データ形式に関する注意】
+・入力データがExcelから出力されたCSV形式の場合、大量のカンマ（,,,）、空白セル、改行、日本語と英語の併記が含まれることがあります。
+・項目名の前後・周辺にあるデータや、離れたセル位置にある数値も文脈から慎重に紐づけて抽出してください。
+・チェックボックス（□ / ☑ / ■ / ✓ や「有・無」の選択）は、文脈からどちらが選択されているか判断し「有」または「無」で出力してください。
+・表形式で項目名と値が離れている場合（例：「所定労働時間,,,,40」のような形式）、カンマ区切りの位置関係から値を正確に読み取ってください。
 
 【制約（必ず遵守）】
+・JSONオブジェクトのみを出力すること（説明文・マークダウン不可）
+・上記フィールド定義にあるキー名のみを使用すること
 ・書類に明記されている情報のみ抽出し、推測・補完は行わないこと
-・読み取れない項目はnullとすること
+・該当情報がない場合は ""（空文字列）とするか、キー自体を省略すること
 ・日付は必ずYYYY-MM-DD形式
+・性別は「男」または「女」（M/Fは使用しない）
+・有無は「有」または「無」（英語不可）
 ・数値フィールドは数値のみ（単位・記号・カンマ不可）`;
 
+        // 注意: responseSchema は使用しない（約300フィールドのスキーマは
+        // Gemini の状態数上限を超え "too many states" 400エラーになるため、
+        // スキーマなしJSONモード＋プロンプト内フィールド定義で出力させる）
         const resp = await ai.models.generateContent({
           model: "gemini-2.5-flash",
           contents: [{ parts: [
@@ -173,22 +315,47 @@ export async function fillAllFieldsFromDocs(
         const txt = resp.text ?? "{}";
         try {
           const data = JSON.parse(txt);
-          ocrPerDoc.push({ name: doc.documentName, data });
-          docsRead++;
-        } catch {
-          // フォールバック: マークダウンコードフェンスが含まれる場合
+          return { ok: true, name: doc.documentName, data };
+        } catch (parseErr: any) {
+          console.error(`[fillAllFields] JSON parse error for "${doc.documentName}":`, parseErr?.message, "raw:", txt.slice(0, 500));
           const m = txt.match(/```json?\s*([\s\S]*?)```/) ?? txt.match(/(\{[\s\S]*\})/);
           if (m) {
-            const data = JSON.parse(m[1] ?? m[0]);
-            ocrPerDoc.push({ name: doc.documentName, data });
-            docsRead++;
+            try {
+              const data = JSON.parse(m[1] ?? m[0]);
+              return { ok: true, name: doc.documentName, data };
+            } catch (e2: any) {
+              console.error(`[fillAllFields] fallback parse also failed for "${doc.documentName}":`, e2?.message);
+              return { ok: false, name: doc.documentName, error: "JSONパース失敗" };
+            }
           }
+          return { ok: false, name: doc.documentName, error: "JSONパース失敗" };
         }
-      } catch { /* 1書類エラーは無視 */ }
+      } catch (geminiErr: any) {
+        const msg = geminiErr?.message ?? String(geminiErr);
+        console.error(`[fillAllFields] Gemini Stage1 error for "${doc.documentName}":`, msg);
+        return { ok: false, name: doc.documentName, error: msg.slice(0, 200) };
+      }
+      }
+    );
+
+    const ocrPerDoc: { name: string; data: Record<string, any> }[] = [];
+    let docsRead = 0;
+    const docErrors: string[] = [];
+    for (const r of docResults) {
+      if (r.ok) {
+        ocrPerDoc.push({ name: r.name, data: r.data });
+        docsRead++;
+      } else {
+        docErrors.push(`${r.name}: ${r.error}`);
+      }
     }
 
     if (ocrPerDoc.length === 0) {
-      return { success: false, error: "書類の読み取りに失敗しました。書類の形式を確認してください。" };
+      const detail = docErrors.length > 0
+        ? `\n詳細:\n${docErrors.join("\n")}`
+        : "";
+      console.error(`[fillAllFields] all docs failed. submitted=${submitted.length}, errors:`, docErrors);
+      return { success: false, error: `書類の読み取りに失敗しました。${detail}` };
     }
 
     // ── 4. 全書類OCR結果を統合サマリーとして構築 ────────────────────────────
@@ -201,7 +368,6 @@ export async function fillAllFieldsFromDocs(
       v ? (VISA_TYPE_LABELS[v] ?? v) : "";
 
     const masterBase: Record<string, any> = {
-      // 申請人マスターから確定値（常にこれを優先）
       nationality:              applicant?.nationality ?? "",
       dateOfBirth:              applicant?.dateOfBirth ?? "",
       familyNameEn:             applicant?.familyNameEn ?? "",
@@ -222,31 +388,23 @@ export async function fillAllFieldsFromDocs(
       currentPeriodExpiry:      applicant?.currentVisaExpiry ?? "",
       residenceCardNumber:      applicant?.residenceCardNumber ?? "",
       desiredStatusOfResidence: VISA_TYPE_LABELS[app.visaType] ?? app.visaType ?? "",
-      // 組織マスター
-      employerName:    org?.nameJa ?? "",
-      employerAddress: [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join(""),
-      employerPhone:   org?.phone ?? "",
-      orgName:         org?.nameJa ?? "",
-      orgCorporateNumber: org?.corporateNumber ?? "",
-      orgAddress:      [org?.prefecture, org?.city, org?.addressLine].filter(Boolean).join(""),
-      orgPhone:        org?.phone ?? "",
-      orgCapital:      org?.capital ? String(org.capital) : "",
-      orgEmployeeCount: org?.employeeCount ? String(org.employeeCount) : "",
-      // 取次者固定
+      // 組織マスター（全申請書共通の企業基本情報のみ）
+      ...mapOrganizationToFormData(org),
       agentName:         "山口忠士",
       agentOrganization: "兵庫県行政書士会",
       agentAddress:      "〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B",
       agentPhone:        "090-2596-0128",
     };
 
-    // ── 6. 包括的Geminiコール：全フィールドを一括入力 ─────────────────────────
+    // ── 6. 包括的Geminiコール：全フィールドを一括統合（Stage 2）──────────────
     const synthPrompt = `【役割】あなたは在留資格申請を専門とする行政書士AIアシスタントです。複数の提出書類から読み取った情報を統合し、申請書の全フィールドを正確に埋めます。
 
 【処理手順】
-1. 全${docsRead}件の書類読取結果を確認する
-2. 同一フィールドに複数の情報源がある場合、最も信頼性の高い書類の値を採用する
+1. 全${docsRead}件の書類読取結果を確認する（キー名は出力JSONと同じフォームフィールド名です）
+2. 同一フィールドに複数の情報源がある場合、最も公的かつ最新の書類（パスポート・在留カード等）を優先する
 3. 申請人の情報と扶養者・配偶者の情報を正確に区別する
-4. 各フィールドの値を指定されたフォーマットに整形する
+4. docSubject が「在日親族」の書類（親族の在留カード・メモ等）の情報は、申請人のフィールドには入れず、familyInJapan 配列に1人1要素で組み立てる（氏名・生年月日・国籍・在留カード番号、notes にあれば続柄・勤務先・同居の有無）。申請人本人は含めない
+5. 各フィールドの値を指定されたフォーマットに整形する
 
 ━━ 申請人情報（確定値・変更不可） ━━
 氏名: ${applicantNameEn}${applicantNameJa ? `（${applicantNameJa}）` : ""}
@@ -259,110 +417,28 @@ ${docSummary}
 ━━ 所属機関情報 ━━
 ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[org.prefecture, org.city, org.addressLine].filter(Boolean).join("")}` : "（なし）"}
 
-上記の書類情報を精査し、以下のJSONフィールドをすべて埋めてください。
+上記の書類情報を精査し、下記フィールド定義の全フィールドを埋めてください。
+
+【出力フィールド定義】（このキー名のJSONオブジェクトで出力すること）
+${STAGE2_FIELD_LIST}
+
+【データ形式に関する注意】
+・入力データがExcelから出力されたCSV形式の場合、大量のカンマ（,,,）、空白セル、改行、日本語と英語の併記が含まれることがあります。
+・項目名の前後・周辺にあるデータや、離れたセル位置にある数値も文脈から慎重に紐づけて抽出してください。
+・チェックボックス（□ / ☑ / ■ / ✓ や「有・無」の選択）は、文脈からどちらが選択されているか判断し「有」または「無」で出力してください。
+・表形式で項目名と値が離れている場合（例：「所定労働時間,,,,40」のような形式）、カンマ区切りの位置関係から値を正確に読み取ってください。
 
 【制約（必ず遵守）】
+・JSONオブジェクトのみを出力すること（説明文・マークダウン不可）
+・上記フィールド定義にあるキー名のみを使用すること
 ・書類に明記されている情報を最優先（推測・補完は行わない）
 ・日付は必ずYYYY-MM-DD形式（例：2025-03-15）
 ・有無は「有」または「無」のみ（英語不可）
 ・性別は「男」または「女」のみ（M/F不可）
 ・数値フィールドは数値のみ（単位・記号・カンマ不可）
-・不明・書類に記載なしは ""（空文字列）とすること
+・不明・書類に記載なしは ""（空文字列）とするか、キー自体を省略すること`;
 
-{
-  "placeOfBirth": "出生地（都市・国名）",
-  "maritalStatus": "配偶者の有無（有 または 無）",
-  "occupation": "職業（例：会社員、主婦、留学生）",
-  "homeTownCity": "本国における居住地（都市・国名）",
-  "cellularPhoneNo": "携帯電話番号",
-
-  "currentPeriodOfStay": "現在の在留期間の長さ（例：3年、1年）",
-  "desiredPeriodOfStay": "希望する在留期間（例：3年）",
-  "reasonForApplication": "更新・変更の理由（書類から読み取れる事実を具体的に記述）",
-
-  "criminalRecord": "犯罪記録の有無（有 または 無）",
-  "criminalRecordDetail": "犯罪記録の詳細（有の場合のみ）",
-  "familyInJapanExists": "在日親族の有無（有 または 無）",
-
-  "employerBranchName": "勤務先支店・事業所名",
-  "salary": "給与・報酬額（数値のみ・円）",
-  "salaryType": "給与種別（月額 または 年額）",
-  "position": "職務上の地位・役職名",
-  "activityDetails": "業務内容・活動の詳細",
-  "employmentStartDate": "雇用開始年月日（YYYY-MM-DD）",
-  "workPeriodFixed": "就労予定期間（定めなし または 定めあり）",
-  "workPeriodDuration": "就労期間（定めありの場合のみ）",
-  "businessExperienceYears": "実務経験年数（数値のみ）",
-
-  "educationCountry": "学校所在国（本邦（日本） または 外国）",
-  "educationDegree": "学位（大学院（博士）/大学院（修士）/大学/短期大学/専門学校/高等学校等）",
-  "educationSchoolName": "学校名（正式名称）",
-  "educationGraduationDate": "卒業年月日（YYYY-MM-DD）",
-  "majorCategory": "専攻・専門分野",
-  "itQualificationExists": "情報処理技術者資格の有無（有 または 無）",
-  "itQualificationName": "資格名（有の場合）",
-
-  "workHistory": [
-    {"joinDate": "入社年月（YYYY-MM）", "leaveDate": "退社年月（YYYY-MM。現職は空文字）", "employer": "勤務先名称"}
-  ],
-
-  "marriageNotificationPlaceJapan": "日本の市区町村役場への届出先（役場名）",
-  "marriageNotificationDateJapan": "日本への届出年月日（YYYY-MM-DD）",
-  "marriageNotificationPlaceForeign": "本国等の機関への届出先（機関名）",
-  "marriageNotificationDateForeign": "本国等への届出年月日（YYYY-MM-DD）",
-  "fundingMethod": "滞在費支弁方法（親族負担/外国からの送金/身元保証人負担/その他）",
-  "partTimeWorkExistsR": "資格外活動の有無（有 または 無）",
-
-  "supporterNameEn": "扶養者 氏名（ローマ字。姓名を半角スペース区切りで。例：YAMADA Taro）",
-  "supporterDob": "扶養者 生年月日（YYYY-MM-DD）",
-  "supporterNationality": "扶養者 国籍・地域",
-  "supporterResidenceCard": "扶養者 在留カード番号（英数字12桁）",
-  "supporterStatusOfResidence": "扶養者 在留資格（日本語）",
-  "supporterPeriodOfStay": "扶養者 在留期間の長さ（例：3年）",
-  "supporterPeriodExpiry": "扶養者 在留期間満了日（YYYY-MM-DD）",
-  "supporterRelationship": "申請人との続柄（夫/妻/父/母/養父/養母/その他）",
-  "supporterEmployer": "扶養者 勤務先名称",
-  "supporterCorporateNumber": "扶養者 法人番号（13桁）",
-  "supporterBranchName": "扶養者 支店・事業所名",
-  "supporterEmployerAddress": "扶養者 勤務先所在地（フル住所）",
-  "supporterEmployerPhone": "扶養者 勤務先電話番号",
-  "supporterAnnualIncome": "扶養者 年収（数値のみ・円）",
-
-  "spouseFamilyNameEn": "配偶者 姓（ローマ字）",
-  "spouseGivenNameEn": "配偶者 名（ローマ字）",
-  "spouseFamilyNameJa": "配偶者 姓（漢字）",
-  "spouseGivenNameJa": "配偶者 名（漢字）",
-  "spouseDob": "配偶者 生年月日（YYYY-MM-DD）",
-  "spouseNationality": "配偶者 国籍",
-  "spouseResidenceStatus": "配偶者 身分（日本国籍/永住者/特別永住者）",
-  "spouseResidenceCard": "配偶者 在留カード番号",
-  "spouseOccupation": "配偶者 職業",
-  "spouseEmployer": "配偶者 勤務先・通学先",
-  "spouseAddress": "配偶者 住所",
-  "marriageDate": "婚姻年月日（YYYY-MM-DD）",
-  "marriageRegistrationPlace": "婚姻届出市区町村名",
-  "cohabitation": "同居の有無（有 または 無）",
-
-  "schoolName": "学校名（正式名称）",
-  "schoolType": "学校種別（大学院/大学/短期大学/専門学校/高等学校/日本語学校/その他）",
-  "schoolAddress": "学校所在地",
-  "schoolPhone": "学校電話番号",
-  "enrollmentDate": "入学年月日（YYYY-MM-DD）",
-  "expectedGraduationDate": "卒業予定年月日（YYYY-MM-DD）",
-  "courseOfStudy": "在籍コース・専攻名",
-  "annualTuition": "年間学費（数値のみ・円）",
-  "fundingSource": "費用支弁方法",
-  "fundingAmount": "月額生活費（数値のみ・円）",
-  "partTimeWorkPermit": "資格外活動許可の有無（有 または 無）",
-
-  "orgBranchName": "所属機関 支店・事業所名",
-  "orgEmploymentInsuranceNo": "雇用保険適用事業所番号（11桁）",
-  "orgAnnualSales": "年間売上高（数値のみ・円）",
-  "orgForeignEmployeeCount": "外国人職員数（数値のみ）",
-  "contractType": "契約形態（雇用/委任/請負/その他）",
-  "occupationCode": "職種コード番号"
-}`;
-
+    // 注意: responseSchema は使用しない（状態数上限超過のため。STAGE1と同様）
     const synthResp = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [{ parts: [{ text: synthPrompt }] }],
@@ -376,10 +452,16 @@ ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[o
     try {
       aiData = JSON.parse(synthTxt);
     } catch {
-      // フォールバック: マークダウンコードフェンスが含まれる場合
       const synthM = synthTxt.match(/```json?\s*([\s\S]*?)```/) ?? synthTxt.match(/(\{[\s\S]*\})/);
       aiData = synthM ? JSON.parse(synthM[1] ?? synthM[0]) : {};
     }
+
+    // ── 6-b. バリデーション・クリーニング ────────────────────────────────────
+    aiData = validateAndClean(aiData);
+
+    // ── 6-c. 業種・職種マスタ照合クレンジング ────────────────────────────────
+    // ラベル表記ゆれ→コード自動変換、マスタにない不正値→空（画面で手動選択）
+    aiData = cleanseMasterCodes(aiData);
 
     // ── 7. マスターデータ優先でマージ ────────────────────────────────────────
     // EMPTY_FORM_DATA → 既存保存データ → AI抽出 → マスター確定値 の順で上書き
@@ -399,17 +481,30 @@ ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[o
         merged.workHistory = aiData.workHistory;
       }
     }
+    // familyInJapan（在日親族）は既存リストとマージ（氏名で重複排除・申請人本人は除外）
+    if (aiData.familyInJapan && Array.isArray(aiData.familyInJapan) && aiData.familyInJapan.length > 0) {
+      const extracted = normalizeFamilyMembers(aiData.familyInJapan);
+      if (extracted.length > 0) {
+        merged.familyInJapan = mergeFamilyMembers(
+          (merged.familyInJapan ?? []) as any[],
+          extracted,
+          [applicantNameEn, applicantNameJa],
+        );
+        if ((merged.familyInJapan as any[]).length > 0) {
+          merged.familyInJapanExists = '有';
+        }
+      }
+    }
 
     // マスター確定値を最後に上書き（変更不可フィールド）
     Object.assign(merged, masterBase);
 
-    // ── 7-b. 家族滞在（認定・更新・変更すべて）の場合、扶養者情報を在日親族に自動反映 ──
+    // ── 7-b. 家族滞在の場合、扶養者情報を在日親族に自動反映 ─────────────────
     if (app.visaType === 'dependent') {
       const supporterName = merged.supporterNameEn
         || [merged.supporterFamilyNameEn, merged.supporterGivenNameEn].filter(Boolean).join(' ');
       if (supporterName) {
         const familyList = (merged.familyInJapan ?? []) as any[];
-        // 既に同名の扶養者が登録されていなければ追加
         const alreadyExists = familyList.some((m: any) =>
           m.name && supporterName && m.name.replace(/\s/g, '') === supporterName.replace(/\s/g, '')
         );
@@ -428,6 +523,34 @@ ${org ? `${org.nameJa ?? ""} / 法人番号: ${org.corporateNumber ?? ""} / ${[o
         }
       }
     }
+
+    // ── 7-c. AIフィールドステータスの生成 ───────────────────────────────────
+    const fieldStatus: Record<string, 'confirmed' | 'empty'> = {};
+    for (const key of Object.keys(EMPTY_FORM_DATA)) {
+      if (STATUS_EXEMPT_KEYS.has(key)) continue;
+      if (MASTER_OVERRIDE_KEYS.has(key)) continue;
+      // 配列型は個別判定
+      if (key === 'workHistory' || key === 'familyInJapan' || key === 'orgOccupationNumberAdditional') continue;
+
+      const val = merged[key];
+      if (val && val !== '' && val !== '無' && val !== '有') {
+        // 実質的な値がある → confirmed
+        fieldStatus[key] = 'confirmed';
+      } else if (YESNO_FIELDS.has(key) && (val === '有' || val === '無')) {
+        // 有無フィールドでデフォルト値と異なるか、AIが設定した → confirmed
+        const defaultVal = (EMPTY_FORM_DATA as any)[key];
+        if (aiData[key] && aiData[key] !== '') {
+          fieldStatus[key] = 'confirmed';
+        } else if (val !== defaultVal) {
+          fieldStatus[key] = 'confirmed';
+        } else {
+          fieldStatus[key] = 'empty';
+        }
+      } else {
+        fieldStatus[key] = 'empty';
+      }
+    }
+    merged.aiFieldStatus = fieldStatus;
 
     // ── 8. DBに保存 ───────────────────────────────────────────────────────────
     await db.update(applications)

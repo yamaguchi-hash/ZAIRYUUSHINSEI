@@ -58,6 +58,13 @@ export const tenants = pgTable("tenants", {
 });
 
 // ─── Organization master ───────────────────────────────────────────────────────
+// 【設計基準】このテーブルに置けるのは「すべての在留資格・すべての申請書類で
+// 共通して使い回せる企業の基本属性」だけ（会社名・法人番号・代表者・住所・
+// 連絡先・業種・資本金・売上・職員数・各種保険番号等）。
+// 雇用契約期間・就業場所・給与額など申請案件や契約ごとに変動する情報は、
+// このテーブルに追加せず applications.formData（申請データ）側で保持すること。
+// カラム追加時は src/lib/org-master-mapping.ts の ORG_MASTER_COMMON_FIELD_KEYS
+// に必ずキーを登録する（未登録キーはサーバーアクションで保存時に破棄される）。
 export const organizationMaster = pgTable("organization_master", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
@@ -69,6 +76,7 @@ export const organizationMaster = pgTable("organization_master", {
   city: text("city"),
   addressLine: text("address_line"),
   phone: text("phone"),
+  fax: text("fax"),                      // FAX番号
   capital: real("capital"),              // 資本金（円）
   annualSales: real("annual_sales"),     // 年間売上金額（円）
   employeeCount: integer("employee_count"), // 常勤職員数
@@ -78,6 +86,8 @@ export const organizationMaster = pgTable("organization_master", {
   // ── 追加フィールド ────────────────────────────────────────────────────────
   workersAccidentInsuranceNo: text("workers_accident_insurance_no"),  // 労働災害保険番号
   employmentInsuranceNo: text("employment_insurance_no"),              // 雇用保険事業者番号
+  laborInsuranceNo: text("labor_insurance_no"),                        // 労働保険番号（14桁）
+  socialInsuranceSymbol: text("social_insurance_symbol"),              // 健康保険・厚生年金保険事業所整理記号等
   representativeTitle: text("representative_title"),                   // 代表者役職
   representativeName: text("representative_name"),                     // 代表者氏名
   email: text("email"),                                                // メールアドレス
@@ -241,6 +251,23 @@ export const pdfFieldMapping = pgTable("pdf_field_mapping", {
   fontSize: real("font_size"),
   isActive: boolean("is_active").notNull().default(true),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── Application attachments（入管提出用添付書類） ─────────────────────────────
+// 申請案件ごとにアップロードされた添付書類（パスポート写し・雇用契約書等）を
+// 永続保存し、AI抽出のソースおよび提出用Zipパッケージの素材として管理する
+export const applicationAttachments = pgTable("application_attachments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  applicationId: uuid("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+  documentType: text("document_type").notNull(),   // passport | residence_card | employment_contract | ...
+  documentLabel: text("document_label"),           // 表示用書類名
+  fileUrl: text("file_url").notNull(),             // Blob URL（applications/{appId}/ 配下）
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
+  uploadedBy: uuid("uploaded_by").references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
 });
 
 // ─── Applicant documents ──────────────────────────────────────────────────────

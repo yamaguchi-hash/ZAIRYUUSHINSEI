@@ -341,24 +341,39 @@ export interface ApplicationFormData {
   // V型 Item 2: 雇用契約
   orgContractStartDate: string;       // 雇用契約期間（始）
   orgContractEndDate: string;         // 雇用契約期間（終）
+  orgContractRenewal: string;         // 雇用契約期間 更新の有無・内容（雇用条件書より）
   orgSpecifiedIndustrialField: string; // (2) 特定産業分野
   orgWorkCategory: string;            // (2) 業務区分
   orgOccupationNumber: string;        // (2) 主職種番号
   orgOccupationNumberAdditional: string[]; // (2) 追加職種番号（複数選択・配列）
+  orgVWorkplaceName: string;          // 就業の場所（名称）（雇用条件書より）
+  orgVWorkplaceAddress: string;       // 就業の場所（所在地）（雇用条件書より）
   orgWorkHoursWeekly: string;         // (3) 所定労働時間（週平均）
   orgWorkHoursMonthly: string;        // (3) 所定労働時間（月平均）
+  orgWorkDaysWeekly: string;          // 所定労働日数（週・雇用条件書より）
   orgWorkHoursEquivalent: string;     // (3) 正規労働者と同等か 有/無
   orgTimeConvertedBasicSalary: string; // (4) 基本給の時間換算額
   orgJapaneseEquivalentSalary: string; // (4) 同種業務日本人の月額報酬
   orgSalaryEqualToJapanese: string;   // (4) 日本人同等以上か 有/無
+  orgAllowancesDetail: string;        // 諸手当の名称・金額の内訳（雇用条件書より）
+  orgMonthlyTotalEstimate: string;    // 1か月当たりの支払概算額合計（雇用条件書より）
+  orgSalaryEqualityExplanation: string; // 報酬が日本人と同等以上であることの説明・支給要件
+  orgOvertimeRate: string;            // 時間外労働の割増賃金率（%）
+  orgHolidayRate: string;             // 休日労働の割増賃金率（%）
+  orgNightShiftRate: string;          // 深夜労働の割増賃金率（%）
+  orgSalaryClosingDate: string;       // 賃金締切日
+  orgSalaryPaymentDate: string;       // 賃金支払日
   orgSalaryPaymentCash: string;       // (5) 現金払い 有/無
   orgSalaryPaymentBank: string;       // (5) 銀行振込 有/無
+  orgDeductionItems: string;          // 賃金支払時に控除する項目（宿舎費・水道光熱費・食費等）の内訳
   orgForeignTreatmentDifference: string; // (6) 外国人差別的扱い 有/無
   orgForeignTreatmentDetail: string;   // (6) 差別的扱いの詳細
   orgPaidHolidayForReturn: string;    // (7) 一時帰国有給休暇 有/無
   orgFieldSpecificEmploymentCriteria: string; // (8) 分野別雇用基準 有/無
   orgReturnTravelExpenses: string;    // (9) 帰国旅費負担 有/無
+  orgReturnTravelExpenseDetail: string; // 帰国旅費負担の規定内容・負担者（雇用条件書より）
   orgHealthCheck: string;             // (10) 健康状況確認 有/無
+  orgHealthCheckCostBurden: string;   // 健康診断の受診費用負担に関する記述（雇用条件書より）
   orgProperResidenceCriteria: string; // (11) 適正在留基準 有/無
 
   // V型 Item 3: 所属機関情報（既存のorg系フィールドを共用）
@@ -444,8 +459,45 @@ export interface ApplicationFormData {
   // 支援責任者・支援担当者
   supportManagerName: string;         // 支援責任者氏名
   supportManagerTitle: string;        // 支援責任者役職・部署
+  supportManagerAppointed: string;    // (34) 役員又は職員の中から支援責任者を選任していることの有無
   supportStaffName: string;           // 支援担当者氏名
   supportStaffTitle: string;          // 支援担当者役職・部署
+  supportStaffAppointed: string;      // (35) 役員又は職員の中から支援担当者を選任していることの有無
+
+  // (36) 中長期在留者受入・管理実績等のいずれかに該当することの有無 — V3シート
+  supportExperienceCriteria: string;
+  supportExperienceCriteriaItem1: boolean; // ① 中長期在留者の受入れ又は管理を適正に行った実績
+  supportExperienceCriteriaItem2: boolean; // ② 支援責任者・担当者の生活相談等従事経験
+  supportExperienceCriteriaItem3: boolean; // ③ その他支援業務を適正に実施できる事情
+  supportExperienceCriteriaItem3Detail: string;
+
+  supportLanguageCapability: string;  // (37) 外国人が理解できる言語による支援体制の有無
+  supportDocumentKept: string;        // (38) 1号支援状況に関する文書の作成・1年以上保管
+
+  // V4シート (39)〜(42)
+  supportNeutralPosition: string;     // (39) 支援責任者・担当者が中立な立場であることの有無
+  supportFailureHistory: string;      // (40) 過去の1号特定技能外国人支援の懈怠の有無
+  supportFailureHistoryDetail: string;
+  supportPeriodicInterviewCapability: string; // (41) 定期面談を実施できる体制の有無
+  supportImplementationFieldCriteria: string; // (42) 支援計画実施の分野別基準への適合の有無
+
+  // 4 1号特定技能外国人支援計画の内容（特定技能1号の場合のみ）— V4シート (1)〜(16)
+  supportPlanInfoProvision: string;       // (1) 在留に関する留意事項等の情報提供
+  supportPlanInfoProvisionMethod: string; // (2) 対面・テレビ電話等による実施
+  supportPlanAirportTransfer: string;     // (3) 出入国時の送迎
+  supportPlanHousingSupport: string;      // (4) 住居確保に係る支援
+  supportPlanLifeContractSupport: string; // (5) 預金口座開設・携帯電話契約等の支援
+  supportPlanLivingInfoProvision: string; // (6) 生活一般に関する情報提供
+  supportPlanProcedureAccompany: string;  // (7) 行政手続への同行等
+  supportPlanJapaneseLearning: string;    // (8) 日本語学習機会の提供
+  supportPlanConsultationResponse: string;// (9) 相談・苦情対応
+  supportPlanExchangePromotion: string;   // (10) 日本人との交流促進支援
+  supportPlanJobChangeSupport: string;    // (11) 非自発的離職時の転職支援
+  supportPlanPeriodicInterview: string;   // (12) 定期面談・行政機関への通報
+  supportPlanCopyProvided: string;        // (13) 支援計画の作成・写しの交付
+  supportPlanFieldSpecificMatters: string;// (14) 分野別告示事項の記載（該当する場合のみ）
+  supportPlanContentAppropriate: string;  // (15) 支援内容の適正性
+  supportPlanFieldSpecificCriteria: string; // (16) 分野別告示基準への適合（該当する場合のみ）
 
   // 登録支援機関（特定技能１号・全支援委託の場合）
   rsoName: string;                    // (5-1) 登録支援機関名称
@@ -544,6 +596,12 @@ export interface ApplicationFormData {
   // ══════════════════════════════════════════════════════════════════════════
   riyushoSubmissionBureau: string;   // 提出先管理局（例: "大阪", "東京", "名古屋"）
   riyushoBody: string;               // 理由書本文
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // AI読み取りステータス（各フィールドの確信度）
+  // confirmed: AI/手入力で値が設定済み / empty: 要手動入力
+  // ══════════════════════════════════════════════════════════════════════════
+  aiFieldStatus?: Record<string, 'confirmed' | 'empty'>;
 }
 
 // ─── 空フォームデータ ─────────────────────────────────────────────────────────
@@ -632,15 +690,21 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   homeCountryProcedureComplied: '有', regularExpensesUnderstood: '有',
   technologyTransferEffortV: '有', ssfSpecificFieldCriteriaMet: '有',
   // 所属機関 V型固有
-  orgContractStartDate: '', orgContractEndDate: '',
+  orgContractStartDate: '', orgContractEndDate: '', orgContractRenewal: '',
   orgSpecifiedIndustrialField: '', orgWorkCategory: '',
   orgOccupationNumber: '', orgOccupationNumberAdditional: [],
-  orgWorkHoursWeekly: '', orgWorkHoursMonthly: '', orgWorkHoursEquivalent: '有',
+  orgVWorkplaceName: '', orgVWorkplaceAddress: '',
+  orgWorkHoursWeekly: '', orgWorkHoursMonthly: '', orgWorkDaysWeekly: '', orgWorkHoursEquivalent: '有',
   orgTimeConvertedBasicSalary: '', orgJapaneseEquivalentSalary: '', orgSalaryEqualToJapanese: '有',
+  orgAllowancesDetail: '', orgMonthlyTotalEstimate: '', orgSalaryEqualityExplanation: '',
+  orgOvertimeRate: '', orgHolidayRate: '', orgNightShiftRate: '',
+  orgSalaryClosingDate: '', orgSalaryPaymentDate: '',
   orgSalaryPaymentCash: '無', orgSalaryPaymentBank: '有',
+  orgDeductionItems: '',
   orgForeignTreatmentDifference: '無', orgForeignTreatmentDetail: '',
   orgPaidHolidayForReturn: '有', orgFieldSpecificEmploymentCriteria: '有',
-  orgReturnTravelExpenses: '有', orgHealthCheck: '有', orgProperResidenceCriteria: '有',
+  orgReturnTravelExpenses: '有', orgReturnTravelExpenseDetail: '',
+  orgHealthCheck: '有', orgHealthCheckCostBurden: '', orgProperResidenceCriteria: '有',
   orgLaborInsuranceNo: '', orgHealthInsuranceMet: '有', orgLaborInsuranceMet: '有',
   orgPlacementProviderName: '', orgPlacementProviderCorporateNo: '', orgPlacementProviderInsuranceNo: '',
   orgPlacementProviderAddress: '', orgPlacementProviderPhone: '',
@@ -678,7 +742,34 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   orgCoexistenceWorkplaceCity: '有', orgCoexistenceWorkplaceCityDate: '', orgCoexistenceWorkplaceCityName: '',
   orgCoexistenceResidenceCity: '有', orgCoexistenceResidenceCityDate: '', orgCoexistenceResidenceCityName: '',
   orgFieldSpecificContractCriteria: '有',
-  supportManagerName: '', supportManagerTitle: '', supportStaffName: '', supportStaffTitle: '',
+  supportManagerName: '', supportManagerTitle: '', supportManagerAppointed: '有',
+  supportStaffName: '', supportStaffTitle: '', supportStaffAppointed: '有',
+  supportExperienceCriteria: '無',
+  supportExperienceCriteriaItem1: false, supportExperienceCriteriaItem2: false,
+  supportExperienceCriteriaItem3: false, supportExperienceCriteriaItem3Detail: '',
+  supportLanguageCapability: '有',
+  supportDocumentKept: '有',
+  supportNeutralPosition: '有',
+  supportFailureHistory: '無', supportFailureHistoryDetail: '',
+  supportPeriodicInterviewCapability: '有',
+  supportImplementationFieldCriteria: '有',
+  // 4 1号特定技能外国人支援計画 (1)〜(16)
+  supportPlanInfoProvision: '有',
+  supportPlanInfoProvisionMethod: '有',
+  supportPlanAirportTransfer: '有',
+  supportPlanHousingSupport: '有',
+  supportPlanLifeContractSupport: '有',
+  supportPlanLivingInfoProvision: '有',
+  supportPlanProcedureAccompany: '有',
+  supportPlanJapaneseLearning: '有',
+  supportPlanConsultationResponse: '有',
+  supportPlanExchangePromotion: '有',
+  supportPlanJobChangeSupport: '有',
+  supportPlanPeriodicInterview: '有',
+  supportPlanCopyProvided: '有',
+  supportPlanFieldSpecificMatters: '有',
+  supportPlanContentAppropriate: '有',
+  supportPlanFieldSpecificCriteria: '有',
   rsoName: '', rsoCorporateNo: '', rsoInsuranceNo: '', rsoAddress: '', rsoPhone: '',
   rsoRepresentative: '', rsoRegNo: '', rsoRegDate: '',
   rsoSupportBusinessName: '', rsoSupportBusinessAddress: '',

@@ -8,6 +8,7 @@ import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
 import { ShinseiFormEditor } from "./shinsei-form-editor";
 import type { ApplicationFormData } from "@/lib/form-types";
 import { EMPTY_FORM_DATA } from "@/lib/form-types";
+import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
 
 export default async function ShinseiFormPage({
   params,
@@ -60,15 +61,8 @@ export default async function ShinseiFormPage({
     currentPeriodExpiry:        applicant.currentVisaExpiry ?? '',
     residenceCardNumber:        applicant.residenceCardNumber ?? '',
     desiredStatusOfResidence:   VISA_TYPE_LABELS[application.visaType] ?? application.visaType ?? '',
-    employerName:               organization?.nameJa ?? '',
-    employerAddress:            [organization?.prefecture, organization?.city, organization?.addressLine].filter(Boolean).join(''),
-    employerPhone:              organization?.phone ?? '',
-    orgName:                    organization?.nameJa ?? '',
-    orgCorporateNumber:         organization?.corporateNumber ?? '',
-    orgAddress:                 [organization?.prefecture, organization?.city, organization?.addressLine].filter(Boolean).join(''),
-    orgPhone:                   organization?.phone ?? '',
-    orgCapital:                 organization?.capital ? String(organization.capital) : '',
-    orgEmployeeCount:           organization?.employeeCount ? String(organization.employeeCount) : '',
+    // 所属機関マスター（全申請書共通の企業基本情報のみを自動反映）
+    ...mapOrganizationToFormData(organization),
   };
 
   // 8. 日本における連絡先（申請人マスターから常に取得）
@@ -142,7 +136,23 @@ export default async function ShinseiFormPage({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-300"
           >
             <FileDown className="w-4 h-4" />
-            申請書PDF出力
+            申請書PDF（一括）
+          </Link>
+          <Link
+            href={`/print/${id}/shinsei-applicant`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            申請人用PDF
+          </Link>
+          <Link
+            href={`/print/${id}/shinsei-org`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            所属機関用PDF
           </Link>
           {showRiyusho && (
             <Link

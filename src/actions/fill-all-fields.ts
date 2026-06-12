@@ -13,7 +13,7 @@ import { normalizeFamilyMembers, mergeFamilyMembers } from "@/lib/family-schema"
 import { STAGE1_RESPONSE_SCHEMA, STAGE2_RESPONSE_SCHEMA, schemaToFieldList } from "@/lib/shinsei-ai-schemas";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
-import { cleanseNumeric } from "@/lib/numeric-cleansing";
+import { cleanseNumeric, cleanseNumericInt } from "@/lib/numeric-cleansing";
 
 // プロンプト用フィールド定義リスト（モジュールロード時に1回だけ生成）
 const STAGE1_FIELD_LIST = schemaToFieldList(STAGE1_RESPONSE_SCHEMA);
@@ -99,8 +99,13 @@ function validateAndClean(data: Record<string, any>): Record<string, any> {
     }
     if (NUMERIC_FIELDS.has(k)) {
       // 単純な数字以外除去だと「160時間30分」→"16030"、「160.5」→"1605"、
-      // 全角「１６０」→"" の誤変換が起きるため cleanseNumeric で正規化する
-      if (v) data[k] = cleanseNumeric(v);
+      // 全角「１６０」→"" の誤変換が起きるため cleanseNumeric で正規化する。
+      // 所定労働時間（週・月）は様式上整数のため四捨五入する
+      if (v) {
+        data[k] = (k === 'orgWorkHoursWeekly' || k === 'orgWorkHoursMonthly')
+          ? cleanseNumericInt(v)
+          : cleanseNumeric(v);
+      }
     }
   }
   return data;

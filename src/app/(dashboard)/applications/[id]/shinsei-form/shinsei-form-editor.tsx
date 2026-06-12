@@ -1909,8 +1909,9 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                         </Field>
                       </div>
                       <div className="grid grid-cols-3 gap-3">
-                        <Field label="(3) 所定労働時間（週平均・時間）"><input className={inputCls} type="number" value={form.orgWorkHoursWeekly} onChange={e => set("orgWorkHoursWeekly", e.target.value)} placeholder="40" /></Field>
-                        <Field label="所定労働時間（月平均・時間）"><input className={inputCls} type="number" value={form.orgWorkHoursMonthly} onChange={e => set("orgWorkHoursMonthly", e.target.value)} placeholder="160" /></Field>
+                        {/* 所定労働時間（週・月）は様式上整数のため、フォーカスアウト時に四捨五入で補正 */}
+                        <Field label="(3) 所定労働時間（週平均・時間）"><input className={inputCls} type="number" step={1} value={form.orgWorkHoursWeekly} onChange={e => set("orgWorkHoursWeekly", e.target.value)} onBlur={e => { const n = parseFloat(e.target.value); if (isFinite(n) && !Number.isInteger(n)) set("orgWorkHoursWeekly", String(Math.round(n))); }} placeholder="40" /></Field>
+                        <Field label="所定労働時間（月平均・時間）"><input className={inputCls} type="number" step={1} value={form.orgWorkHoursMonthly} onChange={e => set("orgWorkHoursMonthly", e.target.value)} onBlur={e => { const n = parseFloat(e.target.value); if (isFinite(n) && !Number.isInteger(n)) set("orgWorkHoursMonthly", String(Math.round(n))); }} placeholder="160" /></Field>
                         <Field label="所定労働日数（週・日）【任意】"><input className={inputCls} type="number" value={form.orgWorkDaysWeekly} onChange={e => set("orgWorkDaysWeekly", e.target.value)} placeholder="5" /></Field>
                       </div>
                       <Field label="所定労働時間が通常の労働者の所定労働時間と同等であることの有無">

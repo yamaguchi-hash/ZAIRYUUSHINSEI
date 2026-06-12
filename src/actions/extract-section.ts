@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth";
 import { db, applications, applicationDocumentChecklist, applicationAttachments, applicantMaster } from "@/lib/db";
 import { cleanseMasterCodes } from "@/lib/master-cleansing";
-import { cleanseNumeric } from "@/lib/numeric-cleansing";
+import { cleanseNumeric, cleanseNumericInt } from "@/lib/numeric-cleansing";
 import { computeTimeConvertedBasicSalary } from "@/lib/salary-conversion";
 import { FAMILY_IN_JAPAN_SCHEMA, normalizeFamilyMembers, mergeFamilyMembers } from "@/lib/family-schema";
 import { mapWithConcurrency } from "@/lib/concurrency";
@@ -46,6 +46,20 @@ const NUMERIC_FIELDS_BY_SECTION: Partial<Record<SectionKey, string[]>> = {
     "salary", "orgTimeConvertedBasicSalary", "orgJapaneseEquivalentSalary",
   ],
 };
+
+// 申請書様式が整数を前提とするフィールド（小数点以下を四捨五入して整数化する）
+const INTEGER_NUMERIC_FIELDS = new Set(["orgWorkHoursWeekly", "orgWorkHoursMonthly"]);
+
+// 就業の場所（所在地）等の住所文字列を AddressSplitSimple の永続形式
+// 「〒1234567|住所」へ正規化する（郵便番号が含まれない場合はそのまま）
+function normalizeAddressWithZip(v: unknown): string {
+  const s = String(v ?? "").trim();
+  if (!s || /^〒\d{7}\|/.test(s)) return s;
+  const m = s.match(/〒?\s*(\d{3})[-ー−]?(\d{4})\s*/);
+  if (!m) return s;
+  const rest = (s.slice(0, m.index) + s.slice((m.index ?? 0) + m[0].length)).trim();
+  return `〒${m[1]}${m[2]}|${rest}`;
+}
 
 const SECTION_CONFIG: Record<
   SectionKey,
@@ -689,8 +703,10 @@ const SECTION_CONFIG: Record<
 　・「２．契約の更新の有無」のチェック状態（自動的に更新する／更新する場合があり得る／契約の更新はしない 等）→ orgContractRenewal にそのまま記載のテキストで出力
 
 (2) 就業の場所（名称・所在地）
-　・参照箇所: 2ページ目「II．就業の場所」
-　・「名称」→ orgVWorkplaceName、「所在地」（住所）→ orgVWorkplaceAddress にテキストのまま抽出
+　・参照箇所: 2ページ目「II．就業の場所」（「事業所名」「所在地」「連絡先」等の行で構成される）
+　・「名称」（事業所名）→ orgVWorkplaceName
+　・「所在地」（住所）→ orgVWorkplaceAddress。郵便番号が記載されている場合は「〒1234567|都道府県以下の住所」の形式（郵便番号7桁＋縦棒＋住所）で出力し、郵便番号がない場合は住所のみを出力すること。この欄は必ず確認し、記載があれば省略せずに抽出すること
+　・日本語の下にベトナム語・英語等の翻訳が併記されている場合は、日本語の記載内容のみを抽出すること
 
 (3) 業務区分
 　・参照箇所: 2ページ目「III．従事する業務の内容」の「２．業務区分（　　）」
@@ -702,7 +718,7 @@ const SECTION_CONFIG: Record<
 　　「①週（」の直後の数値→ orgWorkHoursWeekly、「②月（」の直後の数値→ orgWorkHoursMonthly に抽出すること（②月の値は見落としやすいので必ず確認する）
 　・週の所定労働日数（例：週5日）→ orgWorkDaysWeekly に数値のみで抽出
 　・この様式は日本語の下にベトナム語・英語等の翻訳が併記されていることが多い。翻訳行の数値ではなく、日本語の記入欄に書かれた数値を抽出すること
-　・「160時間00分」のように分が併記されている場合は、分を時間に換算した10進数で出力する（例：160時間30分 → 160.5、160時間00分 → 160）
+　・週・月の所定労働時間は整数で出力する。「160時間00分」のように分が併記されている場合は分を時間に換算し、小数になる場合は小数点以下を四捨五入すること（例：160時間00分 → 160、160時間30分 → 161、40.5 → 41、164.4 → 164）
 
 (5) 報酬の額（基本給・諸手当・月額概算合計・時間換算額）
 　・参照箇所: 5ページ目「VII．賃金」の１・２項、または別紙7〜8ページ目「１．基本賃金」「２．諸手当の額」「３．１か月当たりの支払概算額」
@@ -1029,11 +1045,19 @@ ${config.extraInstructions ?? ""}
     cleanseMasterCodes(result);
 
     // 数値フィールドの正規化（「160時間00分」「250,000円」「25%」「全角数字」→ 数値のみ）
-    // <input type="number"> は非数値文字列を表示できず空欄に見えるため必須
+    // <input type="number"> は非数値文字列を表示できず空欄に見えるため必須。
+    // 所定労働時間（週・月）は様式上整数のため小数点以下を四捨五入する
     for (const key of NUMERIC_FIELDS_BY_SECTION[sectionKey] ?? []) {
       if (result[key] !== undefined && result[key] !== null && result[key] !== "") {
-        result[key] = cleanseNumeric(result[key]);
+        result[key] = INTEGER_NUMERIC_FIELDS.has(key)
+          ? cleanseNumericInt(result[key])
+          : cleanseNumeric(result[key]);
       }
+    }
+
+    // 就業の場所（所在地）を AddressSplitSimple の「〒1234567|住所」形式へ正規化
+    if (sectionKey === "orgEmploymentConditions" && result.orgVWorkplaceAddress) {
+      result.orgVWorkplaceAddress = normalizeAddressWithZip(result.orgVWorkplaceAddress);
     }
 
     // 基本給の時間換算額の確定（必ず数値クレンジング後に実行する）

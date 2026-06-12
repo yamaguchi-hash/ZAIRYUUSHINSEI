@@ -29,3 +29,16 @@ export function cleanseNumeric(v: unknown): string {
   const n = s.match(/-?\d+(?:\.\d+)?/);
   return n ? n[0] : "";
 }
+
+/**
+ * cleanseNumeric の整数版。小数点以下を四捨五入した整数文字列を返す。
+ * 所定労働時間（週平均・月平均）など、申請書様式が整数を前提とする
+ * フィールドに使用する（例：「40.5」→ "41"、「164.4」→ "164"、
+ * 「160時間30分」→ 160.5 → "161"）。
+ */
+export function cleanseNumericInt(v: unknown): string {
+  const s = cleanseNumeric(v);
+  if (!s) return "";
+  const n = parseFloat(s);
+  return isFinite(n) ? String(Math.round(n)) : "";
+}

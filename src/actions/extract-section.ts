@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db, applications, applicationDocumentChecklist, applicationAttachments, applicantMaster } from "@/lib/db";
 import { cleanseMasterCodes } from "@/lib/master-cleansing";
 import { cleanseNumeric } from "@/lib/numeric-cleansing";
+import { computeTimeConvertedBasicSalary } from "@/lib/salary-conversion";
 import { FAMILY_IN_JAPAN_SCHEMA, normalizeFamilyMembers, mergeFamilyMembers } from "@/lib/family-schema";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import { eq, and } from "drizzle-orm";
@@ -36,8 +37,8 @@ const S = (desc: string) => ({ type: Type.STRING, description: desc, nullable: t
 // 数値クレンジング対象（<input type="number"> へバインドされるフィールド）
 const NUMERIC_FIELDS_BY_SECTION: Partial<Record<SectionKey, string[]>> = {
   orgEmploymentConditions: [
-    "orgWorkHoursWeekly", "orgWorkHoursMonthly", "orgWorkDaysWeekly",
-    "salary", "orgMonthlyTotalEstimate",
+    "orgWorkHoursWeekly", "orgWorkHoursMonthly", "orgWorkDaysWeekly", "orgWorkHoursDaily",
+    "salary", "orgMonthlyTotalEstimate", "orgTimeConvertedBasicSalary",
     "orgOvertimeRate", "orgHolidayRate", "orgNightShiftRate",
   ],
   orgV: [
@@ -627,7 +628,10 @@ const SECTION_CONFIG: Record<
   "orgWorkHoursWeekly": "(4) 所定労働時間（週・数値のみ・時間）",
   "orgWorkHoursMonthly": "(4) 所定労働時間（月・数値のみ・時間）",
   "orgWorkDaysWeekly": "(4) 所定労働日数（週・数値のみ・日）",
+  "orgWorkHoursDaily": "(4) 1日の所定労働時間（数値のみ・時間。例：8）",
   "salary": "(5) 基本賃金（月給・日給・時給等の額。数値のみ・円、カンマ除去）",
+  "orgBasicSalaryType": "(5) 基本賃金の区分（月給／日給／時給 のいずれか。チェックされている区分）",
+  "orgTimeConvertedBasicSalary": "(5) 基本給の時間換算額（書面に直接記載がある場合のみ。数値のみ・円。記載がなければ空文字列）",
   "orgAllowancesDetail": "(5) 諸手当の名称と金額の一覧（例：役職手当 10000円、技能手当 5000円。複数は読点区切り）",
   "orgMonthlyTotalEstimate": "(5) 1か月当たりの支払概算額の合計（数値のみ・円、カンマ除去）",
   "orgSalaryEqualityExplanation": "(6) 報酬が日本人と同等以上であることの説明・支給要件・決定理由（諸手当の支給要件等から抽出）",
@@ -655,7 +659,10 @@ const SECTION_CONFIG: Record<
         orgWorkHoursWeekly:          S("(4) 所定労働時間（週・数値のみ・時間）"),
         orgWorkHoursMonthly:         S("(4) 所定労働時間（月・数値のみ・時間）"),
         orgWorkDaysWeekly:           S("(4) 所定労働日数（週・数値のみ・日）"),
-        salary:                      S("(5) 基本賃金（月額・数値のみ・円）"),
+        orgWorkHoursDaily:           S("(4) 1日の所定労働時間（数値のみ・時間）"),
+        salary:                      S("(5) 基本賃金（月給・日給・時給の額・数値のみ・円）"),
+        orgBasicSalaryType:          S("(5) 基本賃金の区分（月給／日給／時給）"),
+        orgTimeConvertedBasicSalary: S("(5) 基本給の時間換算額（書面記載がある場合のみ・数値のみ・円）"),
         orgAllowancesDetail:         S("(5) 諸手当の名称・金額の一覧"),
         orgMonthlyTotalEstimate:     S("(5) 1か月当たりの支払概算額合計（数値のみ・円）"),
         orgSalaryEqualityExplanation: S("(6) 報酬が日本人と同等以上であることの説明・支給要件"),
@@ -697,11 +704,13 @@ const SECTION_CONFIG: Record<
 　・この様式は日本語の下にベトナム語・英語等の翻訳が併記されていることが多い。翻訳行の数値ではなく、日本語の記入欄に書かれた数値を抽出すること
 　・「160時間00分」のように分が併記されている場合は、分を時間に換算した10進数で出力する（例：160時間30分 → 160.5、160時間00分 → 160）
 
-(5) 報酬の額（基本給・諸手当・月額概算合計）
+(5) 報酬の額（基本給・諸手当・月額概算合計・時間換算額）
 　・参照箇所: 5ページ目「VII．賃金」の１・２項、または別紙7〜8ページ目「１．基本賃金」「２．諸手当の額」「３．１か月当たりの支払概算額」
-　・基本給（月給／日給／時給の額）→ salary
+　・別紙「１．基本賃金」は「月給（　円）／日給（　円）／時給（　円）」の選択式。チェック（記入）されている区分→ orgBasicSalaryType（「月給」「日給」「時給」のいずれか）、その金額→ salary
 　・各諸手当（役職手当・技能手当等）の名称と金額→ orgAllowancesDetail（「名称 金額円」を読点区切りで列挙）
 　・最終的な「１か月当たりの支払概算額（合計）」→ orgMonthlyTotalEstimate
+　・「時間換算額」「時間当たりの額」等の名目で1時間あたりの基本給額が書面に明記されている場合のみ→ orgTimeConvertedBasicSalary（明記がなければ必ず空文字列のままにする。月額÷労働時間の計算はシステム側で行うため、AIが自分で計算してはならない）
+　・1日の所定労働時間（本体3ページ目「IV．労働時間等」の「１．始業・終業の時刻等」にある「１日の所定労働時間数（　時間　分）」）→ orgWorkHoursDaily（日給制の時間換算に使用）
 　・いずれもカンマを除去した整数で出力すること
 
 (6) 報酬が日本人と同等以上であることの説明・比較対象
@@ -1025,6 +1034,23 @@ ${config.extraInstructions ?? ""}
       if (result[key] !== undefined && result[key] !== null && result[key] !== "") {
         result[key] = cleanseNumeric(result[key]);
       }
+    }
+
+    // 基本給の時間換算額の確定（必ず数値クレンジング後に実行する）
+    // 書面記載値 → 時給そのまま → 日給÷1日所定労働時間 → 月給÷月平均所定労働時間 の順
+    if (sectionKey === "orgEmploymentConditions") {
+      const converted = computeTimeConvertedBasicSalary({
+        direct:       result.orgTimeConvertedBasicSalary,
+        salaryType:   result.orgBasicSalaryType,
+        salary:       result.salary,
+        monthlyHours: result.orgWorkHoursMonthly,
+        dailyHours:   result.orgWorkHoursDaily,
+      });
+      if (converted) result.orgTimeConvertedBasicSalary = converted;
+      else delete result.orgTimeConvertedBasicSalary;
+      // 計算用ヘルパーキーはApplicationFormDataに存在しないためフォームへ渡す前に除去
+      delete result.orgBasicSalaryType;
+      delete result.orgWorkHoursDaily;
     }
 
     const hasAnyValue = Object.values(result).some((v) =>

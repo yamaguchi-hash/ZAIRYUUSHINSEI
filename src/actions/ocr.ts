@@ -622,6 +622,7 @@ export async function createApplicantWithDocuments(
     nationality: string; dateOfBirth?: string; gender?: string;
     passportNumber?: string; passportExpiry?: string;
     residenceCardNumber?: string; currentVisaType?: string; currentVisaExpiry?: string;
+    organizationId?: string | null;
     phone?: string; emailAddress?: string; postalCode?: string; japanAddress?: string;
   },
   docIds: string[]
@@ -637,6 +638,7 @@ export async function createApplicantWithDocuments(
       .values({
         tenantId,
         ...applicantData,
+        organizationId: applicantData.organizationId || null,
         dateOfBirth: applicantData.dateOfBirth || null,
         passportExpiry: applicantData.passportExpiry || null,
         currentVisaExpiry: applicantData.currentVisaExpiry || null,

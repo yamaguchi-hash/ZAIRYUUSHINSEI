@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db, applicantMaster, applicantDocuments, applications } from "@/lib/db";
+import { getOrganizations } from "@/actions/organizations";
 import { eq, and, ne, desc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,8 @@ export default async function ApplicantDetailPage({
     .limit(1);
 
   if (!applicant) notFound();
+
+  const organizations = await getOrganizations();
 
   const docs = await db
     .select()
@@ -155,7 +158,10 @@ export default async function ApplicantDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <EditApplicantForm applicant={applicant} />
+            <EditApplicantForm
+              applicant={applicant}
+              organizations={organizations.map((o) => ({ id: o.id, nameJa: o.nameJa }))}
+            />
           </CardContent>
         </Card>
       </div>

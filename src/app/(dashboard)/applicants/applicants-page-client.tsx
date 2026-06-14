@@ -37,7 +37,13 @@ function calcAge(dateOfBirth: string): number {
   return age;
 }
 
-export function ApplicantsPageClient({ applicants }: { applicants: Applicant[] }) {
+export function ApplicantsPageClient({
+  applicants,
+  organizations,
+}: {
+  applicants: Applicant[];
+  organizations: { id: string; nameJa: string }[];
+}) {
   const [showModal, setShowModal] = useState(false);
 
   return (
@@ -183,7 +189,7 @@ export function ApplicantsPageClient({ applicants }: { applicants: Applicant[] }
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <AiRegistrationForm />
+            <AiRegistrationForm organizations={organizations} />
           </div>
         </div>
       )}

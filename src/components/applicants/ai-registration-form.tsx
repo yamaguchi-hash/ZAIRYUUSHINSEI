@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ocrFilesForRegistration, createApplicantWithDocuments } from "@/actions/ocr";
 import { DocumentViewTrigger } from "./document-viewer";
-import { VISA_TYPE_LABELS } from "@/lib/utils";
+import { VISA_TYPE_LABELS, isWorkVisaType } from "@/lib/utils";
 import { AddressSplitInput } from "@/components/ui/postal-code-input";
 import {
   Sparkles, Upload, X, Loader2, CheckCircle, AlertCircle,
@@ -35,10 +35,11 @@ const emptyForm = {
   nationality: "", dateOfBirth: "", gender: "",
   passportNumber: "", passportExpiry: "",
   residenceCardNumber: "", currentVisaType: "", currentVisaExpiry: "",
+  organizationId: "",
   phone: "", emailAddress: "", postalCode: "", japanPrefecture: "", japanCity: "", japanAddressLine: "",
 };
 
-export function AiRegistrationForm() {
+export function AiRegistrationForm({ organizations }: { organizations: { id: string; nameJa: string }[] }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("upload");
   const [docs, setDocs] = useState<UploadedDoc[]>([]);
@@ -106,6 +107,7 @@ export function AiRegistrationForm() {
         residenceCardNumber: result.residenceCardNumber,
         currentVisaType: result.currentVisaType,
         currentVisaExpiry: result.currentVisaExpiry,
+        organizationId: "",
         phone: "",
         emailAddress: "",
         postalCode: result.japanPostalCode ?? "",
@@ -122,12 +124,16 @@ export function AiRegistrationForm() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
+  const isWorkVisa = isWorkVisaType(form.currentVisaType);
+
   // ── 登録 ─────────────────────────────────────────────────────────────────
   function handleSave() {
     setSaveError("");
     startSave(async () => {
       const docIds = docs.map((d) => d.docId).filter(Boolean) as string[];
-      const result = await createApplicantWithDocuments(form, docIds);
+      // 非就労資格の場合は所属機関の紐付けを送らない（データの汚染防止）
+      const payload = { ...form, organizationId: isWorkVisa ? (form.organizationId || null) : null };
+      const result = await createApplicantWithDocuments(payload, docIds);
       if (!result.success) { setSaveError(result.error); return; }
       router.push(`/applicants/${result.applicantId}`);
       router.refresh();
@@ -379,6 +385,20 @@ export function AiRegistrationForm() {
           </div>
           <div><label className="label-xs">在留期限</label><input name="currentVisaExpiry" type="date" value={form.currentVisaExpiry} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
         </div>
+        {isWorkVisa && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+            <label className="block text-xs font-medium text-blue-700 mb-1">
+              所属機関（受入企業）<span className="text-red-500">*</span>
+            </label>
+            <select name="organizationId" value={form.organizationId} onChange={handleChange} className="input-field text-sm py-1.5 bg-white">
+              <option value="">選択してください</option>
+              {organizations.map((org) => (
+                <option key={org.id} value={org.id}>{org.nameJa}</option>
+              ))}
+            </select>
+            <p className="text-xs text-blue-600 mt-1">就労資格のため、所属機関の登録を推奨します。</p>
+          </div>
+        )}
         <div><label className="label-xs">電話番号</label><input name="phone" value={form.phone} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
         <div><label className="label-xs">メールアドレス</label><input name="emailAddress" type="email" value={form.emailAddress} onChange={handleChange} className="input-field text-sm py-1.5" /></div>
         <AddressSplitInput

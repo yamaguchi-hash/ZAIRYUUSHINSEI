@@ -51,6 +51,40 @@ export const VISA_TYPE_LABELS: Record<string, string> = {
   technical_intern_3ro: "技能実習3号ロ",
 };
 
+// ─── 就労資格（所属機関の紐付けが必要な在留資格） ───────────────────────────────
+// VISA_TYPE_LABELS のうち、就労が認められる在留資格のキーのみを列挙する。
+// 家族滞在・留学・永住者・定住者・日本人の配偶者等・特定活動・研修などは含めない。
+export const WORK_VISA_TYPES: Set<string> = new Set([
+  "engineer_humanities",
+  "intra_company_transferee",
+  "skilled_labor",
+  "specified_skilled_worker_1",
+  "specified_skilled_worker_2",
+  "professor",
+  "artist",
+  "religious_activities",
+  "journalist",
+  "business_manager",
+  "legal_accounting",
+  "medical_services",
+  "researcher",
+  "instructor",
+  "highly_skilled_professional_1",
+  "highly_skilled_professional_2",
+  "highly_skilled_professional_3",
+  "technical_intern_1i",
+  "technical_intern_1ro",
+  "technical_intern_2i",
+  "technical_intern_2ro",
+  "technical_intern_3i",
+  "technical_intern_3ro",
+]);
+
+/** 在留資格が就労資格（所属機関の紐付けが必要）かどうかを判定する */
+export function isWorkVisaType(visaType: string | null | undefined): boolean {
+  return !!visaType && WORK_VISA_TYPES.has(visaType);
+}
+
 export const APPLICATION_TYPE_LABELS: Record<string, string> = {
   certification: "在留資格認定証明書交付申請",
   change: "在留資格変更許可申請",

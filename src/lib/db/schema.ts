@@ -101,6 +101,8 @@ export const applicantMaster = pgTable("applicant_master", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   userId: uuid("user_id").references(() => users.id),
+  // 所属機関（受入企業）。就労資格保持者のみ設定。1社が複数の申請人を雇用する「1対多」関係。
+  organizationId: uuid("organization_id").references(() => organizationMaster.id),
   familyNameEn: text("family_name_en").notNull(),
   givenNameEn: text("given_name_en").notNull(),
   familyNameJa: text("family_name_ja"),
@@ -294,6 +296,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
 export const applicantMasterRelations = relations(applicantMaster, ({ one, many }) => ({
   tenant: one(tenants, { fields: [applicantMaster.tenantId], references: [tenants.id] }),
   user: one(users, { fields: [applicantMaster.userId], references: [users.id] }),
+  organization: one(organizationMaster, { fields: [applicantMaster.organizationId], references: [organizationMaster.id] }),
   applications: many(applications),
   documents: many(applicantDocuments),
 }));
@@ -306,6 +309,7 @@ export const applicantDocumentsRelations = relations(applicantDocuments, ({ one 
 export const organizationMasterRelations = relations(organizationMaster, ({ one, many }) => ({
   tenant: one(tenants, { fields: [organizationMaster.tenantId], references: [tenants.id] }),
   applications: many(applications),
+  applicants: many(applicantMaster),
 }));
 
 export const applicationsRelations = relations(applications, ({ one, many }) => ({

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateApplicant } from "@/actions/applicants";
-import { VISA_TYPE_LABELS } from "@/lib/utils";
+import { VISA_TYPE_LABELS, isWorkVisaType } from "@/lib/utils";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { AddressSplitInput } from "@/components/ui/postal-code-input";
 
@@ -21,6 +21,7 @@ interface EditApplicantFormProps {
     residenceCardNumber: string | null;
     currentVisaType: string | null;
     currentVisaExpiry: string | null;
+    organizationId: string | null;
     phone: string | null;
     mobilePhone: string | null;
     emailAddress: string | null;
@@ -30,9 +31,10 @@ interface EditApplicantFormProps {
     japanAddressLine?: string | null;
     japanAddress: string | null;
   };
+  organizations: { id: string; nameJa: string }[];
 }
 
-export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
+export function EditApplicantForm({ applicant, organizations }: EditApplicantFormProps) {
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -106,6 +108,7 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
     residenceCardNumber: applicant.residenceCardNumber ?? "",
     currentVisaType: applicant.currentVisaType ?? "",
     currentVisaExpiry: applicant.currentVisaExpiry ?? "",
+    organizationId: applicant.organizationId ?? "",
     phone: applicant.phone ?? "",
     mobilePhone: applicant.mobilePhone ?? "",
     emailAddress: applicant.emailAddress ?? "",
@@ -121,6 +124,8 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
     setStatus("idle");
   }
 
+  const isWorkVisa = isWorkVisaType(form.currentVisaType);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
@@ -130,6 +135,8 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
           japanPrefecture: form.japanPrefecture,
           japanCity: form.japanCity,
           japanAddressLine: form.japanAddressLine,
+          // 非就労資格の場合は所属機関の紐付けを残さない（データの汚染防止）
+          organizationId: isWorkVisa ? (form.organizationId || null) : null,
         });
         setStatus("success");
         setMessage("保存しました");
@@ -243,6 +250,20 @@ export function EditApplicantForm({ applicant }: EditApplicantFormProps) {
           <input name="currentVisaExpiry" type="date" value={form.currentVisaExpiry} onChange={handleChange} className="input-field text-sm py-1.5" />
         </div>
       </div>
+      {isWorkVisa && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+          <label className="block text-xs font-medium text-blue-700 mb-1">
+            所属機関（受入企業）<span className="text-red-500">*</span>
+          </label>
+          <select name="organizationId" value={form.organizationId} onChange={handleChange} className="input-field text-sm py-1.5 bg-white">
+            <option value="">選択してください</option>
+            {organizations.map((org) => (
+              <option key={org.id} value={org.id}>{org.nameJa}</option>
+            ))}
+          </select>
+          <p className="text-xs text-blue-600 mt-1">就労資格のため、所属機関の登録を推奨します。</p>
+        </div>
+      )}
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">メールアドレス</label>
         <input name="emailAddress" type="email" value={form.emailAddress} onChange={handleChange} className="input-field text-sm py-1.5" />

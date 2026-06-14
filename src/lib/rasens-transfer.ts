@@ -101,6 +101,7 @@ export function buildRasensFields(
     passportNumber?: string | null;
     residenceCardNumber?: string | null;
     phone?: string | null;
+    email?: string | null;
   }
 ): RasensField[] {
   const f = form;
@@ -117,6 +118,9 @@ export function buildRasensFields(
   const phone         = f.telephoneNo   || applicant?.phone         || "";
   const cellPhone     = f.cellularPhoneNo || "";
   const occupation    = f.occupation    || "";
+  const placeOfBirth  = f.placeOfBirth  || "";
+  const homeTownCity  = f.homeTownCity  || "";
+  const email         = applicant?.email || "";
 
   // ── 住所の処理 ──
   // 郵便番号（ハイフンなし）
@@ -136,8 +140,10 @@ export function buildRasensFields(
     { label: "生年月日",          value: formatDate(dob),    note: "YYYYMMDD" },
     { label: "氏名（ローマ字）",  value: `${familyNameEn}　${givenNameEn}`.trim(), note: "姓　名" },
     { label: "性別",              value: sex },
+    { label: "出生地",            value: placeOfBirth },
     { label: "配偶者の有無",      value: f.maritalStatus || "" },
     { label: "職業",              value: occupation },
+    { label: "本国における居住地", value: homeTownCity },
 
     // ── 住所（郵便番号と分離、都道府県市区町村/番地以降で分割、全角）──
     ...(postalCode ? [{ label: "郵便番号", value: postalCode, note: "ハイフンなし" }] : []),
@@ -148,9 +154,10 @@ export function buildRasensFields(
       ? [{ label: "住居地", value: toFullWidthAddress(f.addressInJapan) }]
       : []),
 
-    // ── 電話番号（ハイフンなし）──
+    // ── 電話番号（ハイフンなし）・メールアドレス ──
     { label: "電話番号",          value: formatPhone(phone),     note: "ハイフンなし" },
     ...(cellPhone ? [{ label: "携帯電話番号", value: formatPhone(cellPhone), note: "ハイフンなし" }] : []),
+    { label: "メールアドレス",    value: email },
 
     // ── 旅券・在留情報 ───────────────────────────────────────────────
     { label: "旅券番号",          value: passportNum },

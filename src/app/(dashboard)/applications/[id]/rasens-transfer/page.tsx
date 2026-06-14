@@ -41,6 +41,7 @@ export default async function RasensTransferPage({
     passportNumber:      applicant?.passportNumber      ?? null,
     residenceCardNumber: applicant?.residenceCardNumber ?? null,
     phone:        applicant?.phone ?? null,
+    email:        applicant?.emailAddress ?? null,
   });
 
   const sections = buildTransferSections(fields);

@@ -5,6 +5,7 @@ import { db, applicantDocuments, applicantMaster } from "@/lib/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { GoogleGenAI, Type } from "@google/genai";
 import { revalidatePath } from "next/cache";
+import { lookupZipFromAddress } from "@/lib/zip-lookup";
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   passport_front: "パスポート（表紙）",
@@ -440,20 +441,9 @@ function formatPostalCode(raw: string): string {
 }
 
 // ─── 住所から郵便番号をAPIで検索 ────────────────────────────────────────────
+// 検索ロジックは zip-lookup.ts に集約（町名一致を検証し、特定できなければ空文字）
 async function lookupPostalCode(address: string): Promise<string> {
-  try {
-    // 都道府県＋市区町村レベルで検索（先頭50文字）
-    const query = address.replace(/[0-9０-９\-－]/g, "").slice(0, 50);
-    const url = `https://geoapi.heartrails.com/api/json?method=suggest&address=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
-    if (!res.ok) return "";
-    const data: any = await res.json();
-    const postal = data?.response?.location?.[0]?.postal as string | undefined;
-    if (postal && /^\d{7}$/.test(postal)) return `${postal.slice(0, 3)}-${postal.slice(3)}`;
-  } catch {
-    // タイムアウト・ネットワークエラーは無視
-  }
-  return "";
+  return (await lookupZipFromAddress(address)) ?? "";
 }
 
 // ─── 新規登録用: DBに保存済みのdocIdを使ってOCR実行 ──────────────────────────

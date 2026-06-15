@@ -448,6 +448,10 @@ export default async function ApplicationDetailPage({
             documentRequirementId: c.documentRequirementId,
             masterSortOrder: c.masterSortOrder,
             createdAt: c.createdAt,
+            fileUrl: c.fileUrl,
+            fileName: c.fileName,
+            fileSize: c.fileSize,
+            mimeType: c.mimeType,
           }))}
           applicationId={application.id}
           userRole={userRole}

@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db, applications, applicantMaster, applicationAttachments } from "@/lib/db";
+import { db, applications, applicantMaster, applicationAttachments, applicationDocumentChecklist } from "@/lib/db";
 import { eq, and, asc } from "drizzle-orm";
 import JSZip from "jszip";
 import ExcelJS from "exceljs";
@@ -193,6 +193,28 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
         usedNamesByFolder.set(folderKey, usedNames);
       }
       sub.file(uniqueFileName(usedNames, safeName(att.fileName)), bytes);
+      attachedCount++;
+    }
+
+    // ── 3-b. チェックリスト項目別アップロード（書類名ごとのサブフォルダ） ──
+    const checklistDocs = await db.select().from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.applicationId, applicationId));
+
+    for (const item of checklistDocs) {
+      if (!item.fileUrl || !item.fileName) continue;
+      const bytes = await fetchFileBytes(item.fileUrl);
+      if (!bytes) {
+        failedFiles.push(item.fileName);
+        continue;
+      }
+      const folderKey = safeName(item.documentName);
+      const sub = attachFolder.folder(folderKey)!;
+      let usedNames = usedNamesByFolder.get(folderKey);
+      if (!usedNames) {
+        usedNames = new Set();
+        usedNamesByFolder.set(folderKey, usedNames);
+      }
+      sub.file(uniqueFileName(usedNames, safeName(item.fileName)), bytes);
       attachedCount++;
     }
 

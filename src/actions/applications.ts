@@ -90,7 +90,7 @@ export async function getApplicationById(id: string) {
       documentName:          applicationDocumentChecklist.documentName,
       isRequiredByExpert:    applicationDocumentChecklist.isRequiredByExpert,
       status:                applicationDocumentChecklist.status,
-      // file_url は除外（base64 が巨大なため）
+      fileUrl:               applicationDocumentChecklist.fileUrl,
       fileName:              applicationDocumentChecklist.fileName,
       fileSize:              applicationDocumentChecklist.fileSize,
       mimeType:              applicationDocumentChecklist.mimeType,
@@ -135,9 +135,11 @@ export async function getApplicationById(id: string) {
     documentName:          item.documentName,
     isRequiredByExpert:    item.isRequiredByExpert,
     status:                item.status,
-    // fileUrl は SELECT から除外済み（巨大な base64 URL を DB から取得しない）
-    // file_name が存在すればファイルアップロード済みと判断する
-    fileUrl:    item.fileName ? "(uploaded)" : null,
+    // data: URL（巨大な base64）は RSC ペイロード肥大化防止のためプレースホルダーに変換。
+    // Vercel Blob 等の実URL（https://）はそのまま返してプレビュー/ダウンロードを可能にする。
+    fileUrl: item.fileUrl && !item.fileUrl.startsWith("data:")
+      ? item.fileUrl
+      : (item.fileName ? "(uploaded)" : null),
     fileName:   item.fileName ?? null,
     fileSize:   item.fileSize ?? null,
     mimeType:   item.mimeType ?? null,

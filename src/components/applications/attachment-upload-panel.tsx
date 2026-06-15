@@ -306,8 +306,6 @@ export function AttachmentUploadPanel({
   showHeader?: boolean;
 }) {
   const [attachments, setAttachments] = useState<Attachment[]>(initialAttachments);
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
-  const [zipError, setZipError] = useState("");
 
   const handleUploaded = useCallback((a: Attachment) => {
     setAttachments(prev => [a, ...prev]);
@@ -323,61 +321,16 @@ export function AttachmentUploadPanel({
   const visibleKeys = new Set([...applicantTypes, ...orgTypes, ...outputTypes].map(t => t.key));
   const totalUploaded = attachments.filter(a => visibleKeys.has(a.documentType)).length;
 
-  async function handleZipDownload() {
-    setIsDownloadingZip(true);
-    setZipError("");
-    try {
-      const res = await fetch(`/api/applications/${applicationId}/submission-package`);
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Zipの生成に失敗しました");
-      }
-      const blob = await res.blob();
-      const cd = res.headers.get("Content-Disposition") ?? "";
-      const m = cd.match(/filename\*=UTF-8''([^;]+)/);
-      const fileName = m ? decodeURIComponent(m[1]) : "submission-package.zip";
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setZipError(err.message ?? "ダウンロードに失敗しました");
-    } finally {
-      setIsDownloadingZip(false);
-    }
-  }
-
   return (
     <div className="space-y-4">
       {/* ヘッダー行 */}
       {showHeader && (
-        <>
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <p className="text-xs text-gray-500">
-              申請書のAI自動入力と入管提出に使用する書類です。該当する書類タイプの枠にアップロードしてください。
-              {totalUploaded > 0 && (
-                <span className="ml-2 text-green-600 font-medium">計{totalUploaded}件アップロード済み</span>
-              )}
-            </p>
-            {/* 提出用Zipダウンロード */}
-            <button
-              onClick={handleZipDownload}
-              disabled={isDownloadingZip || totalUploaded === 0}
-              className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-              title="申請書データと添付書類を1つのZipファイルにまとめてダウンロード"
-            >
-              {isDownloadingZip
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Download className="w-4 h-4" />}
-              提出用データをダウンロード
-            </button>
-          </div>
-          {zipError && <p className="text-xs text-red-500 whitespace-pre-wrap">{zipError}</p>}
-        </>
+        <p className="text-xs text-gray-500">
+          申請書のAI自動入力と入管提出に使用する書類です。該当する書類タイプの枠にアップロードしてください。
+          {totalUploaded > 0 && (
+            <span className="ml-2 text-green-600 font-medium">計{totalUploaded}件アップロード済み</span>
+          )}
+        </p>
       )}
 
       {/* 申請人側書類 */}

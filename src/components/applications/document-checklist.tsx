@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * 必要書類チェックリスト（ステータス管理専用）
+ * 必要書類チェックリスト（ステータス管理用）
  * ──────────────────────────────────────────
- * 書類のアップロード機能は「申請書作成用 添付書類（入管提出用）」パネルへ
- * 移行済み。このコンポーネントは書類の要否・提出状況・備考の管理のみ行う。
+ * 書類のアップロードは同セクション内のドロップインアップロード枠
+ * （AttachmentUploadPanel）で行う。このコンポーネントは書類の要否・
+ * 提出状況・備考の管理を行う。
  */
 import { useState, useTransition, useRef, useEffect } from "react";
 import {
@@ -187,7 +188,7 @@ export function DocumentChecklist({
               必要書類チェックリスト
             </CardTitle>
             <p className="text-xs text-gray-400 mt-1">
-              書類の要否と収集状況を管理します。ファイルのアップロードは「申請書作成用 添付書類」パネルで行ってください。
+              書類の要否と収集状況を管理します。ファイルは下のアップロード枠にドラッグ＆ドロップして登録してください。
             </p>
             {requiredItems.length > 0 && (
               <p className="text-xs text-gray-500 mt-1">

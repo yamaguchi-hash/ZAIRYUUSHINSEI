@@ -420,7 +420,7 @@ export default async function ApplicationDetailPage({
         </Card>
       </div>
 
-      {/* 事件メモ（全ステータスで表示） */}
+      {/* 1. 事件メモ（全ステータスで表示） */}
       <CollapsibleSection
         title="事件メモ"
         defaultOpen={true}
@@ -429,147 +429,7 @@ export default async function ApplicationDetailPage({
         <CaseNotesPanel applicationId={application.id} />
       </CollapsibleSection>
 
-      {/* ⑤ 質問書（ステップ5以降） */}
-      {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted" || application.status === "completed") && (
-        <CollapsibleSection
-          title="質問書・顧客聴取"
-          badge={questionnaire.length > 0 ? `${questionnaire.length}件` : undefined}
-          defaultOpen={application.status === "questionnaire_sent"}
-          accentClass="bg-orange-400"
-        >
-          <QuestionnairePanel
-            questions={questionnaire.map((q) => ({
-              id: q.id,
-              fieldKey: q.fieldKey,
-              questionJa: q.questionJa,
-              answer: q.answer,
-              answeredAt: q.answeredAt,
-              isRequired: q.isRequired,
-              answerType: q.answerType,
-            }))}
-            applicationId={application.id}
-            userRole={userRole}
-          />
-        </CollapsibleSection>
-      )}
-
-      {/* 署名済み申請書（⑦以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
-        <CollapsibleSection
-          title="署名済み申請書"
-          badge={((application.draftData as any)?._signedDocuments?.length ?? 0) > 0
-            ? `${(application.draftData as any)._signedDocuments.length}件`
-            : undefined}
-          defaultOpen={true}
-          accentClass="bg-cyan-500"
-        >
-          <SignedDocumentsPanel
-            applicationId={application.id}
-            signedDocs={(application.draftData as any)?._signedDocuments ?? []}
-            applicationStatus={application.status}
-          />
-        </CollapsibleSection>
-      )}
-
-      {/* ⑦ 申請日・申請番号（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
-        <CollapsibleSection
-          title="⑦ 申請日・申請番号の記録"
-          defaultOpen={!((application.draftData as any)?._submission?.applicationDate)}
-          accentClass="bg-teal-500"
-        >
-          <SubmissionInfoPanel
-            applicationId={application.id}
-            savedData={(application.draftData as any)?._submission}
-          />
-        </CollapsibleSection>
-      )}
-
-      {/* 預証作成（submitted 以降・変更/更新申請のみ） */}
-      {(application.status === "submitted" || application.status === "completed") &&
-        (application.applicationType === "change" || application.applicationType === "renewal") && (
-        <CollapsibleSection
-          title="パスポート・在留カード預証（預書）"
-          defaultOpen={!((application.draftData as any)?._azukari?.residenceCardFrontUrl)}
-          accentClass="bg-violet-500"
-        >
-          <AzukariPanel
-            applicationId={application.id}
-            applicationType={application.applicationType}
-            applicantName={
-              (applicant.familyNameJa && applicant.givenNameJa)
-                ? `${applicant.familyNameJa} ${applicant.givenNameJa}`
-                : `${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim()
-            }
-            existingImages={azukariImages}
-            submissionInfo={(application.draftData as any)?._submission}
-            savedData={(application.draftData as any)?._azukari}
-          />
-        </CollapsibleSection>
-      )}
-
-      {/* 納付書作成（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
-        <CollapsibleSection
-          title="納付書作成"
-          defaultOpen={false}
-          accentClass="bg-amber-500"
-        >
-          <NoufushoPanel
-            applicationId={application.id}
-            applicantName={
-              (applicant.familyNameJa && applicant.givenNameJa)
-                ? `${applicant.familyNameJa} ${applicant.givenNameJa}`
-                : `${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim()
-            }
-            submissionApplicationNumber={(application.draftData as any)?._submission?.applicationNumber}
-          />
-        </CollapsibleSection>
-      )}
-
-      {/* ⑧ 許可・完了（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
-        <CollapsibleSection
-          title="⑧ 許可・完了処理"
-          defaultOpen={!((application.draftData as any)?._result?.completedAt)}
-          accentClass="bg-emerald-500"
-        >
-          <PermitResultPanel
-            applicationId={application.id}
-            applicantId={applicant.id}
-            applicationType={application.applicationType}
-            currentVisaType={(application.formData as any)?.currentStatusOfResidence}
-            desiredVisaType={(application.formData as any)?.desiredStatusOfResidence}
-            resultData={(application.draftData as any)?._result}
-          />
-        </CollapsibleSection>
-      )}
-
-      {/* 入管オンライン申請XML管理 */}
-      <CollapsibleSection
-        title="入管オンライン申請XML管理"
-        defaultOpen={false}
-        accentClass="bg-indigo-400"
-      >
-        <RasensXmlPanel applicationId={application.id} />
-      </CollapsibleSection>
-
-      {/* 入管提出用添付書類（申請書作成用アップロード） */}
-      <CollapsibleSection
-        title="申請書作成用 添付書類（入管提出用）"
-        badge={attachmentsList.length > 0 ? `${attachmentsList.length}件` : undefined}
-        defaultOpen={true}
-        accentClass="bg-green-500"
-      >
-        <div className="p-4">
-          <AttachmentUploadPanel
-            applicationId={application.id}
-            initialAttachments={attachmentsList}
-          />
-        </div>
-      </CollapsibleSection>
-
-      {/* 必要書類チェックリスト */}
+      {/* 2. 必要書類チェックリスト（申請書作成用添付書類のアップロードを統合） */}
       <CollapsibleSection
         title="必要書類チェックリスト"
         badge={checklist.length > 0 ? `${checklist.length}件` : undefined}
@@ -604,7 +464,148 @@ export default async function ApplicationDetailPage({
             status: c.status,
           }))}
         />
+        <div className="p-4 border-t border-gray-100">
+          <AttachmentUploadPanel
+            applicationId={application.id}
+            initialAttachments={attachmentsList}
+            sections={["applicant", "organization"]}
+            showHeader={true}
+          />
+        </div>
       </CollapsibleSection>
+
+      {/* 3. 質問書・顧客聴取（ステップ5以降） */}
+      {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted" || application.status === "completed") && (
+        <CollapsibleSection
+          title="質問書・顧客聴取"
+          badge={questionnaire.length > 0 ? `${questionnaire.length}件` : undefined}
+          defaultOpen={application.status === "questionnaire_sent"}
+          accentClass="bg-orange-400"
+        >
+          <QuestionnairePanel
+            questions={questionnaire.map((q) => ({
+              id: q.id,
+              fieldKey: q.fieldKey,
+              questionJa: q.questionJa,
+              answer: q.answer,
+              answeredAt: q.answeredAt,
+              isRequired: q.isRequired,
+              answerType: q.answerType,
+            }))}
+            applicationId={application.id}
+            userRole={userRole}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 4. 署名済み申請書（⑦以降・理由書等の提出書類アップロードを統合） */}
+      {(application.status === "submitted" || application.status === "completed") && (
+        <CollapsibleSection
+          title="署名済み申請書"
+          badge={((application.draftData as any)?._signedDocuments?.length ?? 0) > 0
+            ? `${(application.draftData as any)._signedDocuments.length}件`
+            : undefined}
+          defaultOpen={true}
+          accentClass="bg-cyan-500"
+        >
+          <SignedDocumentsPanel
+            applicationId={application.id}
+            signedDocs={(application.draftData as any)?._signedDocuments ?? []}
+            applicationStatus={application.status}
+          />
+          <div className="p-4 border-t border-gray-100">
+            <AttachmentUploadPanel
+              applicationId={application.id}
+              initialAttachments={attachmentsList}
+              sections={["output"]}
+              showHeader={false}
+            />
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* 申請日・申請番号の記録（submitted 以降） */}
+      {(application.status === "submitted" || application.status === "completed") && (
+        <CollapsibleSection
+          title="申請日・申請番号の記録"
+          defaultOpen={!((application.draftData as any)?._submission?.applicationDate)}
+          accentClass="bg-teal-500"
+        >
+          <SubmissionInfoPanel
+            applicationId={application.id}
+            savedData={(application.draftData as any)?._submission}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 5. 入管オンライン申請XML管理 */}
+      <CollapsibleSection
+        title="入管オンライン申請XML管理"
+        defaultOpen={false}
+        accentClass="bg-indigo-400"
+      >
+        <RasensXmlPanel applicationId={application.id} />
+      </CollapsibleSection>
+
+      {/* 6. パスポート・在留カード預証（submitted 以降・変更/更新申請のみ） */}
+      {(application.status === "submitted" || application.status === "completed") &&
+        (application.applicationType === "change" || application.applicationType === "renewal") && (
+        <CollapsibleSection
+          title="パスポート・在留カード預証"
+          defaultOpen={!((application.draftData as any)?._azukari?.residenceCardFrontUrl)}
+          accentClass="bg-violet-500"
+        >
+          <AzukariPanel
+            applicationId={application.id}
+            applicationType={application.applicationType}
+            applicantName={
+              (applicant.familyNameJa && applicant.givenNameJa)
+                ? `${applicant.familyNameJa} ${applicant.givenNameJa}`
+                : `${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim()
+            }
+            existingImages={azukariImages}
+            submissionInfo={(application.draftData as any)?._submission}
+            savedData={(application.draftData as any)?._azukari}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 7. 納付書作成（submitted 以降） */}
+      {(application.status === "submitted" || application.status === "completed") && (
+        <CollapsibleSection
+          title="納付書作成"
+          defaultOpen={false}
+          accentClass="bg-amber-500"
+        >
+          <NoufushoPanel
+            applicationId={application.id}
+            applicantName={
+              (applicant.familyNameJa && applicant.givenNameJa)
+                ? `${applicant.familyNameJa} ${applicant.givenNameJa}`
+                : `${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim()
+            }
+            submissionApplicationNumber={(application.draftData as any)?._submission?.applicationNumber}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 8. 許可・完了処理（submitted 以降） */}
+      {(application.status === "submitted" || application.status === "completed") && (
+        <CollapsibleSection
+          title="許可・完了処理"
+          defaultOpen={!((application.draftData as any)?._result?.completedAt)}
+          accentClass="bg-emerald-500"
+        >
+          <PermitResultPanel
+            applicationId={application.id}
+            applicantId={applicant.id}
+            applicationType={application.applicationType}
+            currentVisaType={(application.formData as any)?.currentStatusOfResidence}
+            desiredVisaType={(application.formData as any)?.desiredStatusOfResidence}
+            resultData={(application.draftData as any)?._result}
+          />
+        </CollapsibleSection>
+      )}
     </div>
   );
 }

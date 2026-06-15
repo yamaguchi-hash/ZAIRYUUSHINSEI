@@ -295,9 +295,15 @@ function TypeSlot({
 export function AttachmentUploadPanel({
   applicationId,
   initialAttachments,
+  sections = ["applicant", "organization", "output"],
+  showHeader = true,
 }: {
   applicationId: string;
   initialAttachments: Attachment[];
+  /** 表示するアップロード枠のグループ（省略時は全グループ） */
+  sections?: ("applicant" | "organization" | "output")[];
+  /** 説明文・件数表示・提出用Zipダウンロードボタンを表示するか */
+  showHeader?: boolean;
 }) {
   const [attachments, setAttachments] = useState<Attachment[]>(initialAttachments);
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
@@ -311,10 +317,11 @@ export function AttachmentUploadPanel({
   }, []);
 
   const byType = (key: string) => attachments.filter(a => a.documentType === key);
-  const applicantTypes = ATTACHMENT_TYPES.filter(t => t.side === "applicant");
-  const orgTypes = ATTACHMENT_TYPES.filter(t => t.side === "organization");
-  const outputTypes = ATTACHMENT_TYPES.filter(t => t.side === "output");
-  const totalUploaded = attachments.length;
+  const applicantTypes = sections.includes("applicant") ? ATTACHMENT_TYPES.filter(t => t.side === "applicant") : [];
+  const orgTypes = sections.includes("organization") ? ATTACHMENT_TYPES.filter(t => t.side === "organization") : [];
+  const outputTypes = sections.includes("output") ? ATTACHMENT_TYPES.filter(t => t.side === "output") : [];
+  const visibleKeys = new Set([...applicantTypes, ...orgTypes, ...outputTypes].map(t => t.key));
+  const totalUploaded = attachments.filter(a => visibleKeys.has(a.documentType)).length;
 
   async function handleZipDownload() {
     setIsDownloadingZip(true);
@@ -347,87 +354,97 @@ export function AttachmentUploadPanel({
   return (
     <div className="space-y-4">
       {/* ヘッダー行 */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-xs text-gray-500">
-          申請書のAI自動入力と入管提出に使用する書類です。該当する書類タイプの枠にアップロードしてください。
-          {totalUploaded > 0 && (
-            <span className="ml-2 text-green-600 font-medium">計{totalUploaded}件アップロード済み</span>
-          )}
-        </p>
-        {/* 提出用Zipダウンロード */}
-        <button
-          onClick={handleZipDownload}
-          disabled={isDownloadingZip || totalUploaded === 0}
-          className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-          title="申請書データと添付書類を1つのZipファイルにまとめてダウンロード"
-        >
-          {isDownloadingZip
-            ? <Loader2 className="w-4 h-4 animate-spin" />
-            : <Download className="w-4 h-4" />}
-          提出用データをダウンロード
-        </button>
-      </div>
-      {zipError && <p className="text-xs text-red-500 whitespace-pre-wrap">{zipError}</p>}
+      {showHeader && (
+        <>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <p className="text-xs text-gray-500">
+              申請書のAI自動入力と入管提出に使用する書類です。該当する書類タイプの枠にアップロードしてください。
+              {totalUploaded > 0 && (
+                <span className="ml-2 text-green-600 font-medium">計{totalUploaded}件アップロード済み</span>
+              )}
+            </p>
+            {/* 提出用Zipダウンロード */}
+            <button
+              onClick={handleZipDownload}
+              disabled={isDownloadingZip || totalUploaded === 0}
+              className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              title="申請書データと添付書類を1つのZipファイルにまとめてダウンロード"
+            >
+              {isDownloadingZip
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Download className="w-4 h-4" />}
+              提出用データをダウンロード
+            </button>
+          </div>
+          {zipError && <p className="text-xs text-red-500 whitespace-pre-wrap">{zipError}</p>}
+        </>
+      )}
 
       {/* 申請人側書類 */}
-      <div>
-        <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
-          <User className="w-3.5 h-3.5" />
-          申請人の書類
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {applicantTypes.map(t => (
-            <TypeSlot
-              key={t.key}
-              typeDef={t}
-              files={byType(t.key)}
-              applicationId={applicationId}
-              onUploaded={handleUploaded}
-              onDeleted={handleDeleted}
-            />
-          ))}
+      {applicantTypes.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5" />
+            申請人の書類
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {applicantTypes.map(t => (
+              <TypeSlot
+                key={t.key}
+                typeDef={t}
+                files={byType(t.key)}
+                applicationId={applicationId}
+                onUploaded={handleUploaded}
+                onDeleted={handleDeleted}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 所属機関側書類 */}
-      <div>
-        <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
-          <Building2 className="w-3.5 h-3.5" />
-          所属機関の書類
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {orgTypes.map(t => (
-            <TypeSlot
-              key={t.key}
-              typeDef={t}
-              files={byType(t.key)}
-              applicationId={applicationId}
-              onUploaded={handleUploaded}
-              onDeleted={handleDeleted}
-            />
-          ))}
+      {orgTypes.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
+            <Building2 className="w-3.5 h-3.5" />
+            所属機関の書類
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {orgTypes.map(t => (
+              <TypeSlot
+                key={t.key}
+                typeDef={t}
+                files={byType(t.key)}
+                applicationId={applicationId}
+                onUploaded={handleUploaded}
+                onDeleted={handleDeleted}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 提出書類（理由書等） */}
-      <div>
-        <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
-          <FileCheck className="w-3.5 h-3.5" />
-          提出書類（理由書等）
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {outputTypes.map(t => (
-            <TypeSlot
-              key={t.key}
-              typeDef={t}
-              files={byType(t.key)}
-              applicationId={applicationId}
-              onUploaded={handleUploaded}
-              onDeleted={handleDeleted}
-            />
-          ))}
+      {outputTypes.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
+            <FileCheck className="w-3.5 h-3.5" />
+            提出書類（理由書等）
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {outputTypes.map(t => (
+              <TypeSlot
+                key={t.key}
+                typeDef={t}
+                files={byType(t.key)}
+                applicationId={applicationId}
+                onUploaded={handleUploaded}
+                onDeleted={handleDeleted}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

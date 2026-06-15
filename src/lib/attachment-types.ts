@@ -15,8 +15,8 @@ export interface AttachmentTypeDef {
   hint?: string;
   /** AI抽出の対象になるか（申請書フィールドへのマッピングに使用） */
   aiExtractable: boolean;
-  /** 申請人側 or 所属機関側の書類か */
-  side: "applicant" | "organization";
+  /** 申請人側・所属機関側・提出書類（成果物）のいずれか */
+  side: "applicant" | "organization" | "output";
 }
 
 export const ATTACHMENT_TYPES: AttachmentTypeDef[] = [
@@ -120,6 +120,15 @@ export const ATTACHMENT_TYPES: AttachmentTypeDef[] = [
     hint: "上記に該当しないが申請書作成に必要な書類（健康診断書・納税証明書等）",
     aiExtractable: true,
     side: "applicant",
+  },
+
+  // ── 提出書類（成果物） ──────────────────────────────────────────────────────
+  {
+    key: "reason_letter",
+    label: "理由書",
+    hint: "作成・署名済みの理由書（PDF）を申請案件に紐づけて保管します",
+    aiExtractable: false,
+    side: "output",
   },
 ];
 

@@ -9,7 +9,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Upload, FileText, Loader2, Trash2, User, Building2,
-  CheckCircle2, Download, ExternalLink, Plus,
+  CheckCircle2, Download, ExternalLink, Plus, FileCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ATTACHMENT_TYPES, type AttachmentTypeDef } from "@/lib/attachment-types";
@@ -250,6 +250,7 @@ export function AttachmentUploadPanel({
   const byType = (key: string) => attachments.filter(a => a.documentType === key);
   const applicantTypes = ATTACHMENT_TYPES.filter(t => t.side === "applicant");
   const orgTypes = ATTACHMENT_TYPES.filter(t => t.side === "organization");
+  const outputTypes = ATTACHMENT_TYPES.filter(t => t.side === "output");
   const totalUploaded = attachments.length;
 
   async function handleZipDownload() {
@@ -333,6 +334,26 @@ export function AttachmentUploadPanel({
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {orgTypes.map(t => (
+            <TypeSlot
+              key={t.key}
+              typeDef={t}
+              files={byType(t.key)}
+              applicationId={applicationId}
+              onUploaded={handleUploaded}
+              onDeleted={handleDeleted}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* 提出書類（理由書等） */}
+      <div>
+        <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
+          <FileCheck className="w-3.5 h-3.5" />
+          提出書類（理由書等）
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {outputTypes.map(t => (
             <TypeSlot
               key={t.key}
               typeDef={t}

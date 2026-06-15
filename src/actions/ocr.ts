@@ -697,11 +697,18 @@ function normalizeDateToIso(raw: unknown): string {
   return s;
 }
 
-/** 在留カード番号を正規化する（大文字化・空白除去） */
+/** 在留カード番号を正規化する（大文字化・記号除去・英数字12桁の抽出） */
 function normalizeResidenceCardNumber(raw: unknown): string {
   const s = cleanExtractedValue(raw);
   if (!s) return "";
-  return s.toUpperCase().replace(/[\s　]/g, "");
+  // 全角英数字を半角に変換してから、英数字以外（スペース・ハイフン等）を除去
+  const halfWidth = s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) =>
+    String.fromCharCode(c.charCodeAt(0) - 0xfee0)
+  );
+  const cleaned = halfWidth.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  // 在留カード番号は英数字12桁。12桁の連続部分が見つかればそれを優先する
+  const match = cleaned.match(/[A-Z0-9]{12}/);
+  return match ? match[0] : cleaned;
 }
 
 /**

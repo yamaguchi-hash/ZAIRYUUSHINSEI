@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { updateApplicant } from "@/actions/applicants";
 import { VISA_TYPE_LABELS, isWorkVisaType } from "@/lib/utils";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
@@ -118,6 +118,18 @@ export function EditApplicantForm({ applicant, organizations }: EditApplicantFor
     japanAddressLine: addressLine,
     japanAddress: applicant.japanAddress ?? "",
   });
+
+  // 在留カード更新パネルでのマスター上書き（router.refresh()）後、
+  // このフォームのローカルStateにも最新の在留カード番号・在留期限を反映する。
+  // useStateの初期値はマウント時のpropsしか見ないため、refresh時のprops更新を
+  // 明示的に同期しないと旧値が残り、誤って「変更を保存する」で上書きされてしまう。
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      residenceCardNumber: applicant.residenceCardNumber ?? "",
+      currentVisaExpiry: applicant.currentVisaExpiry ?? "",
+    }));
+  }, [applicant.residenceCardNumber, applicant.currentVisaExpiry]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));

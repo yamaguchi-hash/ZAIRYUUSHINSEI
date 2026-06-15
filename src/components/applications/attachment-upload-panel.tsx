@@ -10,6 +10,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Upload, FileText, Loader2, Trash2, User, Building2,
   CheckCircle2, Download, ExternalLink, Plus, FileCheck,
+  Eye, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ATTACHMENT_TYPES, type AttachmentTypeDef } from "@/lib/attachment-types";
@@ -32,6 +33,47 @@ function formatBytes(n: number | null): string {
   return `${(n / (1024 * 1024)).toFixed(1)}MB`;
 }
 
+// 画像ファイルかどうかを判定（MIMEタイプ優先、なければ拡張子で判定）
+function isImageAttachment(att: { mimeType: string | null; fileName: string }): boolean {
+  if (att.mimeType) return att.mimeType.startsWith("image/");
+  return /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(att.fileName);
+}
+
+// ── 画像プレビューモーダル ──────────────────────────────────────────────────
+function ImagePreviewModal({ att, onClose }: { att: Attachment; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
+          <p className="text-sm font-medium text-gray-700 truncate">{att.fileName}</p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <a
+              href={att.fileUrl}
+              download={att.fileName}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+              title="ダウンロード"
+            >
+              <Download className="w-4 h-4" />
+            </a>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-600" title="閉じる">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-100 p-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={att.fileUrl} alt={att.fileName} className="max-w-full max-h-[75vh] object-contain rounded shadow-lg" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── 書類タイプごとのアップロードスロット ──────────────────────────────────────
 function TypeSlot({
   typeDef,
@@ -51,6 +93,7 @@ function TypeSlot({
   const [isUploading, setIsUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [previewAtt, setPreviewAtt] = useState<Attachment | null>(null);
 
   async function handleFiles(fileList: File[]) {
     if (fileList.length === 0) return;
@@ -123,32 +166,49 @@ function TypeSlot({
       {/* アップロード済みファイル一覧 */}
       {hasFiles && (
         <div className="space-y-1 mb-2">
-          {files.map(att => (
-            <div key={att.id} className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-2.5 py-1.5">
-              <FileText className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-              <a
-                href={att.fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-gray-700 hover:text-blue-600 truncate flex-1 min-w-0 flex items-center gap-1"
-                title={att.fileName}
-              >
-                <span className="truncate">{att.fileName}</span>
-                <ExternalLink className="w-3 h-3 text-gray-300 flex-shrink-0" />
-              </a>
-              <span className="text-xs text-gray-300 flex-shrink-0">{formatBytes(att.fileSize)}</span>
-              <button
-                onClick={() => handleDelete(att)}
-                disabled={deletingId === att.id}
-                className="p-0.5 text-gray-300 hover:text-red-500 disabled:opacity-50 flex-shrink-0"
-                title="削除"
-              >
-                {deletingId === att.id
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <Trash2 className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-          ))}
+          {files.map(att => {
+            const isImage = isImageAttachment(att);
+            return (
+              <div key={att.id} className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-2.5 py-1.5">
+                <FileText className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                {isImage ? (
+                  // 画像ファイル: クリックでその場にモーダルプレビュー表示
+                  <button
+                    type="button"
+                    onClick={() => setPreviewAtt(att)}
+                    className="text-xs text-gray-700 hover:text-blue-600 truncate flex-1 min-w-0 flex items-center gap-1 text-left"
+                    title={att.fileName}
+                  >
+                    <span className="truncate">{att.fileName}</span>
+                    <Eye className="w-3 h-3 text-gray-300 flex-shrink-0" />
+                  </button>
+                ) : (
+                  // 画像以外（PDF・Word・Excel等）: ファイル名リンクからダウンロード/別タブ表示のみ
+                  <a
+                    href={att.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-gray-700 hover:text-blue-600 truncate flex-1 min-w-0 flex items-center gap-1"
+                    title={att.fileName}
+                  >
+                    <span className="truncate">{att.fileName}</span>
+                    <ExternalLink className="w-3 h-3 text-gray-300 flex-shrink-0" />
+                  </a>
+                )}
+                <span className="text-xs text-gray-300 flex-shrink-0">{formatBytes(att.fileSize)}</span>
+                <button
+                  onClick={() => handleDelete(att)}
+                  disabled={deletingId === att.id}
+                  className="p-0.5 text-gray-300 hover:text-red-500 disabled:opacity-50 flex-shrink-0"
+                  title="削除"
+                >
+                  {deletingId === att.id
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Trash2 className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -224,6 +284,9 @@ function TypeSlot({
           if (fl.length) { handleFiles(fl); e.target.value = ""; }
         }}
       />
+      {previewAtt && (
+        <ImagePreviewModal att={previewAtt} onClose={() => setPreviewAtt(null)} />
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { DocumentUploadZone } from "./document-upload-zone";
 import { DocumentViewTrigger } from "./document-viewer";
 import {
   Sparkles, Loader2, CheckCircle, AlertCircle,
-  ChevronDown, ChevronUp, FileText, Eye,
+  ChevronDown, ChevronUp, FileText, Eye, Clock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
@@ -25,7 +25,11 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   passport_data_page: "パスポート（顔写真ページ）",
   residence_card_front: "在留カード（表面）",
   residence_card_back: "在留カード（裏面）",
+  residence_card_renewal: "最新の在留カード",
 };
+
+// 在留カード更新時にアップロードされた書類（履歴として複数件たまる）
+const RENEWAL_DOC_TYPE = "residence_card_renewal";
 
 interface DocItem {
   id: string;
@@ -79,13 +83,26 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
     });
   }
 
-  const uploadedCount = docs.length;
+  const uploadedCount = docs.filter((d) => d.documentType !== RENEWAL_DOC_TYPE).length;
   const isPdf = (fileName: string) => fileName?.toLowerCase().endsWith(".pdf");
+
+  // 在留カード更新の履歴（複数アップロードされた場合、最新の1件のみメインに表示し、
+  // それ以外は下部の折りたたみ履歴に回す）
+  const renewalDocs = docs
+    .filter((d) => d.documentType === RENEWAL_DOC_TYPE)
+    .sort((a, b) => new Date(b.uploadedAt ?? 0).getTime() - new Date(a.uploadedAt ?? 0).getTime());
+  const latestRenewal = renewalDocs[0] ?? null;
+  const renewalHistory = renewalDocs.slice(1);
+
+  const galleryDocs = [
+    ...docs.filter((d) => d.documentType !== RENEWAL_DOC_TYPE),
+    ...(latestRenewal ? [latestRenewal] : []),
+  ];
 
   return (
     <div className="space-y-4">
       {/* ── Uploaded documents gallery ── */}
-      {docs.length > 0 && (
+      {galleryDocs.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
@@ -95,7 +112,7 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
-              {docs.map((doc) => (
+              {galleryDocs.map((doc) => (
                 <DocumentViewTrigger
                   key={doc.id}
                   url={doc.fileUrl}
@@ -267,6 +284,40 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
           </CardContent>
         )}
       </Card>
+
+      {/* ── 在留カードの履歴（目立たない折りたたみエリア） ── */}
+      {renewalHistory.length > 0 && (
+        <details className="group bg-gray-50 border border-gray-200 rounded-xl">
+          <summary className="cursor-pointer list-none px-4 py-2.5 flex items-center justify-between text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors">
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              過去の在留カード（履歴）{renewalHistory.length}件
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="px-4 pb-3 pt-1 space-y-1.5 border-t border-gray-100">
+            {renewalHistory.map((doc) => (
+              <DocumentViewTrigger
+                key={doc.id}
+                url={doc.fileUrl}
+                fileName={doc.fileName}
+                documentType={doc.documentType}
+              >
+                <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-2.5 py-1.5 hover:border-blue-300 cursor-pointer transition-colors">
+                  <FileText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                  <span className="text-xs text-gray-600 truncate flex-1">{doc.fileName}</span>
+                  {doc.uploadedAt && (
+                    <span className="text-xs text-gray-400 flex-shrink-0">
+                      {formatDate(doc.uploadedAt.toString())}
+                    </span>
+                  )}
+                  <Eye className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                </div>
+              </DocumentViewTrigger>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

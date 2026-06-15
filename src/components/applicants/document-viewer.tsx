@@ -8,6 +8,7 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   passport_data_page: "パスポート（顔写真ページ）",
   residence_card_front: "在留カード（表面）",
   residence_card_back: "在留カード（裏面）",
+  residence_card_renewal: "最新の在留カード",
 };
 
 interface DocumentViewerProps {

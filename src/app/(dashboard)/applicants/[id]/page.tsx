@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { db, applicantMaster, applicantDocuments, applications } from "@/lib/db";
+import { db, applicantMaster, applicantDocuments, applicantResidenceCardHistories, applications } from "@/lib/db";
 import { getOrganizations } from "@/actions/organizations";
 import { eq, and, ne, desc } from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -8,7 +8,7 @@ import { ArrowLeft, User, AlertTriangle, FileText, ExternalLink } from "lucide-r
 import Link from "next/link";
 import { formatDate, VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS, APPLICATION_STATUS_LABELS, STATUS_COLORS } from "@/lib/utils";
 import { OcrPanel } from "@/components/applicants/ocr-panel";
-import { ResidenceCardRenewalPanel } from "@/components/applicants/residence-card-renewal-panel";
+import { ResidenceCardHistoryPanel } from "@/components/applicants/residence-card-history-panel";
 import { EditApplicantForm } from "./edit-applicant-form";
 import { DeleteApplicantButton } from "./delete-applicant-button";
 
@@ -43,6 +43,13 @@ export default async function ApplicantDetailPage({
     .select()
     .from(applicantDocuments)
     .where(and(eq(applicantDocuments.applicantId, id), eq(applicantDocuments.tenantId, tenantId)));
+
+  // 在留カードの変更履歴（マスタ上書き時に退避された旧情報）
+  const residenceCardHistories = await db
+    .select()
+    .from(applicantResidenceCardHistories)
+    .where(and(eq(applicantResidenceCardHistories.applicantId, id), eq(applicantResidenceCardHistories.tenantId, tenantId)))
+    .orderBy(desc(applicantResidenceCardHistories.replacedAt));
 
   // 過去の申請案件を取得
   const pastApplications = await db
@@ -133,11 +140,6 @@ export default async function ApplicantDetailPage({
             </div>
           )}
         </div>
-      </div>
-
-      {/* ── 在留カード更新（番号・満了日の自動上書き） ── */}
-      <div className="mb-6">
-        <ResidenceCardRenewalPanel applicantId={id} />
       </div>
 
       {/* ── Main grid ── */}
@@ -243,6 +245,20 @@ export default async function ApplicantDetailPage({
           )}
         </CardContent>
       </Card>
+
+      {/* ── 在留カードの変更履歴（折りたたみ） ── */}
+      <div className="mt-4">
+        <ResidenceCardHistoryPanel
+          histories={residenceCardHistories.map((h) => ({
+            id: h.id,
+            oldResidenceCardNumber: h.oldResidenceCardNumber,
+            oldCurrentVisaExpiry: h.oldCurrentVisaExpiry,
+            oldFileUrl: h.oldFileUrl,
+            oldFileName: h.oldFileName,
+            replacedAt: h.replacedAt,
+          }))}
+        />
+      </div>
     </div>
   );
 }

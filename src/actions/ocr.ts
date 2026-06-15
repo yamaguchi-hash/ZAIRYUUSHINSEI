@@ -1,8 +1,8 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { db, applicantDocuments, applicantMaster } from "@/lib/db";
-import { eq, and, ne, inArray } from "drizzle-orm";
+import { db, applicantDocuments, applicantMaster, applicantResidenceCardHistories } from "@/lib/db";
+import { eq, and, ne, inArray, desc } from "drizzle-orm";
 import { GoogleGenAI, Type } from "@google/genai";
 import { revalidatePath } from "next/cache";
 import { lookupZipFromAddress } from "@/lib/zip-lookup";
@@ -792,55 +792,103 @@ export async function confirmResidenceCardRenewal(
     throw new Error("在留カード番号または在留期限のいずれかを入力してください");
   }
 
-  const update: Record<string, any> = { updatedAt: new Date() };
-  if (residenceCardNumber) update.residenceCardNumber = residenceCardNumber;
-  if (currentVisaExpiry) update.currentVisaExpiry = currentVisaExpiry;
-
-  await db
-    .update(applicantMaster)
-    .set(update)
-    .where(and(eq(applicantMaster.id, applicantId), eq(applicantMaster.tenantId, tenantId)));
-
-  // ── ファイル名の自動判定・自動付与（申請人氏名_最新の在留カード_YYYYMMDD.拡張子） ──
-  const [applicant] = await db
-    .select({
-      familyNameEn: applicantMaster.familyNameEn,
-      givenNameEn: applicantMaster.givenNameEn,
-      familyNameJa: applicantMaster.familyNameJa,
-      givenNameJa: applicantMaster.givenNameJa,
-    })
-    .from(applicantMaster)
-    .where(eq(applicantMaster.id, applicantId))
-    .limit(1);
-
-  const existingDocs = await db
-    .select({ fileName: applicantDocuments.fileName })
-    .from(applicantDocuments)
-    .where(eq(applicantDocuments.applicantId, applicantId));
-
-  const fileName = applicant
-    ? buildAutoFileName({
-        applicantName: getApplicantNameForFile(applicant),
-        docLabel: "最新の在留カード",
-        originalFileName: data.fileName,
-        existingNames: existingDocs.map((d) => d.fileName),
+  await db.transaction(async (tx) => {
+    const [applicant] = await tx
+      .select({
+        residenceCardNumber: applicantMaster.residenceCardNumber,
+        currentVisaExpiry: applicantMaster.currentVisaExpiry,
+        familyNameEn: applicantMaster.familyNameEn,
+        givenNameEn: applicantMaster.givenNameEn,
+        familyNameJa: applicantMaster.familyNameJa,
+        givenNameJa: applicantMaster.givenNameJa,
       })
-    : data.fileName;
+      .from(applicantMaster)
+      .where(and(eq(applicantMaster.id, applicantId), eq(applicantMaster.tenantId, tenantId)))
+      .limit(1);
 
-  await db.insert(applicantDocuments).values({
-    tenantId,
-    applicantId,
-    documentType: "residence_card_renewal",
-    fileUrl: data.fileUrl,
-    fileName,
-    fileSize: data.fileSize,
-    mimeType: data.mimeType,
-    ocrExtractedData: data.raw ?? null,
-    ocrProcessedAt: new Date(),
+    if (!applicant) throw new Error("申請人が見つかりません");
+
+    // ── 上書き前の「最新の在留カード」ファイルを特定（履歴退避用） ──
+    const renewalDocs = await tx
+      .select({ fileUrl: applicantDocuments.fileUrl, fileName: applicantDocuments.fileName, uploadedAt: applicantDocuments.uploadedAt })
+      .from(applicantDocuments)
+      .where(and(
+        eq(applicantDocuments.applicantId, applicantId),
+        eq(applicantDocuments.documentType, "residence_card_renewal")
+      ));
+    const previousDoc = renewalDocs
+      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
+
+    // ── 古い在留カード番号・在留期限・ファイルを履歴テーブルへ退避 ──
+    if (applicant.residenceCardNumber || applicant.currentVisaExpiry || previousDoc) {
+      await tx.insert(applicantResidenceCardHistories).values({
+        tenantId,
+        applicantId,
+        oldResidenceCardNumber: applicant.residenceCardNumber,
+        oldCurrentVisaExpiry: applicant.currentVisaExpiry,
+        oldFileUrl: previousDoc?.fileUrl ?? null,
+        oldFileName: previousDoc?.fileName ?? null,
+      });
+    }
+
+    // ── 申請人マスターを最新情報へ上書き更新 ──
+    const update: Record<string, any> = { updatedAt: new Date() };
+    if (residenceCardNumber) update.residenceCardNumber = residenceCardNumber;
+    if (currentVisaExpiry) update.currentVisaExpiry = currentVisaExpiry;
+
+    await tx
+      .update(applicantMaster)
+      .set(update)
+      .where(and(eq(applicantMaster.id, applicantId), eq(applicantMaster.tenantId, tenantId)));
+
+    // ── ファイル名の自動判定・自動付与（申請人氏名_最新の在留カード_YYYYMMDD.拡張子） ──
+    const existingDocs = await tx
+      .select({ fileName: applicantDocuments.fileName })
+      .from(applicantDocuments)
+      .where(eq(applicantDocuments.applicantId, applicantId));
+
+    const fileName = buildAutoFileName({
+      applicantName: getApplicantNameForFile(applicant),
+      docLabel: "最新の在留カード",
+      originalFileName: data.fileName,
+      existingNames: existingDocs.map((d) => d.fileName),
+    });
+
+    await tx.insert(applicantDocuments).values({
+      tenantId,
+      applicantId,
+      documentType: "residence_card_renewal",
+      fileUrl: data.fileUrl,
+      fileName,
+      fileSize: data.fileSize,
+      mimeType: data.mimeType,
+      ocrExtractedData: data.raw ?? null,
+      ocrProcessedAt: new Date(),
+    });
   });
 
   revalidatePath(`/applicants/${applicantId}`);
   revalidatePath("/applicants");
 
   return { residenceCardNumber, currentVisaExpiry };
+}
+
+/**
+ * 申請人の在留カード変更履歴（上書き更新時に退避された旧情報）を取得する。
+ */
+export async function getApplicantResidenceCardHistories(applicantId: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+  const tenantId = (session.user as any).tenantId;
+
+  return db
+    .select()
+    .from(applicantResidenceCardHistories)
+    .where(
+      and(
+        eq(applicantResidenceCardHistories.applicantId, applicantId),
+        eq(applicantResidenceCardHistories.tenantId, tenantId)
+      )
+    )
+    .orderBy(desc(applicantResidenceCardHistories.replacedAt));
 }

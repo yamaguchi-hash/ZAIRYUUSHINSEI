@@ -288,6 +288,18 @@ export const applicantDocuments = pgTable("applicant_documents", {
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
 });
 
+// ─── Applicant residence card histories（在留カード上書き更新時の旧情報退避） ────────
+export const applicantResidenceCardHistories = pgTable("applicant_residence_card_histories", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  applicantId: uuid("applicant_id").notNull().references(() => applicantMaster.id, { onDelete: "cascade" }),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  oldResidenceCardNumber: text("old_residence_card_number"),
+  oldCurrentVisaExpiry: date("old_current_visa_expiry"),
+  oldFileUrl: text("old_file_url"),
+  oldFileName: text("old_file_name"),
+  replacedAt: timestamp("replaced_at").defaultNow().notNull(),
+});
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ one, many }) => ({
   tenant: one(tenants, { fields: [users.tenantId], references: [tenants.id] }),
@@ -300,11 +312,17 @@ export const applicantMasterRelations = relations(applicantMaster, ({ one, many 
   organization: one(organizationMaster, { fields: [applicantMaster.organizationId], references: [organizationMaster.id] }),
   applications: many(applications),
   documents: many(applicantDocuments),
+  residenceCardHistories: many(applicantResidenceCardHistories),
 }));
 
 export const applicantDocumentsRelations = relations(applicantDocuments, ({ one }) => ({
   applicant: one(applicantMaster, { fields: [applicantDocuments.applicantId], references: [applicantMaster.id] }),
   tenant: one(tenants, { fields: [applicantDocuments.tenantId], references: [tenants.id] }),
+}));
+
+export const applicantResidenceCardHistoriesRelations = relations(applicantResidenceCardHistories, ({ one }) => ({
+  applicant: one(applicantMaster, { fields: [applicantResidenceCardHistories.applicantId], references: [applicantMaster.id] }),
+  tenant: one(tenants, { fields: [applicantResidenceCardHistories.tenantId], references: [tenants.id] }),
 }));
 
 export const organizationMasterRelations = relations(organizationMaster, ({ one, many }) => ({

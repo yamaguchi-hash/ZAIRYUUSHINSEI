@@ -7,7 +7,7 @@ import { previewResidenceCardRenewal, confirmResidenceCardRenewal, getApplicantD
 import { DocumentLink, isImageFile } from "@/components/applicants/document-viewer";
 import {
   Trophy, Loader2, CheckCircle, AlertCircle, CreditCard, Calendar,
-  Upload, FileText, Eye, ExternalLink,
+  Upload, FileText, Eye, ExternalLink, Sparkles, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +51,16 @@ interface RenewalDoc {
   uploadedAt?: Date | string | null;
 }
 
+interface CardPreview {
+  residenceCardNumber: string;
+  currentVisaExpiry: string;
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  raw: Record<string, any>;
+}
+
 export function PermitResultPanel({
   applicationId,
   applicantId,
@@ -69,12 +79,14 @@ export function PermitResultPanel({
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState("");
 
-  // ── 新在留カードのドロップインアップロード（AI解析・自動リネーム・マスター更新） ──
+  // ── 新在留カードのドロップインアップロード（AI解析 → 確認 → 自動リネーム・マスター更新） ──
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
   const [cardError, setCardError] = useState("");
   const [cardSuccess, setCardSuccess] = useState("");
+  const [cardPreview, setCardPreview] = useState<CardPreview | null>(null);
   const [renewalDocs, setRenewalDocs] = useState<RenewalDoc[]>([]);
 
   const isCompleted = !!resultData?.completedAt;
@@ -116,11 +128,10 @@ export function PermitResultPanel({
       }
       const { url, fileName, fileSize, mimeType } = await res.json();
 
-      // AI抽出エンジンで在留カード番号・在留期限を解析
+      // AI抽出エンジンで在留カード番号・在留期限を解析（この時点ではマスターは更新しない）
       const extracted = await previewResidenceCardRenewal(url, mimeType);
 
-      // 解析結果を申請人マスターへ即時反映し、ファイルを自動リネームして保存
-      await confirmResidenceCardRenewal(applicantId, {
+      setCardPreview({
         residenceCardNumber: extracted.residenceCardNumber,
         currentVisaExpiry: extracted.currentVisaExpiry,
         fileUrl: url,
@@ -129,19 +140,39 @@ export function PermitResultPanel({
         mimeType,
         raw: extracted.raw,
       });
-
-      if (extracted.residenceCardNumber) setNewCardNumber(extracted.residenceCardNumber);
-      if (extracted.currentVisaExpiry) setNewVisaExpiry(extracted.currentVisaExpiry);
-
-      setCardSuccess("新しい在留カードを読み取り、申請人マスターを更新しました");
-      refreshRenewalDocs();
-      router.refresh();
     } catch (err: any) {
       setCardError(err.message ?? "処理に失敗しました");
     } finally {
       setIsProcessing(false);
       if (inputRef.current) inputRef.current.value = "";
     }
+  }
+
+  async function handleCardConfirm() {
+    if (!cardPreview) return;
+    setIsConfirming(true);
+    setCardError("");
+    try {
+      // ユーザー承認後、申請人マスターを上書き更新（旧情報は履歴テーブルへ自動退避）
+      await confirmResidenceCardRenewal(applicantId, cardPreview);
+
+      if (cardPreview.residenceCardNumber) setNewCardNumber(cardPreview.residenceCardNumber);
+      if (cardPreview.currentVisaExpiry) setNewVisaExpiry(cardPreview.currentVisaExpiry);
+
+      setCardSuccess("新しい在留カードを保存し、申請人マスターを更新しました");
+      setCardPreview(null);
+      refreshRenewalDocs();
+      router.refresh();
+    } catch (err: any) {
+      setCardError(err.message ?? "更新に失敗しました");
+    } finally {
+      setIsConfirming(false);
+    }
+  }
+
+  function handleCardCancel() {
+    setCardPreview(null);
+    setCardError("");
   }
 
   async function handleComplete() {
@@ -165,6 +196,8 @@ export function PermitResultPanel({
     }
     // 成功時はstatus=completedになり自動リロードされる（revalidatePath）
   }
+
+  const isPreviewPdf = cardPreview?.fileName.toLowerCase().endsWith(".pdf");
 
   // 完了済み表示
   if (isCompleted) {
@@ -251,8 +284,8 @@ export function PermitResultPanel({
                 {isProcessing ? (
                   <>
                     <Loader2 className="w-7 h-7 text-emerald-600 animate-spin" />
-                    <p className="text-sm font-medium text-emerald-700">AIで解析・自動保存中...</p>
-                    <p className="text-xs text-gray-400">在留カード番号・在留期限を読み取り、申請人マスターを更新しています</p>
+                    <p className="text-sm font-medium text-emerald-700">AIで解析中...</p>
+                    <p className="text-xs text-gray-400">在留カード番号・在留期限を読み取っています</p>
                   </>
                 ) : (
                   <>
@@ -344,7 +377,7 @@ export function PermitResultPanel({
               </div>
             </div>
             <p className="text-xs text-gray-400">
-              ※ 在留カードをアップロードするとAIが自動解析し、上記の番号・在留期限と申請人マスターを即時更新します。手動での修正も可能です。
+              ※ 在留カードをアップロードするとAIが自動解析します。内容を確認・承認すると、上記の番号・在留期限と申請人マスターが更新されます（旧情報は変更履歴に保存されます）。
             </p>
           </div>
         )}
@@ -361,6 +394,84 @@ export function PermitResultPanel({
             : <><CheckCircle className="w-4 h-4" />許可日を記録して完了</>}
         </button>
       </div>
+
+      {/* AI読み取り結果の確認モーダル（承認後にマスター更新・履歴退避） */}
+      {cardPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-500" />
+                AI読み取り結果の確認
+              </h3>
+              <button onClick={handleCardCancel} disabled={isConfirming} className="text-gray-400 hover:text-gray-600 disabled:opacity-50">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              {cardPreview.fileName}{isPreviewPdf ? "（PDF）" : ""} から読み取った内容です。必要に応じて修正し、「承認してマスターを更新」を押すと申請人マスターに反映されます（旧情報は変更履歴に保存されます）。
+            </p>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">在留カード番号</label>
+              <input
+                value={cardPreview.residenceCardNumber}
+                onChange={(e) => {
+                  const v = e.target.value.toUpperCase().replace(/[\s　]/g, "");
+                  setCardPreview((p) => (p ? { ...p, residenceCardNumber: v } : p));
+                }}
+                placeholder="AB12345678CD"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-emerald-400 bg-white font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">在留期間満了日</label>
+              <input
+                type="date"
+                value={cardPreview.currentVisaExpiry}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setCardPreview((p) => (p ? { ...p, currentVisaExpiry: v } : p));
+                }}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-emerald-400 bg-white"
+              />
+            </div>
+
+            {(!cardPreview.residenceCardNumber || !cardPreview.currentVisaExpiry) && (
+              <p className="text-xs text-orange-600">
+                AIが一部の項目を読み取れませんでした。内容を確認し、必要な値を入力してください。
+              </p>
+            )}
+
+            {cardError && (
+              <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5 text-xs">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> {cardError}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleCardCancel}
+                disabled={isConfirming}
+                className="flex-1 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleCardConfirm}
+                disabled={isConfirming || (!cardPreview.residenceCardNumber && !cardPreview.currentVisaExpiry)}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isConfirming ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                承認してマスターを更新
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

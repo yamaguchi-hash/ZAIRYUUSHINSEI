@@ -5,6 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** ローマ字氏名のスペースを半角1つに統一し、前後の空白を除去する（全角スペース・連続スペース対応） */
+export function normalizeRomajiName(str: string | null | undefined): string {
+  if (!str) return "";
+  return str.replace(/[\s　]+/g, " ").trim();
+}
+
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return "—";
   const d = new Date(date);

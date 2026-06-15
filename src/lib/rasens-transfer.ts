@@ -11,6 +11,7 @@
  */
 
 import type { ApplicationFormData, FamilyMember } from "@/lib/form-types";
+import { normalizeRomajiName } from "@/lib/utils";
 
 export interface RasensField {
   /** RASENSページ上のラベルテキスト */
@@ -87,6 +88,17 @@ function formatPostalCode(code: string): string {
   return code.replace(/-/g, "").replace(/\s/g, "");
 }
 
+/**
+ * 「〒1234567|住所」形式の値を、他の住所欄やPDF出力と揃う
+ * 「〒123-4567　住所」の標準表記に変換する（PDF側の fmtAddr() と同じ規則）
+ */
+function formatStandardAddress(value: string | null | undefined): string {
+  if (!value) return "";
+  const m = value.match(/^〒(\d{3})(\d{4})\|(.*)$/);
+  if (m) return `〒${m[1]}-${m[2]}　${m[3] || ""}`.trim();
+  return value;
+}
+
 /** JLSフォームデータからRASENSフィールド一覧を生成 */
 export function buildRasensFields(
   form: Partial<ApplicationFormData>,
@@ -107,8 +119,8 @@ export function buildRasensFields(
   const f = form;
 
   const nationality   = f.nationality   || applicant?.nationality   || "";
-  const familyNameEn  = f.familyNameEn  || applicant?.familyNameEn  || "";
-  const givenNameEn   = f.givenNameEn   || applicant?.givenNameEn   || "";
+  const familyNameEn  = normalizeRomajiName(f.familyNameEn  || applicant?.familyNameEn  || "");
+  const givenNameEn   = normalizeRomajiName(f.givenNameEn   || applicant?.givenNameEn   || "");
   const familyNameJa  = f.familyNameJa  || applicant?.familyNameJa  || "";
   const givenNameJa   = f.givenNameJa   || applicant?.givenNameJa   || "";
   const dob           = f.dateOfBirth   || applicant?.dateOfBirth   || "";
@@ -138,7 +150,7 @@ export function buildRasensFields(
     // ── 申請人 基本情報 ──────────────────────────────────────────────
     { label: "国籍・地域",        value: nationality },
     { label: "生年月日",          value: formatDate(dob),    note: "YYYYMMDD" },
-    { label: "氏名（ローマ字）",  value: `${familyNameEn}　${givenNameEn}`.trim(), note: "姓　名" },
+    { label: "氏名（ローマ字）",  value: `${familyNameEn} ${givenNameEn}`.trim(), note: "姓 名" },
     { label: "性別",              value: sex },
     { label: "出生地",            value: placeOfBirth },
     { label: "配偶者の有無",      value: f.maritalStatus || "" },
@@ -184,7 +196,7 @@ export function buildRasensFields(
     // ── 扶養者情報（家族滞在） ────────────────────────────────────────
     ...((f.supporterNameEn || f.supporterFamilyNameEn) ? [
       { label: "扶養者　氏名（ローマ字）",
-        value: f.supporterNameEn || `${f.supporterFamilyNameEn ?? ""}　${f.supporterGivenNameEn ?? ""}`.trim() },
+        value: normalizeRomajiName(f.supporterNameEn || `${f.supporterFamilyNameEn ?? ""} ${f.supporterGivenNameEn ?? ""}`.trim()) },
       { label: "扶養者　生年月日",        value: formatDate(f.supporterDob || ""),  note: "YYYYMMDD" },
       { label: "扶養者　国籍・地域",      value: f.supporterNationality || "" },
       { label: "扶養者　在留資格",        value: f.supporterStatusOfResidence || "" },
@@ -200,7 +212,7 @@ export function buildRasensFields(
         ? [{ label: "扶養者　支店・事業所名", value: f.supporterBranchName }]
         : []),
       ...(f.supporterEmployerAddress || f.supporterAddress
-        ? [{ label: "扶養者　勤務先所在地", value: stripZipPrefix(f.supporterEmployerAddress || f.supporterAddress || "") }]
+        ? [{ label: "扶養者　勤務先所在地", value: formatStandardAddress(f.supporterEmployerAddress || f.supporterAddress || "") }]
         : []),
       ...(f.supporterEmployerPhone
         ? [{ label: "扶養者　勤務先電話番号", value: f.supporterEmployerPhone }]

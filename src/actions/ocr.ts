@@ -6,6 +6,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { GoogleGenAI, Type } from "@google/genai";
 import { revalidatePath } from "next/cache";
 import { lookupZipFromAddress } from "@/lib/zip-lookup";
+import { normalizeRomajiName } from "@/lib/utils";
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   passport_front: "パスポート（表紙）",
@@ -363,10 +364,10 @@ export async function ocrAndFillApplicant(applicantId: string) {
   };
 
   const fnEn = getVal("surname_en", "surname", "family_name", "last_name");
-  if (fnEn) update.familyNameEn = fnEn.toUpperCase();
+  if (fnEn) update.familyNameEn = normalizeRomajiName(fnEn.toUpperCase());
 
   const gnEn = getVal("given_name_en", "given_name", "first_name");
-  if (gnEn) update.givenNameEn = gnEn.toUpperCase();
+  if (gnEn) update.givenNameEn = normalizeRomajiName(gnEn.toUpperCase());
 
   const nat = getVal("nationality", "country", "citizenship");
   if (nat) update.nationality = nat;
@@ -506,10 +507,10 @@ export async function ocrFilesForRegistration(docIds: string[]): Promise<
     };
 
     const fnEn = get("surname_en", "surname", "family_name", "familyName", "last_name", "lastName");
-    if (fnEn) result.familyNameEn = fnEn.toUpperCase();
+    if (fnEn) result.familyNameEn = normalizeRomajiName(fnEn.toUpperCase());
 
     const gnEn = get("given_name_en", "given_name", "givenName", "first_name", "firstName");
-    if (gnEn) result.givenNameEn = gnEn.toUpperCase();
+    if (gnEn) result.givenNameEn = normalizeRomajiName(gnEn.toUpperCase());
 
     const fnJa = get("surname_ja", "family_name_ja", "familyNameJa", "last_name_ja");
     if (fnJa) result.familyNameJa = fnJa;

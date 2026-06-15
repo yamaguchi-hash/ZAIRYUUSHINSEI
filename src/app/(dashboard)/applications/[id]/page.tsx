@@ -536,6 +536,7 @@ export default async function ApplicationDetailPage({
         >
           <PermitResultPanel
             applicationId={application.id}
+            applicantId={applicant.id}
             applicationType={application.applicationType}
             currentVisaType={(application.formData as any)?.currentStatusOfResidence}
             desiredVisaType={(application.formData as any)?.desiredStatusOfResidence}

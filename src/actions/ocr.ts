@@ -159,10 +159,10 @@ function buildPrompt(documentType: string): string {
 - nationality: 国籍・地域
 - date_of_birth: 生年月日（YYYY-MM-DD）
 - gender: 性別（M または F のみ）
-- residence_card_number: 在留カード番号（英数字）
+- residence_card_number: 在留カード番号（英数字12桁。大文字・スペースなしで出力）
 - status_of_residence: 在留資格（日本語表記）
 - period_of_stay: 在留期間（例：3年、1年）
-- date_of_expiry: 在留期限（YYYY-MM-DD）
+- date_of_expiry: 在留期限（YYYY-MM-DD形式。和暦表記の場合は西暦に変換して出力）
 - postal_code: 郵便番号（数字7桁のみ。〒マーク不要）
 - address: 住居地（郵便番号を除いた住所のみ）
 
@@ -176,6 +176,7 @@ function buildPrompt(documentType: string): string {
 ・書類に明記されている情報のみ抽出し、推測・補完は行わないこと
 ・読み取れない項目はnullとすること
 ・日付は必ずYYYY-MM-DD形式（例：2025-03-15）
+・和暦（令和・平成等）で記載されている場合は西暦のYYYY-MM-DD形式に変換すること（例：令和7年3月15日 → 2025-03-15）
 ・性別はMまたはFのみ（男/女/MALE/FEMALE等は変換すること）`;
   }
 
@@ -660,4 +661,120 @@ export async function createApplicantWithDocuments(
   } catch (err: any) {
     return { success: false, error: err.message ?? "登録に失敗しました" };
   }
+}
+
+// ─── 在留カード更新（番号・在留期限の上書き） ─────────────────────────────────
+
+/** Geminiが返すnull相当の値（null / "null" / "undefined" / 空文字）を除去する */
+function cleanExtractedValue(raw: unknown): string {
+  if (raw == null) return "";
+  const s = String(raw).trim();
+  if (s === "" || s === "null" || s === "undefined") return "";
+  return s;
+}
+
+/** 和暦・各種日本語日付表記をYYYY-MM-DD形式に変換する */
+function normalizeDateToIso(raw: unknown): string {
+  const s = cleanExtractedValue(raw);
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // 令和/平成/昭和/大正 + 年月日（「元年」表記にも対応）
+  const eraMatch = s.match(/(令和|平成|昭和|大正)\s*(\d{1,2}|元)\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+  if (eraMatch) {
+    const eraBase: Record<string, number> = { "令和": 2018, "平成": 1988, "昭和": 1925, "大正": 1911 };
+    const eraYear = eraMatch[2] === "元" ? 1 : parseInt(eraMatch[2], 10);
+    const year = eraBase[eraMatch[1]] + eraYear;
+    return `${year}-${eraMatch[3].padStart(2, "0")}-${eraMatch[4].padStart(2, "0")}`;
+  }
+
+  // YYYY年MM月DD日 / YYYY/MM/DD / YYYY.MM.DD
+  const ymd = s.match(/(\d{4})[年./-]\s*(\d{1,2})[月./-]\s*(\d{1,2})/);
+  if (ymd) {
+    return `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`;
+  }
+
+  return s;
+}
+
+/** 在留カード番号を正規化する（大文字化・空白除去） */
+function normalizeResidenceCardNumber(raw: unknown): string {
+  const s = cleanExtractedValue(raw);
+  if (!s) return "";
+  return s.toUpperCase().replace(/[\s　]/g, "");
+}
+
+/**
+ * 更新後の在留カードをAIで解析し、在留カード番号・在留期限のプレビューを返す。
+ * この時点ではDBへの保存は行わない（ユーザーの確認後に confirmResidenceCardRenewal を呼ぶ）。
+ */
+export async function previewResidenceCardRenewal(fileUrl: string, mimeType: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY が設定されていません。.env.local に追加してください。");
+  }
+
+  const extracted = await ocrSingleDocument(fileUrl, mimeType, "residence_card");
+
+  return {
+    residenceCardNumber: normalizeResidenceCardNumber(extracted.residence_card_number),
+    currentVisaExpiry: normalizeDateToIso(extracted.date_of_expiry),
+    raw: extracted,
+  };
+}
+
+/**
+ * ユーザーの確認後、申請人マスターの在留カード番号・在留期限を上書き更新し、
+ * アップロードされた在留カードを添付書類履歴として保存する。
+ */
+export async function confirmResidenceCardRenewal(
+  applicantId: string,
+  data: {
+    residenceCardNumber: string;
+    currentVisaExpiry: string;
+    fileUrl: string;
+    fileName: string;
+    fileSize?: number;
+    mimeType?: string;
+    raw?: Record<string, any>;
+  }
+) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+  const tenantId = (session.user as any).tenantId;
+  if (!tenantId) throw new Error("テナントIDが不正です");
+
+  const residenceCardNumber = normalizeResidenceCardNumber(data.residenceCardNumber);
+  const currentVisaExpiry = normalizeDateToIso(data.currentVisaExpiry);
+
+  if (!residenceCardNumber && !currentVisaExpiry) {
+    throw new Error("在留カード番号または在留期限のいずれかを入力してください");
+  }
+
+  const update: Record<string, any> = { updatedAt: new Date() };
+  if (residenceCardNumber) update.residenceCardNumber = residenceCardNumber;
+  if (currentVisaExpiry) update.currentVisaExpiry = currentVisaExpiry;
+
+  await db
+    .update(applicantMaster)
+    .set(update)
+    .where(and(eq(applicantMaster.id, applicantId), eq(applicantMaster.tenantId, tenantId)));
+
+  await db.insert(applicantDocuments).values({
+    tenantId,
+    applicantId,
+    documentType: "residence_card_renewal",
+    fileUrl: data.fileUrl,
+    fileName: data.fileName,
+    fileSize: data.fileSize,
+    mimeType: data.mimeType,
+    ocrExtractedData: data.raw ?? null,
+    ocrProcessedAt: new Date(),
+  });
+
+  revalidatePath(`/applicants/${applicantId}`);
+  revalidatePath("/applicants");
+
+  return { residenceCardNumber, currentVisaExpiry };
 }

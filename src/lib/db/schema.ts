@@ -31,6 +31,7 @@ export const applicationTypeEnum = pgEnum("application_type", [
 
 export const applicantDocumentTypeEnum = pgEnum("applicant_document_type", [
   "passport_front", "passport_data_page", "residence_card_front", "residence_card_back", "residence_card",
+  "residence_card_renewal",
 ]);
 
 // ─── Users ────────────────────────────────────────────────────────────────────

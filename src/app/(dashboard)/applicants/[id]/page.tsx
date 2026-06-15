@@ -8,6 +8,7 @@ import { ArrowLeft, User, AlertTriangle, FileText, ExternalLink } from "lucide-r
 import Link from "next/link";
 import { formatDate, VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS, APPLICATION_STATUS_LABELS, STATUS_COLORS } from "@/lib/utils";
 import { OcrPanel } from "@/components/applicants/ocr-panel";
+import { ResidenceCardRenewalPanel } from "@/components/applicants/residence-card-renewal-panel";
 import { EditApplicantForm } from "./edit-applicant-form";
 import { DeleteApplicantButton } from "./delete-applicant-button";
 
@@ -132,6 +133,11 @@ export default async function ApplicantDetailPage({
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── 在留カード更新（番号・満了日の自動上書き） ── */}
+      <div className="mb-6">
+        <ResidenceCardRenewalPanel applicantId={id} />
       </div>
 
       {/* ── Main grid ── */}

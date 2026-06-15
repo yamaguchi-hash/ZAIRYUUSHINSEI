@@ -2,11 +2,12 @@
 
 import { auth } from "@/lib/auth";
 import { db, applicantDocuments, applicantMaster } from "@/lib/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, ne, inArray } from "drizzle-orm";
 import { GoogleGenAI, Type } from "@google/genai";
 import { revalidatePath } from "next/cache";
 import { lookupZipFromAddress } from "@/lib/zip-lookup";
 import { normalizeRomajiName } from "@/lib/utils";
+import { buildAutoFileName, getApplicantNameForFile } from "@/lib/file-naming";
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   passport_front: "パスポート（表紙）",
@@ -90,6 +91,38 @@ export async function saveApplicantDocument(data: {
   const tenantId = (session.user as any).tenantId;
   if (!tenantId) throw new Error("テナントIDが不正です");
 
+  // ── ファイル名の自動判定・自動付与（申請人氏名_書類名_YYYYMMDD.拡張子） ──
+  const [applicant] = await db
+    .select({
+      familyNameEn: applicantMaster.familyNameEn,
+      givenNameEn: applicantMaster.givenNameEn,
+      familyNameJa: applicantMaster.familyNameJa,
+      givenNameJa: applicantMaster.givenNameJa,
+    })
+    .from(applicantMaster)
+    .where(eq(applicantMaster.id, data.applicantId))
+    .limit(1);
+
+  // 同じ書類タイプの既存ファイルは置き換えられるため、衝突判定からは除外する
+  const otherDocs = await db
+    .select({ fileName: applicantDocuments.fileName })
+    .from(applicantDocuments)
+    .where(
+      and(
+        eq(applicantDocuments.applicantId, data.applicantId),
+        ne(applicantDocuments.documentType, data.documentType)
+      )
+    );
+
+  const fileName = applicant
+    ? buildAutoFileName({
+        applicantName: getApplicantNameForFile(applicant),
+        docLabel: DOCUMENT_TYPE_LABELS[data.documentType] ?? data.documentType,
+        originalFileName: data.fileName,
+        existingNames: otherDocs.map((d) => d.fileName),
+      })
+    : data.fileName;
+
   // Upsert: delete existing same type and insert new
   await db
     .delete(applicantDocuments)
@@ -102,7 +135,7 @@ export async function saveApplicantDocument(data: {
 
   const [doc] = await db
     .insert(applicantDocuments)
-    .values({ tenantId, ...data })
+    .values({ tenantId, ...data, fileName })
     .returning();
 
   revalidatePath(`/applicants/${data.applicantId}`);
@@ -768,12 +801,38 @@ export async function confirmResidenceCardRenewal(
     .set(update)
     .where(and(eq(applicantMaster.id, applicantId), eq(applicantMaster.tenantId, tenantId)));
 
+  // ── ファイル名の自動判定・自動付与（申請人氏名_最新の在留カード_YYYYMMDD.拡張子） ──
+  const [applicant] = await db
+    .select({
+      familyNameEn: applicantMaster.familyNameEn,
+      givenNameEn: applicantMaster.givenNameEn,
+      familyNameJa: applicantMaster.familyNameJa,
+      givenNameJa: applicantMaster.givenNameJa,
+    })
+    .from(applicantMaster)
+    .where(eq(applicantMaster.id, applicantId))
+    .limit(1);
+
+  const existingDocs = await db
+    .select({ fileName: applicantDocuments.fileName })
+    .from(applicantDocuments)
+    .where(eq(applicantDocuments.applicantId, applicantId));
+
+  const fileName = applicant
+    ? buildAutoFileName({
+        applicantName: getApplicantNameForFile(applicant),
+        docLabel: "最新の在留カード",
+        originalFileName: data.fileName,
+        existingNames: existingDocs.map((d) => d.fileName),
+      })
+    : data.fileName;
+
   await db.insert(applicantDocuments).values({
     tenantId,
     applicantId,
     documentType: "residence_card_renewal",
     fileUrl: data.fileUrl,
-    fileName: data.fileName,
+    fileName,
     fileSize: data.fileSize,
     mimeType: data.mimeType,
     ocrExtractedData: data.raw ?? null,

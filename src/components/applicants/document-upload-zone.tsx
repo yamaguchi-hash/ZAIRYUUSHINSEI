@@ -2,9 +2,9 @@
 
 import { useRef, useState } from "react";
 import { saveApplicantDocument, deleteApplicantDocument } from "@/actions/ocr";
-import { Upload, X, CheckCircle, Loader2, FileText } from "lucide-react";
+import { Upload, X, CheckCircle, Loader2, FileText, Eye, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DocumentViewTrigger } from "./document-viewer";
+import { DocumentLink, isImageFile } from "./document-viewer";
 
 type DocType = "passport_front" | "passport_data_page" | "residence_card_front" | "residence_card_back";
 
@@ -73,8 +73,6 @@ export function DocumentUploadZone({
     }
   }
 
-  const isPdf = existingDoc?.fileName?.toLowerCase().endsWith(".pdf");
-
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -90,47 +88,36 @@ export function DocumentUploadZone({
       </div>
 
       {existingDoc ? (
-        /* Preview with viewer */
-        <div className="relative border border-gray-200 rounded-xl overflow-hidden bg-gray-50 group">
-          <DocumentViewTrigger
+        /* ファイル名表示のみ（クリックで閲覧） */
+        <div className="flex items-center gap-2 border border-gray-200 rounded-xl bg-gray-50 px-3 py-2.5">
+          <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
+          <DocumentLink
             url={existingDoc.fileUrl}
             fileName={existingDoc.fileName}
             documentType={documentType}
+            className="flex-1 min-w-0 flex items-center gap-1 text-sm text-gray-700 hover:text-blue-600 text-left"
           >
-            <div className="aspect-[3/2] flex items-center justify-center">
-              {isPdf ? (
-                <div className="flex flex-col items-center gap-2 text-gray-400">
-                  <FileText className="w-10 h-10" />
-                  <p className="text-xs">{existingDoc.fileName}</p>
-                </div>
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={existingDoc.fileUrl}
-                  alt={label}
-                  className="object-contain w-full h-full p-2"
-                />
-              )}
-            </div>
-          </DocumentViewTrigger>
-
-          {/* Hover overlay */}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
-            <button
-              onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
-              className="bg-white text-gray-800 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-gray-100"
-            >
-              差し替え
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-              disabled={isDeleting}
-              className="bg-red-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-red-600 flex items-center gap-1"
-            >
-              {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
-              削除
-            </button>
-          </div>
+            <span className="truncate">{existingDoc.fileName}</span>
+            {isImageFile(existingDoc.fileName) ? (
+              <Eye className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+            ) : (
+              <ExternalLink className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+            )}
+          </DocumentLink>
+          <button
+            onClick={() => inputRef.current?.click()}
+            className="text-xs font-medium text-blue-600 hover:text-blue-700 flex-shrink-0"
+          >
+            差し替え
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="p-1 text-gray-300 hover:text-red-500 disabled:opacity-50 flex-shrink-0"
+            title="削除"
+          >
+            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+          </button>
         </div>
       ) : (
         /* Drop zone */

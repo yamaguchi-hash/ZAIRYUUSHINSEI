@@ -11,9 +11,10 @@ import { put, del } from "@vercel/blob";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
-import { db, applications, applicationAttachments } from "@/lib/db";
+import { db, applications, applicationAttachments, applicantMaster } from "@/lib/db";
 import { eq, and, desc } from "drizzle-orm";
 import { ATTACHMENT_TYPE_MAP, isValidAttachmentType } from "@/lib/attachment-types";
+import { buildAutoFileName, getApplicantNameForFile } from "@/lib/file-naming";
 
 const ALLOWED_MIMES = [
   "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif",
@@ -112,6 +113,32 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       fileUrl = `data:${mimeType};base64,${Buffer.from(bytes).toString("base64")}`;
     }
 
+    // ── ファイル名の自動判定・自動付与（申請人氏名_書類名_YYYYMMDD.拡張子） ──
+    const [appRow] = await db.select({ applicantId: applications.applicantId })
+      .from(applications).where(eq(applications.id, applicationId)).limit(1);
+
+    const [applicant] = appRow
+      ? await db.select({
+          familyNameEn: applicantMaster.familyNameEn,
+          givenNameEn: applicantMaster.givenNameEn,
+          familyNameJa: applicantMaster.familyNameJa,
+          givenNameJa: applicantMaster.givenNameJa,
+        }).from(applicantMaster).where(eq(applicantMaster.id, appRow.applicantId)).limit(1)
+      : [];
+
+    const existingAttachments = await db.select({ fileName: applicationAttachments.fileName })
+      .from(applicationAttachments)
+      .where(eq(applicationAttachments.applicationId, applicationId));
+
+    const fileName = applicant
+      ? buildAutoFileName({
+          applicantName: getApplicantNameForFile(applicant),
+          docLabel: typeDef.label,
+          originalFileName: file.name,
+          existingNames: existingAttachments.map((a) => a.fileName),
+        })
+      : file.name;
+
     // ── DBメタデータ記録 ──
     const [record] = await db.insert(applicationAttachments).values({
       tenantId,
@@ -119,7 +146,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       documentType,
       documentLabel: typeDef.label,
       fileUrl,
-      fileName: file.name,
+      fileName,
       fileSize: file.size,
       mimeType,
       uploadedBy: userId,

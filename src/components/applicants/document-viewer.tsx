@@ -149,3 +149,48 @@ export function DocumentViewTrigger({ url, fileName, documentType, children }: D
     </>
   );
 }
+
+/** 画像ファイルかどうかを拡張子で判定する */
+export function isImageFile(fileName: string): boolean {
+  return /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(fileName);
+}
+
+interface DocumentLinkProps {
+  url: string;
+  fileName: string;
+  documentType: string;
+  className?: string;
+  children: React.ReactNode;
+}
+
+/**
+ * 書類名のリンク表示。
+ * 画像ファイルはクリックでモーダル表示、画像以外（PDF等）は別タブで開く。
+ */
+export function DocumentLink({ url, fileName, documentType, className, children }: DocumentLinkProps) {
+  const [open, setOpen] = useState(false);
+
+  if (isImageFile(fileName)) {
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)} className={className}>
+          {children}
+        </button>
+        {open && (
+          <DocumentViewerModal
+            url={url}
+            fileName={fileName}
+            documentType={documentType}
+            onClose={() => setOpen(false)}
+          />
+        )}
+      </>
+    );
+  }
+
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className={className}>
+      {children}
+    </a>
+  );
+}

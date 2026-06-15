@@ -3,10 +3,10 @@
 import { useState, useTransition, useCallback } from "react";
 import { ocrAndFillApplicant, getApplicantDocuments } from "@/actions/ocr";
 import { DocumentUploadZone } from "./document-upload-zone";
-import { DocumentViewTrigger } from "./document-viewer";
+import { DocumentLink, isImageFile } from "./document-viewer";
 import {
   Sparkles, Loader2, CheckCircle, AlertCircle,
-  ChevronDown, ChevronUp, FileText, Eye, Clock,
+  ChevronDown, ChevronUp, FileText, Eye, ExternalLink, Clock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
@@ -84,7 +84,6 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
   }
 
   const uploadedCount = docs.filter((d) => d.documentType !== RENEWAL_DOC_TYPE).length;
-  const isPdf = (fileName: string) => fileName?.toLowerCase().endsWith(".pdf");
 
   // 在留カード更新の履歴（複数アップロードされた場合、最新の1件のみメインに表示し、
   // それ以外は下部の折りたたみ履歴に回す）
@@ -110,58 +109,40 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
               保存済み書類（クリックで閲覧）
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              {galleryDocs.map((doc) => (
-                <DocumentViewTrigger
-                  key={doc.id}
-                  url={doc.fileUrl}
-                  fileName={doc.fileName}
-                  documentType={doc.documentType}
-                >
-                  <div className="border border-gray-200 rounded-xl overflow-hidden hover:border-blue-400 hover:shadow-md transition-all group bg-gray-50">
-                    {/* Thumbnail */}
-                    <div className="aspect-[3/2] flex items-center justify-center bg-gray-100 relative">
-                      {isPdf(doc.fileName) ? (
-                        <div className="flex flex-col items-center gap-1 text-gray-400">
-                          <FileText className="w-8 h-8" />
-                          <span className="text-xs">PDF</span>
-                        </div>
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={doc.fileUrl}
-                          alt={doc.fileName}
-                          className="object-contain w-full h-full p-2"
-                        />
-                      )}
-                      {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <div className="bg-white rounded-full p-2 shadow">
-                          <Eye className="w-4 h-4 text-blue-600" />
-                        </div>
-                      </div>
-                    </div>
-                    {/* Label */}
-                    <div className="px-2 py-1.5">
-                      <p className="text-xs font-medium text-gray-700 truncate">
-                        {DOC_TYPE_LABELS[doc.documentType] ?? doc.documentType}
-                      </p>
-                      <div className="flex items-center justify-between mt-0.5">
-                        <p className="text-xs text-gray-400 truncate">{doc.fileName}</p>
-                        {doc.ocrProcessedAt ? (
-                          <span className="flex-shrink-0 text-xs text-green-600 flex items-center gap-0.5">
-                            <CheckCircle className="w-3 h-3" />OCR済
-                          </span>
-                        ) : (
-                          <span className="flex-shrink-0 text-xs text-gray-400">未処理</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </DocumentViewTrigger>
-              ))}
-            </div>
+          <CardContent className="space-y-1.5">
+            {galleryDocs.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2"
+              >
+                <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-700 truncate">
+                    {DOC_TYPE_LABELS[doc.documentType] ?? doc.documentType}
+                  </p>
+                  <DocumentLink
+                    url={doc.fileUrl}
+                    fileName={doc.fileName}
+                    documentType={doc.documentType}
+                    className="text-xs text-gray-500 hover:text-blue-600 truncate flex items-center gap-1 text-left"
+                  >
+                    <span className="truncate">{doc.fileName}</span>
+                    {isImageFile(doc.fileName) ? (
+                      <Eye className="w-3 h-3 text-gray-300 flex-shrink-0" />
+                    ) : (
+                      <ExternalLink className="w-3 h-3 text-gray-300 flex-shrink-0" />
+                    )}
+                  </DocumentLink>
+                </div>
+                {doc.ocrProcessedAt ? (
+                  <span className="flex-shrink-0 text-xs text-green-600 flex items-center gap-0.5">
+                    <CheckCircle className="w-3 h-3" />OCR済
+                  </span>
+                ) : (
+                  <span className="flex-shrink-0 text-xs text-gray-400">未処理</span>
+                )}
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
@@ -297,23 +278,26 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
           </summary>
           <div className="px-4 pb-3 pt-1 space-y-1.5 border-t border-gray-100">
             {renewalHistory.map((doc) => (
-              <DocumentViewTrigger
+              <DocumentLink
                 key={doc.id}
                 url={doc.fileUrl}
                 fileName={doc.fileName}
                 documentType={doc.documentType}
+                className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-2.5 py-1.5 hover:border-blue-300 cursor-pointer transition-colors w-full text-left"
               >
-                <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-2.5 py-1.5 hover:border-blue-300 cursor-pointer transition-colors">
-                  <FileText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                  <span className="text-xs text-gray-600 truncate flex-1">{doc.fileName}</span>
-                  {doc.uploadedAt && (
-                    <span className="text-xs text-gray-400 flex-shrink-0">
-                      {formatDate(doc.uploadedAt.toString())}
-                    </span>
-                  )}
+                <FileText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                <span className="text-xs text-gray-600 truncate flex-1">{doc.fileName}</span>
+                {doc.uploadedAt && (
+                  <span className="text-xs text-gray-400 flex-shrink-0">
+                    {formatDate(doc.uploadedAt.toString())}
+                  </span>
+                )}
+                {isImageFile(doc.fileName) ? (
                   <Eye className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
-                </div>
-              </DocumentViewTrigger>
+                ) : (
+                  <ExternalLink className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                )}
+              </DocumentLink>
             ))}
           </div>
         </details>

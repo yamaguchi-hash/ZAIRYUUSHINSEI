@@ -749,19 +749,24 @@ function normalizeResidenceCardNumber(raw: unknown): string {
  * この時点ではDBへの保存は行わない（ユーザーの確認後に confirmResidenceCardRenewal を呼ぶ）。
  */
 export async function previewResidenceCardRenewal(fileUrl: string, mimeType: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("認証が必要です");
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY が設定されていません。.env.local に追加してください。");
+  try {
+    const session = await auth();
+    if (!session?.user) throw new Error("認証が必要です");
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY が設定されていません。.env.local に追加してください。");
+    }
+
+    const extracted = await ocrSingleDocument(fileUrl, mimeType, "residence_card");
+
+    return {
+      residenceCardNumber: normalizeResidenceCardNumber(extracted?.residence_card_number),
+      currentVisaExpiry: normalizeDateToIso(extracted?.date_of_expiry),
+      raw: extracted ?? {},
+    };
+  } catch (err: any) {
+    console.error("[previewResidenceCardRenewal] error:", err);
+    throw new Error(err?.message || "在留カードの解析に失敗しました");
   }
-
-  const extracted = await ocrSingleDocument(fileUrl, mimeType, "residence_card");
-
-  return {
-    residenceCardNumber: normalizeResidenceCardNumber(extracted.residence_card_number),
-    currentVisaExpiry: normalizeDateToIso(extracted.date_of_expiry),
-    raw: extracted,
-  };
 }
 
 /**
@@ -780,20 +785,20 @@ export async function confirmResidenceCardRenewal(
     raw?: Record<string, any>;
   }
 ) {
-  const session = await auth();
-  if (!session?.user) throw new Error("認証が必要です");
-  const tenantId = (session.user as any).tenantId;
-  if (!tenantId) throw new Error("テナントIDが不正です");
+  try {
+    const session = await auth();
+    if (!session?.user) throw new Error("認証が必要です");
+    const tenantId = (session.user as any).tenantId;
+    if (!tenantId) throw new Error("テナントIDが不正です");
 
-  const residenceCardNumber = normalizeResidenceCardNumber(data.residenceCardNumber);
-  const currentVisaExpiry = normalizeDateToIso(data.currentVisaExpiry);
+    const residenceCardNumber = normalizeResidenceCardNumber(data?.residenceCardNumber);
+    const currentVisaExpiry = normalizeDateToIso(data?.currentVisaExpiry);
 
-  if (!residenceCardNumber && !currentVisaExpiry) {
-    throw new Error("在留カード番号または在留期限のいずれかを入力してください");
-  }
+    if (!residenceCardNumber && !currentVisaExpiry) {
+      throw new Error("在留カード番号または在留期限のいずれかを入力してください");
+    }
 
-  await db.transaction(async (tx) => {
-    const [applicant] = await tx
+    const [applicant] = await db
       .select({
         residenceCardNumber: applicantMaster.residenceCardNumber,
         currentVisaExpiry: applicantMaster.currentVisaExpiry,
@@ -808,45 +813,23 @@ export async function confirmResidenceCardRenewal(
 
     if (!applicant) throw new Error("申請人が見つかりません");
 
-    // ── 上書き前の「最新の在留カード」ファイルを特定（履歴退避用） ──
-    const renewalDocs = await tx
-      .select({ fileUrl: applicantDocuments.fileUrl, fileName: applicantDocuments.fileName, uploadedAt: applicantDocuments.uploadedAt })
-      .from(applicantDocuments)
-      .where(and(
-        eq(applicantDocuments.applicantId, applicantId),
-        eq(applicantDocuments.documentType, "residence_card_renewal")
-      ));
-    const previousDoc = renewalDocs
-      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
-
-    // ── 古い在留カード番号・在留期限・ファイルを履歴テーブルへ退避 ──
-    if (applicant.residenceCardNumber || applicant.currentVisaExpiry || previousDoc) {
-      await tx.insert(applicantResidenceCardHistories).values({
-        tenantId,
-        applicantId,
-        oldResidenceCardNumber: applicant.residenceCardNumber,
-        oldCurrentVisaExpiry: applicant.currentVisaExpiry,
-        oldFileUrl: previousDoc?.fileUrl ?? null,
-        oldFileName: previousDoc?.fileName ?? null,
-      });
-    }
-
-    // ── 申請人マスターを最新情報へ上書き更新 ──
-    const update: Record<string, any> = { updatedAt: new Date() };
-    if (residenceCardNumber) update.residenceCardNumber = residenceCardNumber;
-    if (currentVisaExpiry) update.currentVisaExpiry = currentVisaExpiry;
-
-    await tx
-      .update(applicantMaster)
-      .set(update)
-      .where(and(eq(applicantMaster.id, applicantId), eq(applicantMaster.tenantId, tenantId)));
-
-    // ── ファイル名の自動判定・自動付与（申請人氏名_最新の在留カード_YYYYMMDD.拡張子） ──
-    const existingDocs = await tx
-      .select({ fileName: applicantDocuments.fileName })
+    // ── 既存の添付書類を取得（履歴退避用の旧ファイル特定 + ファイル名衝突回避の両方に使用） ──
+    const existingDocs = await db
+      .select({
+        fileUrl: applicantDocuments.fileUrl,
+        fileName: applicantDocuments.fileName,
+        documentType: applicantDocuments.documentType,
+        uploadedAt: applicantDocuments.uploadedAt,
+      })
       .from(applicantDocuments)
       .where(eq(applicantDocuments.applicantId, applicantId));
 
+    // ── 上書き前の「最新の在留カード」ファイルを特定（履歴退避用） ──
+    const previousDoc = existingDocs
+      .filter((d) => d.documentType === "residence_card_renewal")
+      .sort((a, b) => new Date(b.uploadedAt ?? 0).getTime() - new Date(a.uploadedAt ?? 0).getTime())[0];
+
+    // ── ファイル名の自動判定・自動付与（申請人氏名_最新の在留カード_YYYYMMDD.拡張子） ──
     const fileName = buildAutoFileName({
       applicantName: getApplicantNameForFile(applicant),
       docLabel: "最新の在留カード",
@@ -854,7 +837,17 @@ export async function confirmResidenceCardRenewal(
       existingNames: existingDocs.map((d) => d.fileName),
     });
 
-    await tx.insert(applicantDocuments).values({
+    // ── 申請人マスターを最新情報へ上書きするための更新内容 ──
+    const update: Record<string, any> = { updatedAt: new Date() };
+    if (residenceCardNumber) update.residenceCardNumber = residenceCardNumber;
+    if (currentVisaExpiry) update.currentVisaExpiry = currentVisaExpiry;
+
+    const masterUpdateQuery = db
+      .update(applicantMaster)
+      .set(update)
+      .where(and(eq(applicantMaster.id, applicantId), eq(applicantMaster.tenantId, tenantId)));
+
+    const documentInsertQuery = db.insert(applicantDocuments).values({
       tenantId,
       applicantId,
       documentType: "residence_card_renewal",
@@ -865,12 +858,32 @@ export async function confirmResidenceCardRenewal(
       ocrExtractedData: data.raw ?? null,
       ocrProcessedAt: new Date(),
     });
-  });
 
-  revalidatePath(`/applicants/${applicantId}`);
-  revalidatePath("/applicants");
+    // ── マスタ上書き・履歴退避・新ファイル登録を1回のDBトランザクションで実行 ──
+    // (neon-httpドライバは db.transaction() の対話的トランザクションをサポートしないため、
+    //  db.batch() で複数クエリをまとめて単一のトランザクションとして送信する)
+    if (applicant.residenceCardNumber || applicant.currentVisaExpiry || previousDoc) {
+      const historyInsertQuery = db.insert(applicantResidenceCardHistories).values({
+        tenantId,
+        applicantId,
+        oldResidenceCardNumber: applicant.residenceCardNumber,
+        oldCurrentVisaExpiry: applicant.currentVisaExpiry,
+        oldFileUrl: previousDoc?.fileUrl ?? null,
+        oldFileName: previousDoc?.fileName ?? null,
+      });
+      await db.batch([historyInsertQuery, masterUpdateQuery, documentInsertQuery]);
+    } else {
+      await db.batch([masterUpdateQuery, documentInsertQuery]);
+    }
 
-  return { residenceCardNumber, currentVisaExpiry };
+    revalidatePath(`/applicants/${applicantId}`);
+    revalidatePath("/applicants");
+
+    return { residenceCardNumber, currentVisaExpiry };
+  } catch (err: any) {
+    console.error("[confirmResidenceCardRenewal] error:", err);
+    throw new Error(err?.message || "在留カードの更新に失敗しました");
+  }
 }
 
 /**

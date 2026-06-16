@@ -24,6 +24,7 @@ import {
   Clock, Loader2, FileText,
   Pencil, Check, X, FileEdit, ArrowRight, Plus, FilePlus,
   Upload, Download, Trash2, CheckCircle2,
+  User, Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DocumentLink } from "@/components/applicants/document-viewer";
@@ -67,6 +68,23 @@ const STATUS_LABELS: Record<string, string> = {
   approved:      "承認",
   resubmit_required: "再収集",
 };
+
+// ─── 書類カテゴリ判定（申請人 or 所属機関） ────────────────────────────────────
+const ORG_KEYWORDS = [
+  "登記", "決算書", "損益計算書", "貸借対照表", "財務諸表",
+  "雇用契約書", "雇用条件書", "労働条件通知書",
+  "支援計画", "支援責任者", "支援担当者", "支援機関",
+  "登録支援機関", "登録通知書",
+  "就業規則", "給与台帳", "出勤簿",
+  "雇用保険", "社会保険", "健康保険", "厚生年金",
+  "法人税", "法人番号", "消費税",
+  "採用", "受入", "外国人労働者",
+];
+
+function getDocumentSide(name: string): "applicant" | "organization" {
+  const n = name.normalize("NFKC");
+  return ORG_KEYWORDS.some((k) => n.includes(k)) ? "organization" : "applicant";
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 個別ドロップイン（チェックリスト項目ごとの軽量アップロード枠）
@@ -471,6 +489,23 @@ export function DocumentChecklist({
     }
   }
 
+  // カテゴリ分類（申請人 / 所属機関）
+  const applicantItems = localChecklist.filter(i => getDocumentSide(i.documentName) === "applicant");
+  const orgItems = localChecklist.filter(i => getDocumentSide(i.documentName) === "organization");
+  const hasBothCategories = applicantItems.length > 0 && orgItems.length > 0;
+  type GroupedEntry =
+    | { type: "header"; side: "applicant" | "organization" }
+    | { type: "item"; item: ChecklistItem };
+  const grouped: GroupedEntry[] = [];
+  if (applicantItems.length > 0) {
+    if (hasBothCategories) grouped.push({ type: "header", side: "applicant" });
+    applicantItems.forEach(item => grouped.push({ type: "item", item }));
+  }
+  if (orgItems.length > 0) {
+    if (hasBothCategories) grouped.push({ type: "header", side: "organization" });
+    orgItems.forEach(item => grouped.push({ type: "item", item }));
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -539,7 +574,19 @@ export function DocumentChecklist({
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {localChecklist.map((item) => (
+            {grouped.map((entry, idx) => {
+              if (entry.type === "header") {
+                return (
+                  <div key={`header-${entry.side}`} className="px-6 py-2 bg-gray-50 flex items-center gap-1.5">
+                    {entry.side === "applicant"
+                      ? <><User className="w-3.5 h-3.5 text-blue-500" /><span className="text-xs font-semibold text-blue-700">申請人の書類</span></>
+                      : <><Building2 className="w-3.5 h-3.5 text-teal-500" /><span className="text-xs font-semibold text-teal-700">所属機関の書類</span></>
+                    }
+                  </div>
+                );
+              }
+              const { item } = entry;
+              return (
               <div
                 key={item.id}
                 className={cn(
@@ -714,7 +761,8 @@ export function DocumentChecklist({
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

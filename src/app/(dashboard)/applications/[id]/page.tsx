@@ -468,14 +468,6 @@ export default async function ApplicationDetailPage({
             status: c.status,
           }))}
         />
-        <div className="p-4 border-t border-gray-100">
-          <AttachmentUploadPanel
-            applicationId={application.id}
-            initialAttachments={attachmentsList}
-            sections={["applicant", "organization"]}
-            showHeader={true}
-          />
-        </div>
       </CollapsibleSection>
 
       {/* 3. 質問書・顧客聴取（ステップ5以降） */}

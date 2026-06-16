@@ -88,6 +88,18 @@ interface AiFillResult {
   docsRead?: number;
 }
 
+interface MismatchInfo {
+  aiDocumentName: string;
+  droppedInto: string;
+  matchedName: string;
+  moved: boolean;
+}
+
+interface UploadMeta {
+  needsManualClassification?: boolean;
+  mismatch?: MismatchInfo | null;
+}
+
 const ChecklistDropzone = memo(function ChecklistDropzone({
   itemId,
   applicationId,
@@ -101,7 +113,7 @@ const ChecklistDropzone = memo(function ChecklistDropzone({
   applicationId: string;
   documentName: string;
   file: ChecklistFile;
-  onUploaded: (itemId: string, file: UploadedFileResult) => void;
+  onUploaded: (targetItemId: string, file: UploadedFileResult, meta?: UploadMeta) => void;
   onDeleted: (itemId: string) => void;
   onAiResult: (result: AiFillResult) => void;
 }) {
@@ -124,7 +136,11 @@ const ChecklistDropzone = memo(function ChecklistDropzone({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "アップロードに失敗しました");
-      onUploaded(itemId, data.item);
+      onUploaded(
+        data.targetItemId ?? itemId,
+        data.item,
+        { needsManualClassification: data.needsManualClassification, mismatch: data.mismatch }
+      );
       if (data.aiResult) onAiResult(data.aiResult);
     } catch (err: any) {
       setError(err.message ?? "アップロードに失敗しました");
@@ -249,6 +265,9 @@ export function DocumentChecklist({
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [zipError, setZipError] = useState("");
   const [aiFillMessage, setAiFillMessage] = useState("");
+  const [mismatchWarning, setMismatchWarning] = useState("");
+  const [needsManualClassification, setNeedsManualClassification] = useState<Set<string>>(new Set());
+  const [isReassigning, setIsReassigning] = useState<Set<string>>(new Set());
 
   const isExpert = userRole === "expert" || userRole === "admin";
   const requiredItems = localChecklist.filter((i) => i.isRequiredByExpert);
@@ -293,12 +312,27 @@ export function DocumentChecklist({
     requiredItems.length > 0 &&
     requiredItems.every((i) => i.status !== "not_submitted");
 
-  const handleFileUploaded = useCallback((itemId: string, file: UploadedFileResult) => {
+  const handleFileUploaded = useCallback((targetItemId: string, file: UploadedFileResult, meta?: UploadMeta) => {
     setLocalChecklist((prev) =>
-      prev.map((i) => (i.id === itemId
+      prev.map((i) => (i.id === targetItemId
         ? { ...i, fileUrl: file.fileUrl, fileName: file.fileName, fileSize: file.fileSize, mimeType: file.mimeType, status: file.status }
         : i))
     );
+    setNeedsManualClassification((prev) => {
+      const next = new Set(prev);
+      if (meta?.needsManualClassification) next.add(targetItemId); else next.delete(targetItemId);
+      return next;
+    });
+    if (meta?.mismatch) {
+      const m = meta.mismatch;
+      setMismatchWarning(
+        m.moved
+          ? `書類の内容を解析した結果「${m.aiDocumentName}」と判定されたため、「${m.matchedName}」の項目に自動登録しました（ドロップ先：${m.droppedInto}）。`
+          : `ドロップされた枠と書類の中身が異なる可能性があります（AI判定：${m.aiDocumentName}）。「${m.matchedName}」の項目もご確認ください。`
+      );
+    } else {
+      setMismatchWarning("");
+    }
   }, []);
 
   const handleFileDeleted = useCallback((itemId: string) => {
@@ -307,7 +341,39 @@ export function DocumentChecklist({
         ? { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, status: "not_submitted" }
         : i))
     );
+    setNeedsManualClassification((prev) => {
+      const next = new Set(prev);
+      next.delete(itemId);
+      return next;
+    });
   }, []);
+
+  const handleReassign = useCallback(async (fromId: string, toId: string) => {
+    setIsReassigning((prev) => new Set(prev).add(fromId));
+    try {
+      const res = await fetch(`/api/applications/${applicationId}/checklist/${fromId}/document`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetItemId: toId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "再分類に失敗しました");
+      setLocalChecklist((prev) => prev.map((i) => {
+        if (i.id === fromId) return { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, status: "not_submitted" };
+        if (i.id === toId) return { ...i, fileUrl: data.item.fileUrl, fileName: data.item.fileName, fileSize: data.item.fileSize, mimeType: data.item.mimeType, status: data.item.status };
+        return i;
+      }));
+      setNeedsManualClassification((prev) => {
+        const next = new Set(prev);
+        next.delete(fromId);
+        return next;
+      });
+    } catch (err: any) {
+      setMismatchWarning(`再分類に失敗しました: ${err.message ?? "不明なエラー"}`);
+    } finally {
+      setIsReassigning((prev) => { const next = new Set(prev); next.delete(fromId); return next; });
+    }
+  }, [applicationId]);
 
   const handleAiResult = useCallback((result: AiFillResult) => {
     if (result.success) {
@@ -439,6 +505,20 @@ export function DocumentChecklist({
           </button>
         </div>
         {zipError && <p className="text-xs text-red-500 whitespace-pre-wrap mt-2">{zipError}</p>}
+        {mismatchWarning && (
+          <div className="mt-2 flex items-start gap-1.5 text-xs px-3 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+            <span className="flex-shrink-0 mt-0.5">⚠</span>
+            <span>{mismatchWarning}</span>
+            <button
+              type="button"
+              onClick={() => setMismatchWarning("")}
+              className="ml-auto flex-shrink-0 text-amber-400 hover:text-amber-600"
+              title="閉じる"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         {aiFillMessage && (
           <p className={cn(
             "mt-2 text-xs px-3 py-2 rounded-lg",
@@ -570,6 +650,35 @@ export function DocumentChecklist({
                           onDeleted={handleFileDeleted}
                           onAiResult={handleAiResult}
                         />
+                        {/* 未判別書類の手動再分類 */}
+                        {needsManualClassification.has(item.id) && item.fileName && (
+                          <div className="mt-1.5 flex items-start gap-1.5 flex-wrap">
+                            <span className="text-xs text-amber-600 flex-shrink-0 mt-0.5 leading-tight">
+                              ⚠ 書類種別を自動判別できませんでした。正しい項目へ移動:
+                            </span>
+                            <select
+                              className="text-xs border border-amber-300 rounded px-1.5 py-0.5 bg-amber-50 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+                              defaultValue=""
+                              disabled={isReassigning.has(item.id)}
+                              onChange={async (e) => {
+                                const toId = e.target.value;
+                                if (!toId) return;
+                                e.target.value = "";
+                                await handleReassign(item.id, toId);
+                              }}
+                            >
+                              <option value="">書類名を選択...</option>
+                              {localChecklist
+                                .filter((c) => c.id !== item.id && !c.fileName && c.isRequiredByExpert)
+                                .map((c) => (
+                                  <option key={c.id} value={c.id}>{c.documentName}</option>
+                                ))}
+                            </select>
+                            {isReassigning.has(item.id) && (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500 mt-0.5 flex-shrink-0" />
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

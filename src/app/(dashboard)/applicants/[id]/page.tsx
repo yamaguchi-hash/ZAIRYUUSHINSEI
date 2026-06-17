@@ -142,37 +142,36 @@ export default async function ApplicantDetailPage({
         </div>
       </div>
 
-      {/* ── Main grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
-        {/* Left: OCR panel (upload + gallery) */}
-        <OcrPanel
-          applicantId={id}
-          initialDocs={docs.map((d) => ({
-            id: d.id,
-            documentType: d.documentType,
-            fileUrl: d.fileUrl,
-            fileName: d.fileName,
-            ocrProcessedAt: d.ocrProcessedAt,
-            uploadedAt: d.uploadedAt,
-          }))}
-        />
-
-        {/* Right: Edit form */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="w-4 h-4" />
-              申請人情報の編集
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* ── 1. 申請人情報の編集（最上部） ── */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="w-4 h-4" />
+            申請人情報の編集
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="max-w-2xl">
             <EditApplicantForm
               applicant={applicant}
               organizations={organizations.map((o) => ({ id: o.id, nameJa: o.nameJa }))}
             />
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── 2. 保存済み書類 / 3. 書類アップロード ＆ AI自動読み込み ── */}
+      <OcrPanel
+        applicantId={id}
+        initialDocs={docs.map((d) => ({
+          id: d.id,
+          documentType: d.documentType,
+          fileUrl: d.fileUrl,
+          fileName: d.fileName,
+          ocrProcessedAt: d.ocrProcessedAt,
+          uploadedAt: d.uploadedAt,
+        }))}
+      />
 
       {/* ── 過去の申請案件 ── */}
       <Card className="mt-6">

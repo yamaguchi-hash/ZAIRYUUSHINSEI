@@ -6,7 +6,7 @@ import { Upload, X, CheckCircle, Loader2, FileText, Eye, ExternalLink } from "lu
 import { cn } from "@/lib/utils";
 import { DocumentLink, isImageFile } from "./document-viewer";
 
-type DocType = "passport_front" | "passport_data_page" | "residence_card_front" | "residence_card_back";
+type DocType = "passport_data_page" | "residence_card_front" | "residence_card_back";
 
 interface DocumentUploadZoneProps {
   applicantId: string;

@@ -17,6 +17,15 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   residence_card: "在留カード（表面・裏面）",
 };
 
+// ファイル名生成専用ラベル（表示ラベルとは別にアンダースコア区切りで定義）
+const FILENAME_LABELS: Record<string, string> = {
+  passport_data_page:     "パスポート（顔写真ページ）",
+  residence_card_front:   "在留カード_表面",
+  residence_card_back:    "在留カード_裏面",
+  residence_card:         "在留カード",
+  residence_card_renewal: "最新の在留カード",
+};
+
 // ─── 構造化出力スキーマ定義 ──────────────────────────────────────────────────
 const RESIDENCE_CARD_SCHEMA = {
   type: Type.OBJECT,
@@ -80,7 +89,7 @@ function getOcrSchema(documentType: string) {
 // Save uploaded document metadata to DB
 export async function saveApplicantDocument(data: {
   applicantId: string;
-  documentType: "passport_front" | "passport_data_page" | "residence_card_front" | "residence_card_back";
+  documentType: "passport_data_page" | "residence_card_front" | "residence_card_back";
   fileUrl: string;
   fileName: string;
   fileSize?: number;
@@ -117,7 +126,7 @@ export async function saveApplicantDocument(data: {
   const fileName = applicant
     ? buildAutoFileName({
         applicantName: getApplicantNameForFile(applicant),
-        docLabel: DOCUMENT_TYPE_LABELS[data.documentType] ?? data.documentType,
+        docLabel: FILENAME_LABELS[data.documentType] ?? DOCUMENT_TYPE_LABELS[data.documentType] ?? data.documentType,
         originalFileName: data.fileName,
         existingNames: otherDocs.map((d) => d.fileName),
       })
@@ -249,6 +258,27 @@ function buildPrompt(documentType: string): string {
 【制約】書類に明記されている情報のみ抽出し、推測しないこと。読み取れない項目はnullとすること。`;
 }
 
+// ─── Base64変換ヘルパー ─────────────────────────────────────────────────────────
+const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+
+async function fetchAsBase64(fileUrl: string, mimeType: string): Promise<[string, string]> {
+  if (fileUrl.startsWith("data:")) {
+    const commaIdx = fileUrl.indexOf(",");
+    const base64 = fileUrl.slice(commaIdx + 1);
+    const headerMime = fileUrl.slice(5, commaIdx).split(";")[0];
+    const fileMimeType = headerMime === "application/pdf" ? "application/pdf"
+      : SUPPORTED_IMAGE_TYPES.includes(headerMime) ? headerMime : "image/jpeg";
+    return [base64, fileMimeType];
+  }
+  const res = await fetch(fileUrl);
+  if (!res.ok) throw new Error(`ファイルの取得に失敗しました: ${fileUrl}`);
+  const arrayBuffer = await res.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString("base64");
+  const fileMimeType = mimeType === "application/pdf" ? "application/pdf"
+    : SUPPORTED_IMAGE_TYPES.includes(mimeType) ? mimeType : "image/jpeg";
+  return [base64, fileMimeType];
+}
+
 // OCR a single document with Gemini
 async function ocrSingleDocument(
   fileUrl: string,
@@ -257,31 +287,7 @@ async function ocrSingleDocument(
 ): Promise<Record<string, any>> {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-  let base64: string;
-  let fileMimeType: string;
-
-  const supportedImageTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
-
-  if (fileUrl.startsWith("data:")) {
-    const commaIdx = fileUrl.indexOf(",");
-    base64 = fileUrl.slice(commaIdx + 1);
-    const headerMime = fileUrl.slice(5, commaIdx).split(";")[0];
-    if (headerMime === "application/pdf") {
-      fileMimeType = "application/pdf";
-    } else {
-      fileMimeType = supportedImageTypes.includes(headerMime) ? headerMime : "image/jpeg";
-    }
-  } else {
-    const res = await fetch(fileUrl);
-    if (!res.ok) throw new Error(`ファイルの取得に失敗しました: ${fileUrl}`);
-    const arrayBuffer = await res.arrayBuffer();
-    base64 = Buffer.from(arrayBuffer).toString("base64");
-    if (mimeType === "application/pdf") {
-      fileMimeType = "application/pdf";
-    } else {
-      fileMimeType = supportedImageTypes.includes(mimeType) ? mimeType : "image/jpeg";
-    }
-  }
+  const [base64, fileMimeType] = await fetchAsBase64(fileUrl, mimeType);
 
   const prompt = buildPrompt(documentType);
   const schema = getOcrSchema(documentType);
@@ -332,6 +338,98 @@ async function ocrSingleDocument(
   return parsed;
 }
 
+// ─── 在留カード表面・裏面を同時にGeminiへ送信して解析 ──────────────────────────
+async function ocrResidenceCardCombined(
+  frontUrl: string, frontMime: string,
+  backUrl: string,  backMime: string
+): Promise<Record<string, any>> {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+  const [frontBase64, frontFileMime] = await fetchAsBase64(frontUrl, frontMime);
+  const [backBase64,  backFileMime]  = await fetchAsBase64(backUrl,  backMime);
+
+  const prompt = `【役割】あなたは在留資格申請を専門とする行政書士AIアシスタントです。在留カードの表面（1枚目）と裏面（2枚目）の2枚の画像から正確な情報を読み取ります。
+
+【処理対象】在留カード 表面（1枚目画像）・裏面（2枚目画像）
+・1枚目：在留カードの表面
+・2枚目：在留カードの裏面
+
+【処理手順】
+1. 1枚目（表面）から氏名・国籍・在留資格・在留期限・住所・在留カード番号を読み取る
+2. 2枚目（裏面）から住所変更記録の最新住所・勤務先を読み取る
+3. 日付はすべてYYYY-MM-DD形式に変換する
+
+【抽出フィールド（表面）】
+- surname_ja: 姓（漢字）
+- given_name_ja: 名（漢字）
+- surname_en: 姓（ローマ字・大文字）
+- given_name_en: 名（ローマ字・大文字）
+- nationality: 国籍・地域
+- date_of_birth: 生年月日（YYYY-MM-DD）
+- gender: 性別（M または F のみ）
+- residence_card_number: 在留カード番号（英数字12桁。大文字・スペースなし）
+- status_of_residence: 在留資格（日本語表記）
+- period_of_stay: 在留期間（例：3年、1年）
+- date_of_expiry: 在留期限（YYYY-MM-DD。和暦は西暦変換）
+- postal_code: 表面の郵便番号（数字7桁のみ）
+- address: 表面の住居地（郵便番号を除いた住所）
+
+【抽出フィールド（裏面）】
+- back_address: 裏面住所変更記録の最新住所（変更記録欄の最終行。なければnull）
+- back_postal_code: 変更後住所の郵便番号（数字7桁。なければnull）
+- workplace: 勤務先・所属機関名
+- qualification: 資格外活動許可等の記載
+
+【制約】
+・書類に明記されている情報のみ抽出し、推測・補完は行わないこと
+・読み取れない項目はnullとすること
+・日付は必ずYYYY-MM-DD形式（例：2025-03-15）
+・和暦（令和・平成等）の場合は西暦のYYYY-MM-DD形式に変換すること
+・性別はMまたはFのみ`;
+
+  let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
+  try {
+    response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{
+        parts: [
+          { inlineData: { mimeType: frontFileMime, data: frontBase64 } },
+          { inlineData: { mimeType: backFileMime,  data: backBase64  } },
+          { text: prompt },
+        ],
+      }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: RESIDENCE_CARD_SCHEMA,
+      },
+    });
+  } catch (err: any) {
+    const body = err?.errorDetails ?? err?.message ?? "";
+    const bodyStr = typeof body === "string" ? body : JSON.stringify(body);
+    if (err?.status === 429 || bodyStr.includes("429") || bodyStr.includes("RESOURCE_EXHAUSTED") || bodyStr.includes("credits are depleted")) {
+      throw new Error("Gemini APIのクレジットが不足しています。Google AI Studio（https://aistudio.google.com）でお支払い方法を確認してください。");
+    }
+    if (err?.status === 400 || bodyStr.includes("400")) {
+      throw new Error("画像の読み取りに失敗しました。別の形式（JPEGなど）でお試しください。");
+    }
+    throw new Error(`AI読み込みエラー: ${err?.message ?? "不明なエラー"}`);
+  }
+
+  const text = response.text ?? "{}";
+  console.log("[OCR/combined] raw response:", text.slice(0, 1000));
+
+  let parsed: Record<string, any> = {};
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    const m = text.match(/```json?\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+    try { parsed = JSON.parse(m?.[1] ?? text.trim()); } catch { parsed = {}; }
+  }
+
+  console.log("[OCR/combined] parsed fields:", JSON.stringify(parsed));
+  return parsed;
+}
+
 // OCR all documents for an applicant and auto-fill master data
 export async function ocrAndFillApplicant(applicantId: string) {
   const session = await auth();
@@ -353,28 +451,57 @@ export async function ocrAndFillApplicant(applicantId: string) {
       )
     );
 
-  if (docs.length === 0) {
+  // passport_front は廃止済みのため除外して処理
+  const activeDocs = docs.filter(d => d.documentType !== "passport_front");
+
+  if (activeDocs.length === 0) {
     throw new Error("アップロードされた書類がありません");
   }
 
   const allExtracted: Record<string, any> = {};
   const docResults: Array<{ id: string; data: Record<string, any> }> = [];
 
-  for (const doc of docs) {
-    const extracted = await ocrSingleDocument(
-      doc.fileUrl,
-      doc.mimeType ?? "image/jpeg",
-      doc.documentType
-    );
+  const rcFront = activeDocs.find(d => d.documentType === "residence_card_front");
+  const rcBack  = activeDocs.find(d => d.documentType === "residence_card_back");
+  const otherDocs = activeDocs.filter(d =>
+    d.documentType !== "residence_card_front" && d.documentType !== "residence_card_back"
+  );
 
+  // 在留カード以外の書類を個別OCR
+  for (const doc of otherDocs) {
+    const extracted = await ocrSingleDocument(doc.fileUrl, doc.mimeType ?? "image/jpeg", doc.documentType);
     Object.assign(allExtracted, extracted);
     docResults.push({ id: doc.id, data: extracted });
-
-    // Save OCR result to document record
-    await db
-      .update(applicantDocuments)
+    await db.update(applicantDocuments)
       .set({ ocrExtractedData: extracted, ocrProcessedAt: new Date() })
       .where(eq(applicantDocuments.id, doc.id));
+  }
+
+  // 在留カード: 両面揃っていれば同時送信OCR、一方のみなら個別OCR
+  if (rcFront && rcBack) {
+    console.log("[OCR/fill] 在留カード表面・裏面の同時解析を実行");
+    const combined = await ocrResidenceCardCombined(
+      rcFront.fileUrl, rcFront.mimeType ?? "image/jpeg",
+      rcBack.fileUrl,  rcBack.mimeType  ?? "image/jpeg"
+    );
+    Object.assign(allExtracted, combined);
+    docResults.push({ id: rcFront.id, data: combined });
+    docResults.push({ id: rcBack.id,  data: combined });
+    await db.update(applicantDocuments)
+      .set({ ocrExtractedData: combined, ocrProcessedAt: new Date() })
+      .where(eq(applicantDocuments.id, rcFront.id));
+    await db.update(applicantDocuments)
+      .set({ ocrExtractedData: combined, ocrProcessedAt: new Date() })
+      .where(eq(applicantDocuments.id, rcBack.id));
+  } else {
+    for (const doc of [rcFront, rcBack].filter((d): d is NonNullable<typeof d> => d != null)) {
+      const extracted = await ocrSingleDocument(doc.fileUrl, doc.mimeType ?? "image/jpeg", doc.documentType);
+      Object.assign(allExtracted, extracted);
+      docResults.push({ id: doc.id, data: extracted });
+      await db.update(applicantDocuments)
+        .set({ ocrExtractedData: extracted, ocrProcessedAt: new Date() })
+        .where(eq(applicantDocuments.id, doc.id));
+    }
   }
 
   console.log("[OCR/fill] allExtracted:", JSON.stringify(allExtracted).slice(0, 800));
@@ -382,7 +509,7 @@ export async function ocrAndFillApplicant(applicantId: string) {
   // 書類タイプ別に整理
   const byType2: Record<string, Record<string, any>> = {};
   for (const dr of docResults) {
-    const doc = docs.find(d => d.id === dr.id);
+    const doc = activeDocs.find(d => d.id === dr.id);
     if (doc) byType2[doc.documentType] = dr.data;
   }
 
@@ -433,12 +560,22 @@ export async function ocrAndFillApplicant(applicantId: string) {
   const rcExp2 = byType2["residence_card_front"]?.date_of_expiry;
   if (rcExp2 && rcExp2 !== "null") update.currentVisaExpiry = String(rcExp2);
 
-  // 住所優先: 裏面 > 表面
+  // 住所優先: 裏面住所変更(back_address) > 裏面単独OCR(address) > 表面住所
+  // back_address は統合OCR時または裏面スキャン時に住所変更記録が入るフィールド
+  const backAddrChange = allExtracted["back_address"];
   const backAddr2 = byType2["residence_card_back"]?.address;
   const frontAddr2 = byType2["residence_card_front"]?.address;
   let chosenAddr2 = "";
   let chosenPostal2 = "";
-  if (backAddr2 && backAddr2 !== "null") {
+  if (backAddrChange && backAddrChange !== "null") {
+    chosenAddr2 = String(backAddrChange);
+    const bp = allExtracted["back_postal_code"];
+    if (bp && bp !== "null") chosenPostal2 = String(bp);
+    else {
+      const fp = byType2["residence_card_front"]?.postal_code ?? allExtracted["postal_code"];
+      if (fp && fp !== "null") chosenPostal2 = String(fp);
+    }
+  } else if (backAddr2 && backAddr2 !== "null") {
     chosenAddr2 = String(backAddr2);
     const bp = byType2["residence_card_back"]?.postal_code;
     if (bp && bp !== "null") chosenPostal2 = String(bp);

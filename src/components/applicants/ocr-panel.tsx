@@ -11,14 +11,19 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
 
-type DocType = "passport_front" | "passport_data_page" | "residence_card_front" | "residence_card_back";
+type DocType = "passport_data_page" | "residence_card_front" | "residence_card_back";
 
-const DOC_CONFIGS: { type: DocType; label: string; description: string }[] = [
-  { type: "passport_front",     label: "パスポート（表紙）",         description: "表紙面" },
-  { type: "passport_data_page", label: "パスポート（顔写真ページ）",  description: "氏名・番号・有効期限ページ" },
-  { type: "residence_card_front", label: "在留カード（表面）",        description: "氏名・在留資格・有効期限" },
-  { type: "residence_card_back",  label: "在留カード（裏面）",        description: "勤務先等" },
+const PASSPORT_CONFIGS: { type: DocType; label: string; description: string }[] = [
+  { type: "passport_data_page", label: "パスポート（顔写真ページ）", description: "氏名・番号・有効期限ページ" },
 ];
+
+const RESIDENCE_CARD_CONFIGS: { type: DocType; label: string; description: string; optional?: boolean }[] = [
+  { type: "residence_card_front", label: "在留カード（表面）",          description: "氏名・在留資格・有効期限" },
+  { type: "residence_card_back",  label: "在留カード（裏面）",          description: "勤務先・住所変更記録", optional: true },
+];
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const DOC_CONFIGS = [...PASSPORT_CONFIGS, ...RESIDENCE_CARD_CONFIGS];
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   passport_front: "パスポート（表紙）",
@@ -83,7 +88,7 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
     });
   }
 
-  const uploadedCount = docs.filter((d) => d.documentType !== RENEWAL_DOC_TYPE).length;
+  const uploadedCount = docs.filter((d) => d.documentType !== RENEWAL_DOC_TYPE && d.documentType !== "passport_front").length;
 
   // 在留カード更新の履歴（複数アップロードされた場合、最新の1件のみメインに表示し、
   // それ以外は下部の折りたたみ履歴に回す）
@@ -94,7 +99,7 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
   const renewalHistory = renewalDocs.slice(1);
 
   const galleryDocs = [
-    ...docs.filter((d) => d.documentType !== RENEWAL_DOC_TYPE),
+    ...docs.filter((d) => d.documentType !== RENEWAL_DOC_TYPE && d.documentType !== "passport_front"),
     ...(latestRenewal ? [latestRenewal] : []),
   ];
 
@@ -169,9 +174,12 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
 
         {uploadExpanded && (
           <CardContent className="space-y-5">
-            {/* 2×2 upload grid */}
-            <div className="grid grid-cols-2 gap-4">
-              {DOC_CONFIGS.map((cfg) => (
+            {/* パスポートセクション */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
+                <span>📄</span> パスポート
+              </p>
+              {PASSPORT_CONFIGS.map((cfg) => (
                 <DocumentUploadZone
                   key={cfg.type}
                   applicantId={applicantId}
@@ -182,6 +190,29 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
                   onUploaded={refreshDocs}
                 />
               ))}
+            </div>
+
+            {/* 在留カードセクション */}
+            <div className="space-y-2">
+              <div className="flex items-baseline gap-2">
+                <p className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
+                  <span>🪪</span> 在留カード
+                </p>
+                <span className="text-xs text-gray-400">（表裏を別々の画像でアップロードすると、AIが両面を同時解析します）</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {RESIDENCE_CARD_CONFIGS.map((cfg) => (
+                  <DocumentUploadZone
+                    key={cfg.type}
+                    applicantId={applicantId}
+                    documentType={cfg.type}
+                    label={cfg.optional ? `${cfg.label}（任意）` : cfg.label}
+                    description={cfg.description}
+                    existingDoc={getDoc(cfg.type)}
+                    onUploaded={refreshDocs}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* OCR button & results */}

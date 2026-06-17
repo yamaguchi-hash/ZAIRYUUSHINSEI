@@ -6,7 +6,7 @@ import { DocumentUploadZone } from "./document-upload-zone";
 import { DocumentLink, isImageFile } from "./document-viewer";
 import {
   Sparkles, Loader2, CheckCircle, AlertCircle,
-  ChevronDown, ChevronUp, FileText, Eye, ExternalLink, Clock,
+  ChevronDown, ChevronUp, FileText, Eye, ExternalLink, Clock, Plus, X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
@@ -17,13 +17,10 @@ const PASSPORT_CONFIGS: { type: DocType; label: string; description: string }[] 
   { type: "passport_data_page", label: "パスポート（顔写真ページ）", description: "氏名・番号・有効期限ページ" },
 ];
 
-const RESIDENCE_CARD_CONFIGS: { type: DocType; label: string; description: string; optional?: boolean }[] = [
-  { type: "residence_card_front", label: "在留カード（表面）",          description: "氏名・在留資格・有効期限" },
-  { type: "residence_card_back",  label: "在留カード（裏面）",          description: "勤務先・住所変更記録", optional: true },
+const RESIDENCE_CARD_CONFIGS: { type: DocType; label: string; description: string }[] = [
+  { type: "residence_card_front", label: "在留カード（表面）", description: "氏名・在留資格・有効期限" },
+  { type: "residence_card_back",  label: "在留カード（裏面）", description: "勤務先・住所変更記録" },
 ];
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const DOC_CONFIGS = [...PASSPORT_CONFIGS, ...RESIDENCE_CARD_CONFIGS];
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   passport_front: "パスポート（表紙）",
@@ -56,6 +53,10 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
   const [ocrResult, setOcrResult] = useState<{ fields: string[]; extracted: Record<string, any> } | null>(null);
   const [ocrError, setOcrError] = useState("");
   const [uploadExpanded, setUploadExpanded] = useState(true);
+  // 裏面枠の表示制御（既存ドキュメントがある場合は初期表示）
+  const [showBackSide, setShowBackSide] = useState(
+    () => initialDocs.some(d => d.documentType === "residence_card_back")
+  );
 
   const refreshDocs = useCallback(() => {
     getApplicantDocuments(applicantId).then((d) =>
@@ -194,25 +195,62 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
 
             {/* 在留カードセクション */}
             <div className="space-y-2">
-              <div className="flex items-baseline gap-2">
-                <p className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
-                  <span>🪪</span> 在留カード
-                </p>
-                <span className="text-xs text-gray-400">（表裏を別々の画像でアップロードすると、AIが両面を同時解析します）</span>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {RESIDENCE_CARD_CONFIGS.map((cfg) => (
+              <p className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
+                <span>🪪</span> 在留カード
+              </p>
+
+              {/* 表面（常に表示） */}
+              <DocumentUploadZone
+                applicantId={applicantId}
+                documentType="residence_card_front"
+                label={RESIDENCE_CARD_CONFIGS[0].label}
+                description={RESIDENCE_CARD_CONFIGS[0].description}
+                existingDoc={getDoc("residence_card_front")}
+                onUploaded={refreshDocs}
+              />
+
+              {/* 裏面：ドキュメントが存在するか showBackSide が true の場合に表示 */}
+              {(showBackSide || !!getDoc("residence_card_back")) ? (
+                <div className="border-t border-dashed border-gray-200 pt-2 space-y-1.5">
+                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                    <span>↳</span>
+                    <span>裏面（勤務先・住所変更記録）</span>
+                    {!getDoc("residence_card_back") && (
+                      <button
+                        type="button"
+                        onClick={() => setShowBackSide(false)}
+                        className="ml-auto text-gray-300 hover:text-gray-500 transition-colors"
+                        title="裏面枠を閉じる"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                   <DocumentUploadZone
-                    key={cfg.type}
                     applicantId={applicantId}
-                    documentType={cfg.type}
-                    label={cfg.optional ? `${cfg.label}（任意）` : cfg.label}
-                    description={cfg.description}
-                    existingDoc={getDoc(cfg.type)}
+                    documentType="residence_card_back"
+                    label={RESIDENCE_CARD_CONFIGS[1].label}
+                    description={RESIDENCE_CARD_CONFIGS[1].description}
+                    existingDoc={getDoc("residence_card_back")}
                     onUploaded={refreshDocs}
                   />
-                ))}
-              </div>
+                  {getDoc("residence_card_front") && getDoc("residence_card_back") && (
+                    <p className="text-xs text-blue-500 flex items-center gap-1 bg-blue-50 rounded-lg px-2.5 py-1.5">
+                      <Sparkles className="w-3 h-3 flex-shrink-0" />
+                      表面・裏面の両方がそろいました — AIが2枚を同時解析します
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowBackSide(true)}
+                  className="w-full flex items-center justify-center gap-1.5 border border-dashed border-gray-300 rounded-xl py-2 text-xs text-gray-400 hover:text-blue-500 hover:border-blue-300 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  裏面を追加する
+                </button>
+              )}
             </div>
 
             {/* OCR button & results */}

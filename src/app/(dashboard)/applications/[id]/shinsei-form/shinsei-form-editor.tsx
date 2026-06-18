@@ -2123,10 +2123,10 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     <Field label="(8) 常勤職員数（名）"><input className={inputCls} type="number" value={form.orgEmployeeCount} onChange={e => set("orgEmployeeCount", e.target.value)} /></Field>
                   </div>
                   <Field label="(9) 代表者の氏名"><input className={inputCls} value={form.position} onChange={e => set("position", e.target.value)} /></Field>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="(10) 勤務させる事業所名"><input className={inputCls} value={form.orgBranchName} onChange={e => set("orgBranchName", e.target.value)} /></Field>
-                    <Field label="事業所所在地"><input className={inputCls} value={form.activityDetails} onChange={e => set("activityDetails", e.target.value)} placeholder="本社と異なる場合" /></Field>
-                  </div>
+                  <Field label="(10) 勤務させる事業所名"><input className={inputCls} value={form.orgBranchName} onChange={e => set("orgBranchName", e.target.value)} /></Field>
+                  <Field label="事業所所在地（本社と異なる場合）">
+                    <AddressSplitSimple value={form.activityDetails} onChange={v => set("activityDetails", v)} inputClassName={inputCls} />
+                  </Field>
                   <Field label="労働保険番号（14桁）"><ValidatedInput className={inputCls} value={form.orgLaborInsuranceNo} onChange={v => set("orgLaborInsuranceNo", v)} validate={validateLaborInsuranceNumber} placeholder="例：01-234567-890123-000" /></Field>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="健康保険及び厚生年金保険の適用事業所であることの有無">

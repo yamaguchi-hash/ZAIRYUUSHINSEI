@@ -499,22 +499,10 @@ export function DocumentChecklist({
     }
   }
 
-  // カテゴリ分類（申請人 / 所属機関）
-  const applicantItems = localChecklist.filter(i => getDocumentSide(i.documentName) === "applicant");
-  const orgItems = localChecklist.filter(i => getDocumentSide(i.documentName) === "organization");
-  const hasBothCategories = applicantItems.length > 0 && orgItems.length > 0;
-  type GroupedEntry =
-    | { type: "header"; side: "applicant" | "organization" }
-    | { type: "item"; item: ChecklistItem };
-  const grouped: GroupedEntry[] = [];
-  if (applicantItems.length > 0) {
-    if (hasBothCategories) grouped.push({ type: "header", side: "applicant" });
-    applicantItems.forEach(item => grouped.push({ type: "item", item }));
-  }
-  if (orgItems.length > 0) {
-    if (hasBothCategories) grouped.push({ type: "header", side: "organization" });
-    orgItems.forEach(item => grouped.push({ type: "item", item }));
-  }
+  // カテゴリバッジ表示フラグ（申請人 / 所属機関の両方が存在する場合のみバッジを表示）
+  const showCategoryBadge =
+    localChecklist.some(i => getDocumentSide(i.documentName) === "applicant") &&
+    localChecklist.some(i => getDocumentSide(i.documentName) === "organization");
 
   return (
     <Card>
@@ -584,18 +572,8 @@ export function DocumentChecklist({
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {grouped.map((entry, idx) => {
-              if (entry.type === "header") {
-                return (
-                  <div key={`header-${entry.side}`} className="px-6 py-2 bg-gray-50 flex items-center gap-1.5">
-                    {entry.side === "applicant"
-                      ? <><User className="w-3.5 h-3.5 text-blue-500" /><span className="text-xs font-semibold text-blue-700">申請人の書類</span></>
-                      : <><Building2 className="w-3.5 h-3.5 text-teal-500" /><span className="text-xs font-semibold text-teal-700">所属機関の書類</span></>
-                    }
-                  </div>
-                );
-              }
-              const { item } = entry;
+            {localChecklist.map((item) => {
+              const side = getDocumentSide(item.documentName);
               return (
               <div
                 key={item.id}
@@ -638,15 +616,27 @@ export function DocumentChecklist({
                   )}
 
                   <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      "text-sm font-medium leading-tight",
+                    <div className={cn(
+                      "flex items-center gap-1.5 flex-wrap",
                       item.isRequiredByExpert ? "text-gray-900" : "text-gray-400"
                     )}>
-                      {item.documentName}
-                      {item.isRequiredByExpert && (
-                        <span className="ml-2 text-xs text-red-500 font-normal">必須</span>
+                      {/* カテゴリバッジ（インライン） */}
+                      {showCategoryBadge && (
+                        side === "applicant" ? (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 flex-shrink-0 border border-blue-100">
+                            <User className="w-2.5 h-2.5" />申請人
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-600 flex-shrink-0 border border-teal-100">
+                            <Building2 className="w-2.5 h-2.5" />所属機関
+                          </span>
+                        )
                       )}
-                    </p>
+                      <span className="text-sm font-medium leading-tight">{item.documentName}</span>
+                      {item.isRequiredByExpert && (
+                        <span className="text-xs text-red-500 font-normal flex-shrink-0">必須</span>
+                      )}
+                    </div>
                     {item.masterDescription && (
                       <p className="text-xs text-blue-600 mt-0.5 leading-relaxed">
                         ℹ {item.masterDescription}
@@ -690,54 +680,52 @@ export function DocumentChecklist({
                       </div>
                     )}
 
-                    {/* 個別ドロップイン */}
-                    {item.isRequiredByExpert && (
-                      <div className="mt-1.5">
-                        <ChecklistDropzone
-                          itemId={item.id}
-                          applicationId={applicationId}
-                          documentName={item.documentName}
-                          file={{
-                            fileUrl: item.fileUrl ?? null,
-                            fileName: item.fileName ?? null,
-                            fileSize: item.fileSize ?? null,
-                            mimeType: item.mimeType ?? null,
-                          }}
-                          onUploaded={handleFileUploaded}
-                          onDeleted={handleFileDeleted}
-                          onAiResult={handleAiResult}
-                        />
-                        {/* 未判別書類の手動再分類 */}
-                        {needsManualClassification.has(item.id) && item.fileName && (
-                          <div className="mt-1.5 flex items-start gap-1.5 flex-wrap">
-                            <span className="text-xs text-amber-600 flex-shrink-0 mt-0.5 leading-tight">
-                              ⚠ 書類種別を自動判別できませんでした。正しい項目へ移動:
-                            </span>
-                            <select
-                              className="text-xs border border-amber-300 rounded px-1.5 py-0.5 bg-amber-50 focus:outline-none focus:border-amber-500 disabled:opacity-50"
-                              defaultValue=""
-                              disabled={isReassigning.has(item.id)}
-                              onChange={async (e) => {
-                                const toId = e.target.value;
-                                if (!toId) return;
-                                e.target.value = "";
-                                await handleReassign(item.id, toId);
-                              }}
-                            >
-                              <option value="">書類名を選択...</option>
-                              {localChecklist
-                                .filter((c) => c.id !== item.id && !c.fileName && c.isRequiredByExpert)
-                                .map((c) => (
-                                  <option key={c.id} value={c.id}>{c.documentName}</option>
-                                ))}
-                            </select>
-                            {isReassigning.has(item.id) && (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500 mt-0.5 flex-shrink-0" />
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {/* 全項目にドロップイン枠を表示 */}
+                    <div className="mt-1.5">
+                      <ChecklistDropzone
+                        itemId={item.id}
+                        applicationId={applicationId}
+                        documentName={item.documentName}
+                        file={{
+                          fileUrl: item.fileUrl ?? null,
+                          fileName: item.fileName ?? null,
+                          fileSize: item.fileSize ?? null,
+                          mimeType: item.mimeType ?? null,
+                        }}
+                        onUploaded={handleFileUploaded}
+                        onDeleted={handleFileDeleted}
+                        onAiResult={handleAiResult}
+                      />
+                      {/* 未判別書類の手動再分類 */}
+                      {needsManualClassification.has(item.id) && item.fileName && (
+                        <div className="mt-1.5 flex items-start gap-1.5 flex-wrap">
+                          <span className="text-xs text-amber-600 flex-shrink-0 mt-0.5 leading-tight">
+                            ⚠ 書類種別を自動判別できませんでした。正しい項目へ移動:
+                          </span>
+                          <select
+                            className="text-xs border border-amber-300 rounded px-1.5 py-0.5 bg-amber-50 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+                            defaultValue=""
+                            disabled={isReassigning.has(item.id)}
+                            onChange={async (e) => {
+                              const toId = e.target.value;
+                              if (!toId) return;
+                              e.target.value = "";
+                              await handleReassign(item.id, toId);
+                            }}
+                          >
+                            <option value="">書類名を選択...</option>
+                            {localChecklist
+                              .filter((c) => c.id !== item.id && !c.fileName)
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>{c.documentName}</option>
+                              ))}
+                          </select>
+                          {isReassigning.has(item.id) && (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500 mt-0.5 flex-shrink-0" />
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* ステータス選択（手動管理） */}

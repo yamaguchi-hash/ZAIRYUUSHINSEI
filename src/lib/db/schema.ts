@@ -195,6 +195,12 @@ export const applicationDocumentChecklist = pgTable("application_document_checkl
   fileSize: integer("file_size"),
   mimeType: text("mime_type"),
   ocrExtractedData: jsonb("ocr_extracted_data"),
+  additionalFiles: jsonb("additional_files").$type<Array<{
+    fileUrl: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+  }>>(),
   expertNotes: text("expert_notes"),
   submittedAt: timestamp("submitted_at"),
   reviewedAt: timestamp("reviewed_at"),

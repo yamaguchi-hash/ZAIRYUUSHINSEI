@@ -452,6 +452,7 @@ export default async function ApplicationDetailPage({
             fileName: c.fileName,
             fileSize: c.fileSize,
             mimeType: c.mimeType,
+            additionalFiles: c.additionalFiles ?? null,
           }))}
           applicationId={application.id}
           userRole={userRole}

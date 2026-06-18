@@ -94,6 +94,7 @@ export async function getApplicationById(id: string) {
       fileName:              applicationDocumentChecklist.fileName,
       fileSize:              applicationDocumentChecklist.fileSize,
       mimeType:              applicationDocumentChecklist.mimeType,
+      additionalFiles:       applicationDocumentChecklist.additionalFiles,
       ocrExtractedData:      applicationDocumentChecklist.ocrExtractedData,
       expertNotes:           applicationDocumentChecklist.expertNotes,
       submittedAt:           applicationDocumentChecklist.submittedAt,
@@ -143,6 +144,7 @@ export async function getApplicationById(id: string) {
     fileName:   item.fileName ?? null,
     fileSize:   item.fileSize ?? null,
     mimeType:   item.mimeType ?? null,
+    additionalFiles: (item.additionalFiles ?? null) as Array<{ fileUrl: string; fileName: string; fileSize: number; mimeType: string }> | null,
     expertNotes: item.expertNotes ?? null,
     // OCR データ: null または plain object（シリアライズ可）
     // 空オブジェクト {} は null に変換（React hydration の安全化）

@@ -29,6 +29,13 @@ import {
 import { cn } from "@/lib/utils";
 import { DocumentLink } from "@/components/applicants/document-viewer";
 
+interface AdditionalFile {
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+}
+
 interface ChecklistItem {
   id: string;
   documentName: string;
@@ -44,6 +51,7 @@ interface ChecklistItem {
   fileName?: string | null;
   fileSize?: number | null;
   mimeType?: string | null;
+  additionalFiles?: AdditionalFile[] | null;
 }
 
 interface DocumentChecklistProps {
@@ -270,6 +278,151 @@ const ChecklistDropzone = memo(function ChecklistDropzone({
   );
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+// 追加ファイルセクション（2枚目以降のアップロード・表示・削除）
+// ═════════════════════════════════════════════════════════════════════════════
+const ExtraFilesSection = memo(function ExtraFilesSection({
+  itemId,
+  applicationId,
+  documentName,
+  extraFiles,
+  onFileAdded,
+  onFileDeleted,
+  onAiResult,
+}: {
+  itemId: string;
+  applicationId: string;
+  documentName: string;
+  extraFiles: AdditionalFile[];
+  onFileAdded: (itemId: string, file: AdditionalFile) => void;
+  onFileDeleted: (itemId: string, index: number) => void;
+  onAiResult: (result: AiFillResult) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
+
+  async function handleFiles(fileList: File[]) {
+    if (fileList.length === 0) return;
+    setError("");
+    setIsUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", fileList[0]);
+      const res = await fetch(`/api/applications/${applicationId}/checklist/${itemId}/extra-file`, {
+        method: "POST",
+        body: fd,
+      });
+      let data: any;
+      try { data = await res.json(); } catch {
+        throw new Error(`サーバーエラーが発生しました（HTTP ${res.status}）。書類が多い場合は時間がかかることがあります。`);
+      }
+      if (!res.ok) throw new Error(data?.error ?? "アップロードに失敗しました");
+      onFileAdded(itemId, data.addedFile);
+      if (data.aiResult) onAiResult(data.aiResult);
+    } catch (err: any) {
+      setError(err.message ?? "アップロードに失敗しました");
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  async function handleDelete(index: number) {
+    if (!confirm("追加ファイルを削除しますか？")) return;
+    setDeletingIdx(index);
+    setError("");
+    try {
+      const res = await fetch(`/api/applications/${applicationId}/checklist/${itemId}/extra-file`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ index }),
+      });
+      let data: any;
+      try { data = await res.json(); } catch { throw new Error(`サーバーエラー（HTTP ${res.status}）`); }
+      if (!res.ok) throw new Error(data?.error ?? "削除に失敗しました");
+      onFileDeleted(itemId, index);
+    } catch (err: any) {
+      setError(err.message ?? "削除に失敗しました");
+    } finally {
+      setDeletingIdx(null);
+    }
+  }
+
+  return (
+    <div className="mt-1 flex flex-wrap gap-1 items-start">
+      {/* 追加ファイル一覧 */}
+      {extraFiles.map((f, idx) => (
+        <div key={idx} className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg pl-1.5 pr-1 py-1">
+          <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+          {f.fileUrl && f.fileUrl !== "(uploaded)" ? (
+            <DocumentLink
+              url={f.fileUrl}
+              fileName={f.fileName}
+              documentType={documentName}
+              className="text-xs text-green-700 hover:text-green-900 hover:underline truncate max-w-[160px]"
+            >
+              {f.fileName}
+            </DocumentLink>
+          ) : (
+            <span className="text-xs text-green-700 truncate max-w-[160px]" title={f.fileName}>{f.fileName}</span>
+          )}
+          <button
+            type="button"
+            onClick={() => handleDelete(idx)}
+            disabled={deletingIdx === idx}
+            className="p-0.5 text-green-400 hover:text-red-500 disabled:opacity-50 flex-shrink-0"
+            title="削除"
+          >
+            {deletingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+          </button>
+        </div>
+      ))}
+
+      {/* 追加アップロードゾーン */}
+      <div
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragging(false);
+          const fl = Array.from(e.dataTransfer.files);
+          if (fl.length) handleFiles(fl);
+        }}
+        className={cn(
+          "inline-flex items-center gap-1 border border-dashed rounded-lg px-2 py-0.5 cursor-pointer transition-colors text-xs",
+          isDragging
+            ? "border-blue-400 bg-blue-50 text-blue-600"
+            : "border-gray-200 bg-gray-50 text-gray-400 hover:border-blue-300 hover:bg-blue-50/40",
+          isUploading && "pointer-events-none opacity-60"
+        )}
+      >
+        {isUploading ? (
+          <><Loader2 className="w-3 h-3 animate-spin text-blue-500" /><span className="text-blue-500">追加中...</span></>
+        ) : isDragging ? (
+          <><Upload className="w-3 h-3" /><span>ここにドロップ</span></>
+        ) : (
+          <><Plus className="w-3 h-3" /><span>2枚目を追加</span></>
+        )}
+      </div>
+
+      {error && <p className="w-full text-xs text-red-500 mt-0.5 whitespace-pre-wrap max-w-[240px]">{error}</p>}
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,image/jpeg,image/png,application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const fl = Array.from(e.target.files ?? []);
+          if (fl.length) { handleFiles(fl); e.target.value = ""; }
+        }}
+      />
+    </div>
+  );
+});
+
 export function DocumentChecklist({
   checklist,
   applicationId,
@@ -402,6 +555,22 @@ export function DocumentChecklist({
       setIsReassigning((prev) => { const next = new Set(prev); next.delete(fromId); return next; });
     }
   }, [applicationId]);
+
+  const handleExtraFileAdded = useCallback((itemId: string, file: AdditionalFile) => {
+    setLocalChecklist(prev =>
+      prev.map(i => i.id === itemId
+        ? { ...i, additionalFiles: [...(i.additionalFiles ?? []), file] }
+        : i)
+    );
+  }, []);
+
+  const handleExtraFileDeleted = useCallback((itemId: string, index: number) => {
+    setLocalChecklist(prev =>
+      prev.map(i => i.id === itemId
+        ? { ...i, additionalFiles: (i.additionalFiles ?? []).filter((_, idx) => idx !== index) }
+        : i)
+    );
+  }, []);
 
   const handleAiResult = useCallback((result: AiFillResult) => {
     if (result.success) {
@@ -696,6 +865,18 @@ export function DocumentChecklist({
                         onDeleted={handleFileDeleted}
                         onAiResult={handleAiResult}
                       />
+                      {/* 1枚目が存在する場合のみ2枚目以降のUI */}
+                      {item.fileName && (
+                        <ExtraFilesSection
+                          itemId={item.id}
+                          applicationId={applicationId}
+                          documentName={item.documentName}
+                          extraFiles={item.additionalFiles ?? []}
+                          onFileAdded={handleExtraFileAdded}
+                          onFileDeleted={handleExtraFileDeleted}
+                          onAiResult={handleAiResult}
+                        />
+                      )}
                       {/* 未判別書類の手動再分類 */}
                       {needsManualClassification.has(item.id) && item.fileName && (
                         <div className="mt-1.5 flex items-start gap-1.5 flex-wrap">

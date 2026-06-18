@@ -237,6 +237,14 @@ export async function fillAllFieldsFromDocs(
         fileUrl: c.fileUrl!,
         mimeType: c.mimeType,
       })),
+      // additional_files（2枚目以降）も解析対象に含める
+      ...checklist.flatMap(c =>
+        (c.additionalFiles ?? []).map(f => ({
+          documentName: c.documentName,
+          fileUrl: f.fileUrl,
+          mimeType: f.mimeType,
+        }))
+      ),
     ];
 
     if (submitted.length === 0) {

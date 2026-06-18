@@ -201,12 +201,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       .where(eq(applicationDocumentChecklist.applicationId, applicationId));
 
     for (const item of checklistDocs) {
-      if (!item.fileUrl || !item.fileName) continue;
-      const bytes = await fetchFileBytes(item.fileUrl);
-      if (!bytes) {
-        failedFiles.push(item.fileName);
-        continue;
-      }
       const folderKey = safeName(item.documentName);
       const sub = attachFolder.folder(folderKey)!;
       let usedNames = usedNamesByFolder.get(folderKey);
@@ -214,8 +208,30 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
         usedNames = new Set();
         usedNamesByFolder.set(folderKey, usedNames);
       }
-      sub.file(uniqueFileName(usedNames, safeName(item.fileName)), bytes);
-      attachedCount++;
+
+      // 1枚目（primary file）
+      if (item.fileUrl && item.fileName) {
+        const bytes = await fetchFileBytes(item.fileUrl);
+        if (!bytes) {
+          failedFiles.push(item.fileName);
+        } else {
+          sub.file(uniqueFileName(usedNames, safeName(item.fileName)), bytes);
+          attachedCount++;
+        }
+      }
+
+      // 2枚目以降（additional_files JSONB 配列）
+      const extras = (item.additionalFiles ?? []) as Array<{ fileUrl: string; fileName: string }>;
+      for (const extra of extras) {
+        if (!extra.fileUrl || !extra.fileName) continue;
+        const bytes = await fetchFileBytes(extra.fileUrl);
+        if (!bytes) {
+          failedFiles.push(extra.fileName);
+          continue;
+        }
+        sub.file(uniqueFileName(usedNames, safeName(extra.fileName)), bytes);
+        attachedCount++;
+      }
     }
 
     if (attachedCount === 0 && signedCount === 0) {

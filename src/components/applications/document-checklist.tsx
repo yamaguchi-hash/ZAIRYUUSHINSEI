@@ -152,8 +152,16 @@ const ChecklistDropzone = memo(function ChecklistDropzone({
         method: "POST",
         body: fd,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "アップロードに失敗しました");
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(
+          `サーバーエラーが発生しました（HTTP ${res.status}）。` +
+          "書類が多い場合は処理に時間がかかることがあります。しばらく待ってから再試行してください。"
+        );
+      }
+      if (!res.ok) throw new Error(data?.error ?? "アップロードに失敗しました");
       onUploaded(
         data.targetItemId ?? itemId,
         data.item,
@@ -175,8 +183,9 @@ const ChecklistDropzone = memo(function ChecklistDropzone({
       const res = await fetch(`/api/applications/${applicationId}/checklist/${itemId}/document`, {
         method: "DELETE",
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "削除に失敗しました");
+      let data: any;
+      try { data = await res.json(); } catch { throw new Error(`サーバーエラー（HTTP ${res.status}）`); }
+      if (!res.ok) throw new Error(data?.error ?? "削除に失敗しました");
       onDeleted(itemId);
     } catch (err: any) {
       setError(err.message ?? "削除に失敗しました");
@@ -374,8 +383,9 @@ export function DocumentChecklist({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetItemId: toId }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "再分類に失敗しました");
+      let data: any;
+      try { data = await res.json(); } catch { throw new Error(`サーバーエラー（HTTP ${res.status}）`); }
+      if (!res.ok) throw new Error(data?.error ?? "再分類に失敗しました");
       setLocalChecklist((prev) => prev.map((i) => {
         if (i.id === fromId) return { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, status: "not_submitted" };
         if (i.id === toId) return { ...i, fileUrl: data.item.fileUrl, fileName: data.item.fileName, fileSize: data.item.fileSize, mimeType: data.item.mimeType, status: data.item.status };

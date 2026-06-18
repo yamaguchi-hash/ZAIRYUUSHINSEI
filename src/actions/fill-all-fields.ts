@@ -453,7 +453,16 @@ ${STAGE2_FIELD_LIST}
       aiData = JSON.parse(synthTxt);
     } catch {
       const synthM = synthTxt.match(/```json?\s*([\s\S]*?)```/) ?? synthTxt.match(/(\{[\s\S]*\})/);
-      aiData = synthM ? JSON.parse(synthM[1] ?? synthM[0]) : {};
+      if (synthM) {
+        try {
+          aiData = JSON.parse(synthM[1] ?? synthM[0]);
+        } catch (e2: any) {
+          console.error('[fillAllFields] Stage2 fallback JSON parse failed:', e2?.message);
+          aiData = {};
+        }
+      } else {
+        aiData = {};
+      }
     }
 
     // ── 6-b. バリデーション・クリーニング ────────────────────────────────────

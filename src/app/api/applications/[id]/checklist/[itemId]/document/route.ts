@@ -18,7 +18,7 @@ import { buildAutoFileName, getApplicantNameForFile } from "@/lib/file-naming";
 import { classifyDocumentType, matchChecklistItem, UNCLASSIFIED_DOC_LABEL } from "@/lib/document-classifier";
 import { fillAllFieldsFromDocs } from "@/actions/fill-all-fields";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const ALLOWED_MIMES = [
   "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif",
@@ -64,6 +64,7 @@ async function authorize(applicationId: string): Promise<
 
 // ─── POST: アップロード ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string; itemId: string }> }) {
+  try {
   const { id: applicationId, itemId } = await ctx.params;
   const authResult = await authorize(applicationId);
   if (!authResult.ok) return authResult.res;
@@ -243,13 +244,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       },
     });
   } catch (err: any) {
-    console.error("[checklist document POST] error:", err);
+    console.error("[checklist document POST] inner error:", err);
     return NextResponse.json({ error: `アップロードに失敗しました: ${err.message}` }, { status: 500 });
+  }
+  } catch (err: any) {
+    console.error("[checklist document POST] outer error:", err);
+    return NextResponse.json({ error: `サーバーエラーが発生しました: ${err.message}` }, { status: 500 });
   }
 }
 
 // ─── PATCH: 未判別書類の手動再分類（別チェックリスト項目へ移動） ───────────────────
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string; itemId: string }> }) {
+  try {
   const { id: applicationId, itemId } = await ctx.params;
   const authResult = await authorize(applicationId);
   if (!authResult.ok) return authResult.res;
@@ -365,13 +371,18 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       },
     });
   } catch (err: any) {
-    console.error("[checklist document PATCH] error:", err);
+    console.error("[checklist document PATCH] inner error:", err);
     return NextResponse.json({ error: `再分類に失敗しました: ${err.message}` }, { status: 500 });
+  }
+  } catch (err: any) {
+    console.error("[checklist document PATCH] outer error:", err);
+    return NextResponse.json({ error: `サーバーエラーが発生しました: ${err.message}` }, { status: 500 });
   }
 }
 
 // ─── DELETE: 削除 ───────────────────────────────────────────────────────────────
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string; itemId: string }> }) {
+  try {
   const { id: applicationId, itemId } = await ctx.params;
   const authResult = await authorize(applicationId);
   if (!authResult.ok) return authResult.res;
@@ -407,7 +418,11 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
     revalidatePath(`/applications/${applicationId}`);
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error("[checklist document DELETE] error:", err);
+    console.error("[checklist document DELETE] inner error:", err);
     return NextResponse.json({ error: "削除に失敗しました" }, { status: 500 });
+  }
+  } catch (err: any) {
+    console.error("[checklist document DELETE] outer error:", err);
+    return NextResponse.json({ error: `サーバーエラーが発生しました: ${err.message}` }, { status: 500 });
   }
 }

@@ -40,8 +40,8 @@ export const ORG_MASTER_COMMON_FIELD_KEYS = [
   "industry", "category",
   // 資本金又は出資金の額 / 直近の年間売上高 / 常勤職員数 / 決算期
   "capital", "annualSales", "employeeCount", "fiscalYearEnd",
-  // 雇用保険適用事業所番号 / 健康保険・厚生年金保険事業所整理記号等 / 労働保険番号（労災含む）
-  "employmentInsuranceNo", "socialInsuranceSymbol", "laborInsuranceNo", "workersAccidentInsuranceNo",
+  // 雇用保険適用事業所番号 / 健康保険・厚生年金保険事業所整理記号等 / 労働保険番号
+  "employmentInsuranceNo", "socialInsuranceSymbol", "laborInsuranceNo",
 ] as const;
 
 export type OrgMasterCommonFieldKey = (typeof ORG_MASTER_COMMON_FIELD_KEYS)[number];
@@ -91,7 +91,6 @@ export interface OrgMasterRecord {
   employmentInsuranceNo?: string | null;
   socialInsuranceSymbol?: string | null;
   laborInsuranceNo?: string | null;
-  workersAccidentInsuranceNo?: string | null;
 }
 
 /** 業種の自由テキストを BUSINESS_TYPES のコードに変換（一致しなければ空） */

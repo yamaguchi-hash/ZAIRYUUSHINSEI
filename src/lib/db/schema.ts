@@ -85,7 +85,6 @@ export const organizationMaster = pgTable("organization_master", {
   category: text("category"),
   industry: text("industry"),
   // ── 追加フィールド ────────────────────────────────────────────────────────
-  workersAccidentInsuranceNo: text("workers_accident_insurance_no"),  // 労働災害保険番号
   employmentInsuranceNo: text("employment_insurance_no"),              // 雇用保険事業者番号
   laborInsuranceNo: text("labor_insurance_no"),                        // 労働保険番号（14桁）
   socialInsuranceSymbol: text("social_insurance_symbol"),              // 健康保険・厚生年金保険事業所整理記号等

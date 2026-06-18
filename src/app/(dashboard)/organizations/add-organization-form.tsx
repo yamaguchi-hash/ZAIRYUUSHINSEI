@@ -22,7 +22,6 @@ type OrgForm = {
   annualSales: string;
   employeeCount: string;
   industry: string;
-  workersAccidentInsuranceNo: string;
   employmentInsuranceNo: string;
   laborInsuranceNo: string;
   socialInsuranceSymbol: string;
@@ -34,7 +33,7 @@ const EMPTY_FORM: OrgForm = {
   nameJa: "", nameEn: "", corporateNumber: "", postalCode: "",
   prefecture: "", city: "", addressLine: "", phone: "", fax: "", email: "",
   category: "", capital: "", annualSales: "", employeeCount: "", industry: "",
-  workersAccidentInsuranceNo: "", employmentInsuranceNo: "", laborInsuranceNo: "",
+  employmentInsuranceNo: "", laborInsuranceNo: "",
   socialInsuranceSymbol: "",
   representativeTitle: "", representativeName: "",
 };
@@ -56,7 +55,6 @@ type EditingOrg = {
   annualSales?: number | null;
   employeeCount?: number | null;
   industry?: string;
-  workersAccidentInsuranceNo?: string;
   employmentInsuranceNo?: string;
   laborInsuranceNo?: string;
   socialInsuranceSymbol?: string;
@@ -93,7 +91,6 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
       annualSales: editingOrg.annualSales != null ? String(editingOrg.annualSales) : "",
       employeeCount: editingOrg.employeeCount != null ? String(editingOrg.employeeCount) : "",
       industry: editingOrg.industry ?? "",
-      workersAccidentInsuranceNo: editingOrg.workersAccidentInsuranceNo ?? "",
       employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? "",
       laborInsuranceNo: editingOrg.laborInsuranceNo ?? "",
       socialInsuranceSymbol: editingOrg.socialInsuranceSymbol ?? "",
@@ -208,10 +205,6 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 mb-2">保険番号</p>
             <div className="grid grid-cols-1 gap-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">労働災害保険番号</label>
-                <input name="workersAccidentInsuranceNo" value={form.workersAccidentInsuranceNo} onChange={handleChange} placeholder="01-123456-789012-000" className="input-field font-mono" />
-              </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">雇用保険事業者番号</label>
                 <input name="employmentInsuranceNo" value={form.employmentInsuranceNo} onChange={handleChange} placeholder="0100-012345-6" className="input-field font-mono" />

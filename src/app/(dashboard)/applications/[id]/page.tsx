@@ -44,6 +44,9 @@ import { AzukariPanel } from "@/components/applications/azukari-panel";
 import { db, applicantDocuments, applicationAttachments } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
 import { AttachmentUploadPanel } from "@/components/applications/attachment-upload-panel";
+import { buildEffectiveFormData } from "@/lib/effective-form-data";
+import { computeInterviewQuestions } from "@/lib/interview-diff";
+import { toFormType } from "@/lib/questionnaire-questions";
 
 // 8ステップのワークフロー
 const WORKFLOW_STEPS = [
@@ -85,7 +88,17 @@ export default async function ApplicationDetailPage({
   // data が取れなかった場合は notFound() が throw するので、ここには到達しない
   if (!data) notFound();
 
-  const { application, applicant, organization, checklist, questionnaire } = data;
+  const { application, applicant, organization, checklist } = data;
+
+  const effectiveForm = buildEffectiveFormData(application, applicant, organization);
+  const interviewFormType = toFormType(effectiveForm.applicationFormType ?? application.applicationType);
+  const interviewCategory = effectiveForm.visaFormCategory ?? "N";
+  const interviewQuestions = computeInterviewQuestions(
+    effectiveForm,
+    interviewFormType,
+    interviewCategory,
+    checklist
+  );
 
   // 書類マスター取得（ビザ種別・申請種別でフィルタ）
   // masterDocuments: Date オブジェクトを持つフィールドを除外して RSC シリアライズを安全にする
@@ -273,7 +286,7 @@ export default async function ApplicationDetailPage({
             currentStep={application.status}
             applicationId={application.id}
             userRole={userRole}
-            hasQuestionnaire={questionnaire.length > 0}
+            hasQuestionnaire={interviewQuestions.length > 0}
           />
         </CardContent>
       </Card>
@@ -413,7 +426,7 @@ export default async function ApplicationDetailPage({
               </div>
               <div>
                 <dt className="text-gray-500">質問書</dt>
-                <dd>{questionnaire.length}件</dd>
+                <dd>{interviewQuestions.length}件</dd>
               </div>
             </dl>
           </CardContent>
@@ -475,20 +488,12 @@ export default async function ApplicationDetailPage({
       {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted" || application.status === "completed") && (
         <CollapsibleSection
           title="質問書・顧客聴取"
-          badge={questionnaire.length > 0 ? `${questionnaire.length}件` : undefined}
+          badge={interviewQuestions.length > 0 ? `${interviewQuestions.length}件` : undefined}
           defaultOpen={application.status === "questionnaire_sent"}
           accentClass="bg-orange-400"
         >
           <QuestionnairePanel
-            questions={questionnaire.map((q) => ({
-              id: q.id,
-              fieldKey: q.fieldKey,
-              questionJa: q.questionJa,
-              answer: q.answer,
-              answeredAt: q.answeredAt,
-              isRequired: q.isRequired,
-              answerType: q.answerType,
-            }))}
+            questions={interviewQuestions}
             applicationId={application.id}
             userRole={userRole}
           />

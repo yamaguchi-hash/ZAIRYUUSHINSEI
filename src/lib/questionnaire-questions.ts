@@ -280,6 +280,51 @@ export const ALL_QUESTIONS: QQuestion[] = [
     label: "犯罪記録の詳細（内容・処分年月日・機関名）",
     condition: (f) => f.criminalRecord === "有",
   },
+  // ══════════════════════════════════════════════════════════════════════════
+  // 必須確認事項（顧客聴取専用・V特定技能 / N技人国等就労系のみ）
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    key: "disciplinaryActionExists",
+    section: "7. 犯罪・退去強制歴",
+    label: "懲戒処分を受けたことの有無（勤務先・学校等での処分を含む）",
+    options: ["有", "無"],
+    categories: ["V", "N"],
+  },
+  {
+    key: "disciplinaryActionDetail",
+    section: "7. 犯罪・退去強制歴",
+    label: "懲戒処分の詳細（内容・処分年月日・機関名）",
+    categories: ["V", "N"],
+    condition: (f) => f.disciplinaryActionExists === "有",
+  },
+  {
+    key: "doubleContractExists",
+    section: "7. 犯罪・退去強制歴",
+    label: "現在の勤務先以外との二重契約・二重雇用の有無",
+    options: ["有", "無"],
+    categories: ["V", "N"],
+  },
+  {
+    key: "doubleContractDetail",
+    section: "7. 犯罪・退去強制歴",
+    label: "二重契約・二重雇用の詳細（契約先名・契約期間）",
+    categories: ["V", "N"],
+    condition: (f) => f.doubleContractExists === "有",
+  },
+  {
+    key: "taxInsuranceArrearsExists",
+    section: "7. 犯罪・退去強制歴",
+    label: "税金・社会保険料の未納・滞納の有無",
+    options: ["有", "無"],
+    categories: ["V", "N"],
+  },
+  {
+    key: "taxInsuranceArrearsDetail",
+    section: "7. 犯罪・退去強制歴",
+    label: "未納・滞納の詳細（税目・対象期間・現在の対応状況）",
+    categories: ["V", "N"],
+    condition: (f) => f.taxInsuranceArrearsExists === "有",
+  },
   {
     key: "deportationHistory",
     section: "7. 犯罪・退去強制歴",

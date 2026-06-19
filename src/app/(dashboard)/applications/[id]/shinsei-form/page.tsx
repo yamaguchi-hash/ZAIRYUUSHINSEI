@@ -7,8 +7,7 @@ import { QuestionnaireDocxButton } from "@/components/applications/questionnaire
 import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
 import { ShinseiFormEditor } from "./shinsei-form-editor";
 import type { ApplicationFormData } from "@/lib/form-types";
-import { EMPTY_FORM_DATA } from "@/lib/form-types";
-import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
+import { buildEffectiveFormData } from "@/lib/effective-form-data";
 
 export default async function ShinseiFormPage({
   params,
@@ -24,73 +23,6 @@ export default async function ShinseiFormPage({
 
   const { application, applicant, organization } = data;
 
-  // 既存のformDataがあれば使い、なければ空フォームをベースに自動埋め
-  const savedForm = (application.formData ?? null) as Partial<ApplicationFormData> | null;
-
-  // applicationType（DBの値）→ ApplicationFormType（form-types.tsの値）マッピング
-  const toFormType = (t: string): import("@/lib/form-types").ApplicationFormType => {
-    if (t === "coe" || t === "certification") return "coe";
-    if (t === "change") return "change";
-    if (t === "extension" || t === "renewal") return "extension";
-    if (t === "permanent" || t === "permanent_residence") return "permanent";
-    return "extension";
-  };
-
-  // マスターデータからの初期値（savedForm がない場合に使用）
-  const masterData: Partial<ApplicationFormData> = {
-    applicationFormType:        toFormType(application.applicationType),
-    nationality:                applicant.nationality ?? '',
-    dateOfBirth:                applicant.dateOfBirth ?? '',
-    familyNameEn:               applicant.familyNameEn ?? '',
-    givenNameEn:                applicant.givenNameEn ?? '',
-    familyNameJa:               applicant.familyNameJa ?? '',
-    givenNameJa:                applicant.givenNameJa ?? '',
-    sex:                        applicant.gender === 'M' ? '男' : applicant.gender === 'F' ? '女' : '',
-    postalCodeInJapan:          (applicant as any).postalCode ?? '',
-    prefectureInJapan:          (applicant as any).japanPrefecture ?? '',
-    cityInJapan:                (applicant as any).japanCity ?? '',
-    addressLineInJapan:         (applicant as any).japanAddressLine ?? (
-      !(applicant as any).japanPrefecture ? (applicant.japanAddress ?? '') : ''
-    ),
-    addressInJapan:             applicant.japanAddress ?? '',
-    telephoneNo:                applicant.phone ?? '',
-    cellularPhoneNo:            (applicant as any).mobilePhone ?? '',
-    passportNumber:             applicant.passportNumber ?? '',
-    passportExpiry:             applicant.passportExpiry ?? '',
-    currentStatusOfResidence:   VISA_TYPE_LABELS[applicant.currentVisaType ?? ''] ?? applicant.currentVisaType ?? '',
-    currentPeriodExpiry:        applicant.currentVisaExpiry ?? '',
-    residenceCardNumber:        applicant.residenceCardNumber ?? '',
-    desiredStatusOfResidence:   VISA_TYPE_LABELS[application.visaType] ?? application.visaType ?? '',
-    // 所属機関マスター（全申請書共通の企業基本情報のみを自動反映）
-    ...mapOrganizationToFormData(organization),
-  };
-
-  // 8. 日本における連絡先（申請人マスターから常に取得）
-  const masterContactFields = {
-    postalCodeInJapan:  (applicant as any).postalCode      ?? '',
-    prefectureInJapan:  (applicant as any).japanPrefecture ?? '',
-    cityInJapan:        (applicant as any).japanCity        ?? '',
-    addressLineInJapan: (applicant as any).japanAddressLine ?? (
-      !(applicant as any).japanPrefecture ? (applicant.japanAddress ?? '') : ''
-    ),
-    addressInJapan:  applicant.japanAddress ?? '',
-    telephoneNo:     applicant.phone        ?? '',
-    cellularPhoneNo: (applicant as any).mobilePhone ?? '',
-  };
-
-  // 在留資格の英語キー → 日本語ラベル変換
-  const toJaVisaType = (v: string | null | undefined): string => {
-    if (!v) return '';
-    return VISA_TYPE_LABELS[v] ?? v;  // キーが一致すれば日本語、なければ値をそのまま
-  };
-
-  // 現在の在留資格・在留期限・在留カード番号（申請人マスターから常に取得）
-  const masterStatusFields = {
-    currentStatusOfResidence: toJaVisaType(applicant.currentVisaType),
-    currentPeriodExpiry:      applicant.currentVisaExpiry  ?? '',
-    residenceCardNumber:      applicant.residenceCardNumber ?? '',
-  };
-
   // 取次者情報（固定値）
   const fixedAgentFields = {
     agentName:         '山口忠士',
@@ -99,15 +31,12 @@ export default async function ShinseiFormPage({
     agentPhone:        '090-2596-0128',
   };
 
-  // EMPTY_FORM_DATA を基底として savedForm（または masterData）を上書きマージしたうえで、
-  // 「8. 日本における連絡先」「現在の在留資格」「取次者」は常にマスター/固定値で上書きする。
+  // 実効値（保存済みformData ＞ マスター由来 ＞ 空フォーム）を構築したうえで、
+  // 取次者は常に固定値で上書きする。
   const initialForm: ApplicationFormData = {
-    ...EMPTY_FORM_DATA,
-    ...(savedForm ?? masterData),
-    ...masterContactFields,   // ← 連絡先は savedForm に関わらずマスターを使用
-    ...masterStatusFields,    // ← 在留資格・期限・カード番号は savedForm に関わらずマスターを使用
-    ...fixedAgentFields,      // ← 取次者は常に固定値
-  } as ApplicationFormData;
+    ...buildEffectiveFormData(application, applicant, organization),
+    ...fixedAgentFields,
+  };
 
   const visaLabel = VISA_TYPE_LABELS[application.visaType] ?? application.visaType;
   const appTypeLabel = APPLICATION_TYPE_LABELS[application.applicationType] ?? application.applicationType;

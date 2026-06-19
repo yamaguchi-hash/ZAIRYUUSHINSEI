@@ -5,7 +5,7 @@
  * 永続化は行わず、呼び出し時点の最新データから毎回ライブ計算する。
  */
 import type { ApplicationFormData } from "./form-types";
-import { ALL_QUESTIONS, isEmpty } from "./questionnaire-questions";
+import { getEmptyQuestions } from "./questionnaire-questions";
 import { DOC_INTERVIEW_CHECKS } from "./document-interview-checks";
 
 /** applicationDocumentChecklist の行のうち、本関数が参照するフィールドのみの構造的型 */
@@ -20,7 +20,11 @@ export interface ChecklistItemForInterview {
 export interface InterviewQuestion {
   /** 一意キー（保存時のターゲット特定に使用） */
   id: string;
-  /** A: 全カテゴリ共通必須確認事項 / B: 資格別基本質問・書類突合質問 / C: AI検出事項 */
+  /**
+   * A: 全カテゴリ共通必須確認事項 / B: 資格別基本質問・書類突合質問 / C: AI検出事項
+   * 注: "C" は本ファイルの computeInterviewQuestions では生成されない。
+   * 別タスクで実装予定のAI分析アクションが付与するためのバケット。
+   */
   bucket: "A" | "B" | "C";
   /** form: application.formData の該当キーへ保存 / checklist: 該当チェックリスト項目のexpertNotesへ追記 */
   kind: "form" | "checklist";
@@ -47,21 +51,23 @@ export function computeInterviewQuestions(
   category: string,
   checklist: ChecklistItemForInterview[],
 ): InterviewQuestion[] {
-  const formQuestions: InterviewQuestion[] = ALL_QUESTIONS.filter((q) => {
-    if (q.formTypes && !q.formTypes.includes(formType)) return false;
-    if (q.categories && !q.categories.includes(category)) return false;
-    if (q.condition && !q.condition(effectiveForm)) return false;
-    return isEmpty(effectiveForm[q.key]);
-  }).map((q) => ({
-    id: `form:${String(q.key)}`,
-    bucket: (q.categories ? "B" : "A") as "A" | "B",
-    kind: "form" as const,
-    section: q.section,
-    label: q.label,
-    note: q.note,
-    options: q.options,
-    formKey: String(q.key),
-  }));
+  const formQuestions: InterviewQuestion[] = getEmptyQuestions(
+    effectiveForm,
+    formType,
+    category,
+  ).map((q) => {
+    const formKey = String(q.key);
+    return {
+      id: `form:${formKey}`,
+      bucket: q.categories ? "B" : "A",
+      kind: "form" as const,
+      section: q.section,
+      label: q.label,
+      note: q.note,
+      options: q.options,
+      formKey,
+    };
+  });
 
   const docQuestions: InterviewQuestion[] = [];
   for (const check of DOC_INTERVIEW_CHECKS) {

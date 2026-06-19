@@ -6,11 +6,14 @@ import { applications, applicationDocumentChecklist } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApplicationFormData } from "@/lib/form-types";
+import { EMPTY_FORM_DATA } from "@/lib/form-types";
 
 function requireTenantId(tenantId: string | undefined | null): string {
   if (!tenantId) throw new Error("テナントIDが不正です");
   return tenantId;
 }
+
+const KNOWN_FORM_KEYS = new Set(Object.keys(EMPTY_FORM_DATA));
 
 export type SaveInterviewAnswerInput =
   | { kind: "form"; applicationId: string; formKey: string; value: string }
@@ -44,6 +47,9 @@ export async function saveInterviewAnswer(
     if (!app) return { success: false, error: "申請案件が見つかりません" };
 
     if (input.kind === "form") {
+      if (!KNOWN_FORM_KEYS.has(input.formKey)) {
+        return { success: false, error: "不正な項目です" };
+      }
       const current = (app.formData ?? {}) as Partial<ApplicationFormData>;
       const updated = { ...current, [input.formKey]: input.value };
 

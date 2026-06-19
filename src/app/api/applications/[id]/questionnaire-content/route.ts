@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db, applications, applicantMaster } from "@/lib/db";
+import { db, applications, applicantMaster, organizationMaster, applicationDocumentChecklist } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
-import type { ApplicationFormData } from "@/lib/form-types";
-import { ALL_QUESTIONS, toFormType, getEmptyQuestions } from "@/lib/questionnaire-questions";
+import { toFormType } from "@/lib/questionnaire-questions";
+import { buildEffectiveFormData } from "@/lib/effective-form-data";
+import { computeInterviewQuestions } from "@/lib/interview-diff";
 
 export async function GET(
   _req: NextRequest,
@@ -23,11 +24,18 @@ export async function GET(
   const [applicant] = await db.select().from(applicantMaster)
     .where(eq(applicantMaster.id, app.applicantId)).limit(1);
 
-  const form = (app.formData ?? {}) as Partial<ApplicationFormData>;
-  const formType = toFormType(form.applicationFormType ?? app.applicationType);
-  const cat = (form.visaFormCategory ?? "N") as string;
+  const organization = app.organizationId
+    ? await db.select().from(organizationMaster).where(eq(organizationMaster.id, app.organizationId)).limit(1).then(r => r[0])
+    : null;
 
-  const emptyQuestions = getEmptyQuestions(form, formType, cat);
+  const checklist = await db.select().from(applicationDocumentChecklist)
+    .where(eq(applicationDocumentChecklist.applicationId, id));
+
+  const effectiveForm = buildEffectiveFormData(app, applicant, organization);
+  const formType = toFormType(effectiveForm.applicationFormType ?? app.applicationType);
+  const cat = effectiveForm.visaFormCategory ?? "N";
+
+  const emptyQuestions = computeInterviewQuestions(effectiveForm, formType, cat, checklist);
 
   const sections = emptyQuestions.reduce<Record<string, typeof emptyQuestions>>((acc, q) => {
     if (!acc[q.section]) acc[q.section] = [];

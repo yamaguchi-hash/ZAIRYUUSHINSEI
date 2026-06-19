@@ -159,6 +159,13 @@ export interface ApplicationFormData {
   // ── 共通：犯罪・退去強制・家族 ────────────────────────────────────────
   criminalRecord: string;
   criminalRecordDetail: string;
+  // ── 必須確認事項（顧客聴取専用・V/Nカテゴリ） ──────────────────────────────
+  disciplinaryActionExists: string;
+  disciplinaryActionDetail: string;
+  doubleContractExists: string;
+  doubleContractDetail: string;
+  taxInsuranceArrearsExists: string;
+  taxInsuranceArrearsDetail: string;
   // 20. 退去強制歴（COEのみ）
   deportationHistory: string;
   deportationCount: string;
@@ -630,6 +637,9 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   reasonForApplication: '',
   // 共通
   criminalRecord: '無', criminalRecordDetail: '',
+  disciplinaryActionExists: '', disciplinaryActionDetail: '',
+  doubleContractExists: '', doubleContractDetail: '',
+  taxInsuranceArrearsExists: '', taxInsuranceArrearsDetail: '',
   deportationHistory: '無', deportationCount: '', deportationLatestDate: '',
   familyInJapanExists: '無', familyInJapan: [],
   // Part 2 N

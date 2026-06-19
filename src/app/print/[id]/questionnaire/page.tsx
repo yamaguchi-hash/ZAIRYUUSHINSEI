@@ -33,7 +33,13 @@ export default async function QuestionnairePrintPage({
     ? await db.select().from(organizationMaster).where(eq(organizationMaster.id, app.organizationId)).limit(1).then(r => r[0])
     : null;
 
-  const checklist = await db.select().from(applicationDocumentChecklist)
+  const checklist = await db.select({
+    id: applicationDocumentChecklist.id,
+    documentName: applicationDocumentChecklist.documentName,
+    status: applicationDocumentChecklist.status,
+    fileName: applicationDocumentChecklist.fileName,
+    expertNotes: applicationDocumentChecklist.expertNotes,
+  }).from(applicationDocumentChecklist)
     .where(eq(applicationDocumentChecklist.applicationId, id));
 
   const effectiveForm = buildEffectiveFormData(app, applicant, organization);

@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  updateApplicationStatus,
-  generateQuestionnaire,
-} from "@/actions/applications";
+import { updateApplicationStatus } from "@/actions/applications";
 import { CheckCircle, ArrowRight, ArrowLeft, Loader2, Info, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,8 +49,8 @@ const STEP_DESCRIPTIONS: Record<string, { action: string; hint: string }> = {
     hint: "「申請書を作成」ボタンから申請書の各項目を入力・編集してください",
   },
   questionnaire_sent: {
-    action: "不足情報の質問書をAIが自動生成しました。お客様に確認して回答を入力してください",
-    hint: "全質問への回答を保存してから、次のステップへ進んでください",
+    action: "不足している情報をシステムが自動検出しました。お客様に確認して回答を入力してください",
+    hint: "必要に応じて「AIで分析」ボタンで論理矛盾の検出も行えます。全質問への回答を保存してから、次のステップへ進んでください",
   },
   under_review: {
     action: "申請書の内容を最終確認してください",
@@ -120,11 +117,9 @@ export function WorkflowStepper({
     }
   }
 
-  async function runAutoProcess(nextStep: string) {
-    if (nextStep === "questionnaire_sent") {
-      setProcessingMessage("AIが質問書を生成中...");
-      await generateQuestionnaire(applicationId);
-    }
+  async function runAutoProcess(_nextStep: string) {
+    // 質問書・顧客聴取はライブ計算（computeInterviewQuestions）に置き換えたため、
+    // ステップ遷移時の事前生成処理は不要になった。
   }
 
   async function handleAdvance() {

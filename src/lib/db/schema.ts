@@ -208,23 +208,6 @@ export const applicationDocumentChecklist = pgTable("application_document_checkl
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// ─── Questionnaire ────────────────────────────────────────────────────────────
-export const questionnaireQuestions = pgTable("questionnaire_questions", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  applicationId: uuid("application_id").notNull().references(() => applications.id),
-  fieldKey: text("field_key").notNull(),
-  questionJa: text("question_ja").notNull(),
-  questionEn: text("question_en"),
-  questionNative: text("question_native"),
-  nativeLanguage: text("native_language"),
-  answerType: text("answer_type").notNull(),
-  options: jsonb("options"),
-  answer: text("answer"),
-  answeredAt: timestamp("answered_at"),
-  isRequired: boolean("is_required").notNull().default(true),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
 // ─── Audit log ────────────────────────────────────────────────────────────────
 export const auditLog = pgTable("audit_log", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -343,7 +326,6 @@ export const applicationsRelations = relations(applications, ({ one, many }) => 
   expert: one(users, { fields: [applications.expertUserId], references: [users.id] }),
   snapshots: many(applicationSnapshots),
   documentChecklist: many(applicationDocumentChecklist),
-  questionnaire: many(questionnaireQuestions),
   auditLogs: many(auditLog),
   caseNotes: many(caseNotes),
   caseExpenses: many(caseExpenses),

@@ -67,12 +67,14 @@ export async function analyzeInterviewWithAI(
       return { success: true, questions: [] };
     }
 
+    const excludedIds = new Set((application.interviewExcludedFields ?? []) as string[]);
+
     const effectiveForm = buildEffectiveFormData(application, applicant, organization);
     const formType = toFormType(effectiveForm.applicationFormType ?? application.applicationType);
     const category = effectiveForm.visaFormCategory ?? "N";
 
     // ルールベースで既に出ている質問のフィールドキー（重複除去用）
-    const ruleBasedQuestions = computeInterviewQuestions(effectiveForm, formType, category, checklist);
+    const ruleBasedQuestions = computeInterviewQuestions(effectiveForm, formType, category, checklist, excludedIds);
     const alreadyCovered = new Set(
       ruleBasedQuestions.filter((q) => q.kind === "form").map((q) => q.formKey)
     );
@@ -114,13 +116,15 @@ export async function analyzeInterviewWithAI(
       if (alreadyCovered.has(item.field)) continue;
       if (seen.has(item.field)) continue;
       seen.add(item.field);
+      const id = `ai:${item.field}`;
       questions.push({
-        id: `ai:${item.field}`,
+        id,
         bucket: "C",
         kind: "form",
         section: "AI検出事項",
         label: item.question,
         formKey: item.field,
+        isExcluded: excludedIds.has(id),
       });
       if (questions.length >= 15) break;
     }

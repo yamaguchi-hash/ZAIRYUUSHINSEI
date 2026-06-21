@@ -151,6 +151,8 @@ export const applications = pgTable("applications", {
   approvedBy: uuid("approved_by").references(() => users.id),
   submittedAt: timestamp("submitted_at"),
   notes: text("notes"),
+  // 質問書・顧客聴取で手動除外した質問ID一覧（form:xxx / doc:xxx:xxx / ai:xxx 形式）
+  interviewExcludedFields: jsonb("interview_excluded_fields").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

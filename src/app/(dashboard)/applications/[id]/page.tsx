@@ -93,11 +93,13 @@ export default async function ApplicationDetailPage({
   const effectiveForm = buildEffectiveFormData(application, applicant, organization);
   const interviewFormType = toFormType(effectiveForm.applicationFormType ?? application.applicationType);
   const interviewCategory = effectiveForm.visaFormCategory ?? "N";
+  const interviewExcludedIds = new Set((application.interviewExcludedFields ?? []) as string[]);
   const interviewQuestions = computeInterviewQuestions(
     effectiveForm,
     interviewFormType,
     interviewCategory,
-    checklist
+    checklist,
+    interviewExcludedIds
   );
 
   // 書類マスター取得（ビザ種別・申請種別でフィルタ）

@@ -87,3 +87,42 @@ export async function saveInterviewAnswer(
     return { success: false, error: err?.message ?? "保存に失敗しました" };
   }
 }
+
+/**
+ * 質問書・顧客聴取の質問を手動で除外（または復元）する。
+ * 質問自体はサーバー側の計算結果から取り除かれない（isExcludedフラグで制御）。
+ * このアクションは application.interviewExcludedFields のID配列を更新するのみ。
+ */
+export async function setInterviewQuestionExcluded(
+  applicationId: string,
+  questionId: string,
+  excluded: boolean
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    const current = (app.interviewExcludedFields ?? []) as string[];
+    const updated = excluded
+      ? (current.includes(questionId) ? current : [...current, questionId])
+      : current.filter((id) => id !== questionId);
+
+    await db
+      .update(applications)
+      .set({ interviewExcludedFields: updated, updatedAt: new Date() })
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message ?? "保存に失敗しました" };
+  }
+}

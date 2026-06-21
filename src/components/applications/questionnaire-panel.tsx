@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { saveInterviewAnswer } from "@/actions/interview";
+import { saveInterviewAnswer, setInterviewQuestionExcluded } from "@/actions/interview";
 import { analyzeInterviewWithAI } from "@/actions/interview-ai-analysis";
 import type { InterviewQuestion } from "@/lib/interview-diff";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, CheckCircle, Loader2, Save, Sparkles, Info } from "lucide-react";
+import { MessageSquare, CheckCircle, Loader2, Save, Sparkles, Info, Trash2, RotateCcw, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface QuestionnairePanelProps {
-  questions: InterviewQuestion[]; // セクションA/B（サーバーで計算済み）
+  questions: InterviewQuestion[]; // セクションA/B（サーバーで計算済み、isExcludedフラグ付き）
   applicationId: string;
   userRole?: string;
 }
@@ -21,21 +21,53 @@ const BUCKET_LABELS: Record<"A" | "B" | "C", string> = {
   C: "AI検出事項（論理矛盾・参考）",
 };
 
+// ── 削除トースト通知 ─────────────────────────────────────────────────────────
+function UndoToast({
+  onUndo,
+  onDismiss,
+}: {
+  onUndo: () => void;
+  onDismiss: () => void;
+}) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 5000);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-gray-900 text-white rounded-lg px-4 py-3 shadow-lg text-sm">
+      <span>質問を削除しました</span>
+      <button
+        onClick={onUndo}
+        className="inline-flex items-center gap-1 text-amber-300 hover:text-amber-200 font-medium"
+      >
+        <RotateCcw className="w-3.5 h-3.5" />
+        元に戻す
+      </button>
+    </div>
+  );
+}
+
+// ── 1問分のカード（回答入力＋削除ボタン） ─────────────────────────────────────
 function QuestionCard({
   question,
   applicationId,
   isExpert,
   onSaved,
+  onExcluded,
 }: {
   question: InterviewQuestion;
   applicationId: string;
   isExpert: boolean;
   onSaved: (questionId: string) => void;
+  onExcluded: (question: InterviewQuestion) => void;
 }) {
   const [value, setValue] = useState("");
   const [isPending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [isFadingOut, setIsFadingOut] = useState(false);
+  const [isExcludePending, setIsExcludePending] = useState(false);
 
   function handleSave() {
     if (!value.trim()) return;
@@ -66,11 +98,33 @@ function QuestionCard({
     });
   }
 
+  async function handleDelete() {
+    if (question.bucket === "A") {
+      const confirmed = window.confirm(
+        "この質問は入管申請に強く推奨される項目です。本当に削除しますか？"
+      );
+      if (!confirmed) return;
+    }
+
+    setIsFadingOut(true);
+    setIsExcludePending(true);
+    const result = await setInterviewQuestionExcluded(applicationId, question.id, true);
+    setIsExcludePending(false);
+
+    if (result.success) {
+      onExcluded(question);
+    } else {
+      setIsFadingOut(false);
+      setError(result.error ?? "削除に失敗しました");
+    }
+  }
+
   return (
     <div
       className={cn(
-        "rounded-xl border p-4 transition-colors",
-        saved ? "border-green-200 bg-green-50/50" : "border-amber-200 bg-white"
+        "rounded-xl border p-4 transition-all duration-300",
+        isFadingOut ? "opacity-0 max-h-0 overflow-hidden p-0 border-0 mb-0" : "opacity-100",
+        !isFadingOut && (saved ? "border-green-200 bg-green-50/50" : "border-amber-200 bg-white")
       )}
     >
       <div className="flex items-start gap-3 mb-3">
@@ -90,6 +144,17 @@ function QuestionCard({
             )}
           </p>
         </div>
+        {isExpert && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isExcludePending}
+            title="この質問を削除する"
+            className="flex-shrink-0 text-gray-300 hover:text-red-500 disabled:opacity-40 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {!saved && (
@@ -147,6 +212,51 @@ function QuestionCard({
   );
 }
 
+// ── 削除済み質問の折りたたみ一覧 ─────────────────────────────────────────────
+function ExcludedAccordion({
+  items,
+  onRestore,
+}: {
+  items: InterviewQuestion[];
+  onRestore: (question: InterviewQuestion) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (items.length === 0) return null;
+
+  return (
+    <div className="border border-gray-200 rounded-lg">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-500 hover:bg-gray-50"
+      >
+        <span>削除済みの質問を表示（{items.length}件）</span>
+        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="border-t border-gray-100 p-2 space-y-1.5">
+          {items.map((q) => (
+            <div
+              key={q.id}
+              className="flex items-center justify-between gap-2 bg-gray-50 rounded px-3 py-2 text-xs text-gray-600"
+            >
+              <span className="flex-1">{q.label}</span>
+              <button
+                type="button"
+                onClick={() => onRestore(q)}
+                className="inline-flex items-center gap-1 text-amber-700 hover:text-amber-900 flex-shrink-0"
+              >
+                <RotateCcw className="w-3 h-3" />
+                元に戻す
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function QuestionnairePanel({ questions, applicationId, userRole }: QuestionnairePanelProps) {
   const router = useRouter();
   const isExpert = userRole === "expert" || userRole === "admin";
@@ -157,20 +267,68 @@ export function QuestionnairePanel({ questions, applicationId, userRole }: Quest
   const [aiError, setAiError] = useState("");
   const [aiRequested, setAiRequested] = useState(false);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  const [locallyExcludedIds, setLocallyExcludedIds] = useState<Set<string>>(new Set());
+  const [locallyRestoredIds, setLocallyRestoredIds] = useState<Set<string>>(new Set());
+  const [undoTarget, setUndoTarget] = useState<InterviewQuestion | null>(null);
 
-  const visibleRuleQuestions = useMemo(
+  function isQuestionExcluded(q: InterviewQuestion): boolean {
+    if (locallyRestoredIds.has(q.id)) return false;
+    return q.isExcluded === true || locallyExcludedIds.has(q.id);
+  }
+
+  const allRule = useMemo(
     () => questions.filter((q) => !resolvedIds.has(q.id)),
     [questions, resolvedIds]
   );
-  const visibleAiQuestions = useMemo(
+  const allAi = useMemo(
     () => aiQuestions.filter((q) => !resolvedIds.has(q.id)),
     [aiQuestions, resolvedIds]
   );
 
+  const visibleRule = allRule.filter((q) => !isQuestionExcluded(q));
+  const visibleAi = allAi.filter((q) => !isQuestionExcluded(q));
+  const excludedRule = allRule.filter((q) => isQuestionExcluded(q));
+  const excludedAi = allAi.filter((q) => isQuestionExcluded(q));
+
   function handleSaved(questionId: string) {
     setResolvedIds((prev) => new Set(prev).add(questionId));
-    // セクションA/Bはサーバー側の差分計算結果なので、保存内容を反映させて再計算する
     router.refresh();
+  }
+
+  function handleExcluded(question: InterviewQuestion) {
+    setLocallyExcludedIds((prev) => new Set(prev).add(question.id));
+    setLocallyRestoredIds((prev) => {
+      const next = new Set(prev);
+      next.delete(question.id);
+      return next;
+    });
+    setUndoTarget(question);
+  }
+
+  async function restoreQuestion(question: InterviewQuestion) {
+    setLocallyRestoredIds((prev) => new Set(prev).add(question.id));
+    setLocallyExcludedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(question.id);
+      return next;
+    });
+    const result = await setInterviewQuestionExcluded(applicationId, question.id, false);
+    if (!result.success) {
+      // 復元に失敗した場合はロールバックし、除外状態のまま維持する
+      setLocallyRestoredIds((prev) => {
+        const next = new Set(prev);
+        next.delete(question.id);
+        return next;
+      });
+      setLocallyExcludedIds((prev) => new Set(prev).add(question.id));
+    }
+  }
+
+  function handleUndoFromToast() {
+    if (undoTarget) {
+      restoreQuestion(undoTarget);
+      setUndoTarget(null);
+    }
   }
 
   async function handleAnalyze() {
@@ -197,9 +355,9 @@ export function QuestionnairePanel({ questions, applicationId, userRole }: Quest
     }
   }
 
-  function renderBucket(bucket: "A" | "B" | "C", items: InterviewQuestion[]) {
-    if (items.length === 0) return null;
-    const bySection = items.reduce<Record<string, InterviewQuestion[]>>((acc, q) => {
+  function renderBucket(bucket: "A" | "B" | "C", visibleItems: InterviewQuestion[], excludedItems: InterviewQuestion[]) {
+    if (visibleItems.length === 0 && excludedItems.length === 0) return null;
+    const bySection = visibleItems.reduce<Record<string, InterviewQuestion[]>>((acc, q) => {
       (acc[q.section] ??= []).push(q);
       return acc;
     }, {});
@@ -216,17 +374,21 @@ export function QuestionnairePanel({ questions, applicationId, userRole }: Quest
                 applicationId={applicationId}
                 isExpert={isExpert}
                 onSaved={handleSaved}
+                onExcluded={handleExcluded}
               />
             ))}
           </div>
         ))}
+        {isExpert && <ExcludedAccordion items={excludedItems} onRestore={restoreQuestion} />}
       </div>
     );
   }
 
-  const aQuestions = visibleRuleQuestions.filter((q) => q.bucket === "A");
-  const bQuestions = visibleRuleQuestions.filter((q) => q.bucket === "B");
-  const totalCount = aQuestions.length + bQuestions.length + visibleAiQuestions.length;
+  const aQuestions = visibleRule.filter((q) => q.bucket === "A");
+  const bQuestions = visibleRule.filter((q) => q.bucket === "B");
+  const aExcluded = excludedRule.filter((q) => q.bucket === "A");
+  const bExcluded = excludedRule.filter((q) => q.bucket === "B");
+  const totalCount = aQuestions.length + bQuestions.length + visibleAi.length;
 
   return (
     <Card className="border-amber-200 bg-amber-50/30">
@@ -267,8 +429,8 @@ export function QuestionnairePanel({ questions, applicationId, userRole }: Quest
           </p>
         )}
 
-        {renderBucket("A", aQuestions)}
-        {renderBucket("B", bQuestions)}
+        {renderBucket("A", aQuestions, aExcluded)}
+        {renderBucket("B", bQuestions, bExcluded)}
 
         {(aiMessage || aiError) && (
           <div
@@ -282,8 +444,12 @@ export function QuestionnairePanel({ questions, applicationId, userRole }: Quest
           </div>
         )}
 
-        {renderBucket("C", visibleAiQuestions)}
+        {renderBucket("C", visibleAi, excludedAi)}
       </CardContent>
+
+      {undoTarget && (
+        <UndoToast onUndo={handleUndoFromToast} onDismiss={() => setUndoTarget(null)} />
+      )}
     </Card>
   );
 }

@@ -74,7 +74,7 @@ export async function analyzeInterviewWithAI(
     const category = effectiveForm.visaFormCategory ?? "N";
 
     // ルールベースで既に出ている質問のフィールドキー（重複除去用）
-    const ruleBasedQuestions = computeInterviewQuestions(effectiveForm, formType, category, checklist, excludedIds);
+    const ruleBasedQuestions = computeInterviewQuestions(effectiveForm, formType, category, checklist);
     const alreadyCovered = new Set(
       ruleBasedQuestions.filter((q) => q.kind === "form").map((q) => q.formKey)
     );

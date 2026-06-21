@@ -94,8 +94,10 @@ export async function GET(
   const effectiveForm = buildEffectiveFormData(app, applicant, organization);
   const formType = toFormType(effectiveForm.applicationFormType ?? app.applicationType);
   const cat = effectiveForm.visaFormCategory ?? "N";
+  const excludedIds = new Set((app.interviewExcludedFields ?? []) as string[]);
 
-  const emptyQuestions = computeInterviewQuestions(effectiveForm, formType, cat, checklist);
+  const emptyQuestions = computeInterviewQuestions(effectiveForm, formType, cat, checklist, excludedIds)
+    .filter((q) => !q.isExcluded);
   const sections = emptyQuestions.reduce<Record<string, InterviewQuestion[]>>((acc, q) => {
     if (!acc[q.section]) acc[q.section] = [];
     acc[q.section].push(q);

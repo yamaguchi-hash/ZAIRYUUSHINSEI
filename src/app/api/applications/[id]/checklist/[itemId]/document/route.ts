@@ -195,12 +195,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       : file.name;
 
     // ── ⑥ チェックリスト項目を更新（targetItemId = AI一致先 or ドロップ先） ────
+    // 案件固有のアップロードのため、マスター反映フラグは明示的にfalseへ戻す
     const [updated] = await db.update(applicationDocumentChecklist)
       .set({
         fileUrl,
         fileName,
         fileSize: file.size,
         mimeType,
+        fileSourcedFromMaster: false,
         status: "submitted",
         submittedAt: new Date(),
         updatedAt: new Date(),
@@ -336,6 +338,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         fileName: newFileName,
         fileSize: sourceItem.fileSize,
         mimeType: sourceItem.mimeType,
+        fileSourcedFromMaster: sourceItem.fileSourcedFromMaster,
         status: "submitted",
         submittedAt: new Date(),
         updatedAt: new Date(),
@@ -349,6 +352,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         fileName: null,
         fileSize: null,
         mimeType: null,
+        fileSourcedFromMaster: false,
         status: "not_submitted",
         submittedAt: null,
         updatedAt: new Date(),
@@ -397,7 +401,12 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
       return NextResponse.json({ error: "チェックリスト項目が見つかりません" }, { status: 404 });
     }
 
-    if (item.fileUrl && process.env.BLOB_READ_WRITE_TOKEN && item.fileUrl.startsWith("https://")) {
+    // マスターから反映されたファイルは申請人マスター側も同じURLを参照しているため、
+    // Blob自体は削除せずチェックリスト側の参照のみクリアする。
+    if (
+      !item.fileSourcedFromMaster &&
+      item.fileUrl && process.env.BLOB_READ_WRITE_TOKEN && item.fileUrl.startsWith("https://")
+    ) {
       try { await del(item.fileUrl); } catch (e) {
         console.warn("[checklist document DELETE] blob del failed:", e);
       }
@@ -409,6 +418,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
         fileName: null,
         fileSize: null,
         mimeType: null,
+        fileSourcedFromMaster: false,
         status: "not_submitted",
         submittedAt: null,
         updatedAt: new Date(),

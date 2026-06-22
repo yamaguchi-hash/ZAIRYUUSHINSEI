@@ -16,6 +16,7 @@ import { eq, and, ne, inArray, desc, ilike, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
+import { matchMasterDocumentType } from "@/lib/master-document-matching";
 
 function requireTenantId(tenantId: string | undefined | null): string {
   if (!tenantId) throw new Error("テナントIDが不正です");
@@ -96,6 +97,7 @@ export async function getApplicationById(id: string) {
       additionalFiles:       applicationDocumentChecklist.additionalFiles,
       ocrExtractedData:      applicationDocumentChecklist.ocrExtractedData,
       expertNotes:           applicationDocumentChecklist.expertNotes,
+      fileSourcedFromMaster: applicationDocumentChecklist.fileSourcedFromMaster,
       submittedAt:           applicationDocumentChecklist.submittedAt,
       createdAt:             applicationDocumentChecklist.createdAt,
     })
@@ -145,6 +147,7 @@ export async function getApplicationById(id: string) {
     mimeType:   item.mimeType ?? null,
     additionalFiles: (item.additionalFiles ?? null) as Array<{ fileUrl: string; fileName: string; fileSize: number; mimeType: string }> | null,
     expertNotes: item.expertNotes ?? null,
+    fileSourcedFromMaster: item.fileSourcedFromMaster,
     // OCR データ: null または plain object（シリアライズ可）
     // 空オブジェクト {} は null に変換（React hydration の安全化）
     ocrExtractedData: (() => {
@@ -188,6 +191,133 @@ export async function getApplicationById(id: string) {
   });
 
   return { application, applicant, organization, checklist };
+}
+
+/**
+ * 申請人マスター（applicantDocuments）に登録済みのパスポート・在留カードを、
+ * 案件の必要書類チェックリストへ自動反映する（書き込み同期）。
+ * - チェックリスト項目のfileUrlがnull（未提出）かつマッチ対象の場合のみ反映する
+ * - 既にfileUrlが設定されている項目（案件固有アップロード済み or 既に反映済み）は変更しない
+ * - マスターに対応する書類が存在しない場合は何もしない
+ * - ベストエフォート処理: 失敗してもページ表示を妨げないよう例外を投げない
+ */
+export async function syncMasterDocumentsToChecklist(applicationId: string): Promise<void> {
+  try {
+    const session = await auth();
+    if (!session?.user) return;
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [application] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!application) return;
+
+    const checklistItems = await db
+      .select()
+      .from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.applicationId, applicationId));
+
+    const unsynced = checklistItems.filter((item) => !item.fileUrl);
+    if (unsynced.length === 0) return;
+
+    const masterDocs = await db
+      .select()
+      .from(applicantDocuments)
+      .where(and(
+        eq(applicantDocuments.applicantId, application.applicantId),
+        eq(applicantDocuments.tenantId, tenantId),
+      ));
+
+    const passportDoc = masterDocs.find((d) => d.documentType === "passport_data_page") ?? null;
+    const frontDoc = masterDocs.find((d) => d.documentType === "residence_card_front") ?? null;
+    const backDoc = masterDocs.find((d) => d.documentType === "residence_card_back") ?? null;
+
+    const updates: Promise<unknown>[] = [];
+
+    for (const item of unsynced) {
+      const match = matchMasterDocumentType(item.documentName);
+      if (!match) continue;
+
+      if (match.kind === "passport" && passportDoc) {
+        updates.push(
+          db.update(applicationDocumentChecklist)
+            .set({
+              fileUrl: passportDoc.fileUrl,
+              fileName: passportDoc.fileName,
+              fileSize: passportDoc.fileSize,
+              mimeType: passportDoc.mimeType,
+              fileSourcedFromMaster: true,
+              status: "submitted",
+              submittedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(applicationDocumentChecklist.id, item.id))
+        );
+      } else if (match.kind === "residence_card_front" && frontDoc) {
+        updates.push(
+          db.update(applicationDocumentChecklist)
+            .set({
+              fileUrl: frontDoc.fileUrl,
+              fileName: frontDoc.fileName,
+              fileSize: frontDoc.fileSize,
+              mimeType: frontDoc.mimeType,
+              fileSourcedFromMaster: true,
+              status: "submitted",
+              submittedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(applicationDocumentChecklist.id, item.id))
+        );
+      } else if (match.kind === "residence_card_back" && backDoc) {
+        updates.push(
+          db.update(applicationDocumentChecklist)
+            .set({
+              fileUrl: backDoc.fileUrl,
+              fileName: backDoc.fileName,
+              fileSize: backDoc.fileSize,
+              mimeType: backDoc.mimeType,
+              fileSourcedFromMaster: true,
+              status: "submitted",
+              submittedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(applicationDocumentChecklist.id, item.id))
+        );
+      } else if (match.kind === "residence_card_both" && frontDoc) {
+        updates.push(
+          db.update(applicationDocumentChecklist)
+            .set({
+              fileUrl: frontDoc.fileUrl,
+              fileName: frontDoc.fileName,
+              fileSize: frontDoc.fileSize,
+              mimeType: frontDoc.mimeType,
+              ...(backDoc ? {
+                additionalFiles: [{
+                  fileUrl: backDoc.fileUrl,
+                  fileName: backDoc.fileName,
+                  fileSize: backDoc.fileSize ?? 0,
+                  mimeType: backDoc.mimeType ?? "",
+                }],
+              } : {}),
+              fileSourcedFromMaster: true,
+              status: "submitted",
+              submittedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(applicationDocumentChecklist.id, item.id))
+        );
+      }
+    }
+
+    if (updates.length === 0) return;
+    await Promise.all(updates);
+    revalidatePath(`/applications/${applicationId}`);
+  } catch (err: any) {
+    console.error("[syncMasterDocumentsToChecklist] error:", err?.message);
+    // ベストエフォート処理のため、エラーはログのみで握る（呼び出し元はページ表示を継続する）
+  }
 }
 
 export async function createApplication(data: {

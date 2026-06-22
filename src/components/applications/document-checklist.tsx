@@ -52,6 +52,7 @@ interface ChecklistItem {
   fileSize?: number | null;
   mimeType?: string | null;
   additionalFiles?: AdditionalFile[] | null;
+  fileSourcedFromMaster?: boolean;
 }
 
 interface DocumentChecklistProps {
@@ -102,6 +103,7 @@ interface ChecklistFile {
   fileName: string | null;
   fileSize: number | null;
   mimeType: string | null;
+  fileSourcedFromMaster?: boolean;
 }
 
 interface UploadedFileResult extends ChecklistFile {
@@ -221,6 +223,14 @@ const ChecklistDropzone = memo(function ChecklistDropzone({
           ) : (
             <span className="text-xs text-green-700 truncate max-w-[180px]" title={file.fileName ?? ""}>
               {file.fileName}
+            </span>
+          )}
+          {file.fileSourcedFromMaster && (
+            <span
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 flex-shrink-0 whitespace-nowrap"
+              title="申請人マスターに登録済みの書類が自動的に反映されました"
+            >
+              マスターから反映
             </span>
           )}
           <button
@@ -495,7 +505,7 @@ export function DocumentChecklist({
   const handleFileUploaded = useCallback((targetItemId: string, file: UploadedFileResult, meta?: UploadMeta) => {
     setLocalChecklist((prev) =>
       prev.map((i) => (i.id === targetItemId
-        ? { ...i, fileUrl: file.fileUrl, fileName: file.fileName, fileSize: file.fileSize, mimeType: file.mimeType, status: file.status }
+        ? { ...i, fileUrl: file.fileUrl, fileName: file.fileName, fileSize: file.fileSize, mimeType: file.mimeType, status: file.status, fileSourcedFromMaster: false }
         : i))
     );
     setNeedsManualClassification((prev) => {
@@ -518,7 +528,7 @@ export function DocumentChecklist({
   const handleFileDeleted = useCallback((itemId: string) => {
     setLocalChecklist((prev) =>
       prev.map((i) => (i.id === itemId
-        ? { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, status: "not_submitted" }
+        ? { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, status: "not_submitted", fileSourcedFromMaster: false }
         : i))
     );
     setNeedsManualClassification((prev) => {
@@ -860,6 +870,7 @@ export function DocumentChecklist({
                           fileName: item.fileName ?? null,
                           fileSize: item.fileSize ?? null,
                           mimeType: item.mimeType ?? null,
+                          fileSourcedFromMaster: item.fileSourcedFromMaster ?? false,
                         }}
                         onUploaded={handleFileUploaded}
                         onDeleted={handleFileDeleted}

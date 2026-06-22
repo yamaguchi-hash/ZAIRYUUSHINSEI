@@ -203,6 +203,9 @@ export const applicationDocumentChecklist = pgTable("application_document_checkl
     mimeType: string;
   }>>(),
   expertNotes: text("expert_notes"),
+  // 現在のfileUrl/additionalFilesが申請人マスター（applicantDocuments）から
+  // 自動反映されたものかどうか。trueの場合、マスター同期処理が再度上書きしてよい。
+  fileSourcedFromMaster: boolean("file_sourced_from_master").default(false).notNull(),
   submittedAt: timestamp("submitted_at"),
   reviewedAt: timestamp("reviewed_at"),
   reviewedBy: uuid("reviewed_by").references(() => users.id),

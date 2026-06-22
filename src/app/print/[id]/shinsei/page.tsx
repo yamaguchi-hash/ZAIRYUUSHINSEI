@@ -354,7 +354,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   </tr>
                   <tr>
                     <td className="lbl">14. 変更の理由</td>
-                    <td colSpan={3} style={{ whiteSpace: "pre-wrap", minHeight: "48px" }}>{fmt(form.reasonForApplication)}</td>
+                    <td colSpan={3} style={{ whiteSpace: "pre-wrap", minHeight: "24px" }}>{fmt(form.reasonForApplication)}</td>
                   </tr>
                   <tr>
                     <td className="lbl">15. 犯罪記録の有無</td>
@@ -385,7 +385,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                   </tr>
                   <tr>
                     <td className="lbl">14. 更新の理由</td>
-                    <td colSpan={3} style={{ whiteSpace: "pre-wrap", minHeight: "48px" }}>{fmt(form.reasonForApplication)}</td>
+                    <td colSpan={3} style={{ whiteSpace: "pre-wrap", minHeight: "24px" }}>{fmt(form.reasonForApplication)}</td>
                   </tr>
                   <tr>
                     <td className="lbl">15. 犯罪記録の有無</td>
@@ -1309,7 +1309,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               <table>
                 <tbody>
                   <tr>
-                    <td style={{ whiteSpace: "pre-wrap", lineHeight: "1.7", minHeight: "60px", padding: "6px" }}>
+                    <td style={{ whiteSpace: "pre-wrap", lineHeight: "1.3", minHeight: "28px", padding: "3px" }}>
                       {fmt(form.activityDetails)}
                     </td>
                   </tr>
@@ -1469,7 +1469,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                       11. 現在の在留活動の内容<br />
                       <span style={{ fontWeight: "normal", fontSize: "9px" }}>(学生は学校名・週間授業時間)</span>
                     </td>
-                    <td style={{ whiteSpace: "pre-wrap", minHeight: "50px" }}>
+                    <td style={{ whiteSpace: "pre-wrap", minHeight: "24px" }}>
                       {fmt(form.gaikatsuCurrentActivity)}
                     </td>
                   </tr>

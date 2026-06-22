@@ -428,7 +428,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           {/* ── N型 Part 2（就労系） ─────────────────────────────────────────── */}
           {isNtype && (
             <>
-              <div className="section page-break">
+              <div className="section">
                 申請人等作成用　Part 2 N　— 就労・学歴（項目 {p2Base}〜{p2Base + 5}）
               </div>
 
@@ -496,7 +496,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           {/* ── T型 Part 2（日本人配偶者等） ─────────────────────────────────── */}
           {isTtype && (
             <>
-              <div className="section page-break">申請人等作成用　Part 2 T　— 配偶者等の情報</div>
+              <div className="section">申請人等作成用　Part 2 T　— 配偶者等の情報</div>
 
               <div className="section3">配偶者・日本人等の情報</div>
               <table>
@@ -552,7 +552,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           {/* ── R型 Part 2（申請人用２Ｒ：項目17〜20 + 取次者） ──────────────── */}
           {isRtype && (
             <>
-              <div className="section page-break">
+              <div className="section">
                 申請人等作成用　２　Ｒ　—「家族滞在」{isChange ? '在留資格変更用' : '在留期間更新用'}　（項目 17〜20）
               </div>
 
@@ -824,7 +824,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           {/* ── P型 Part 2（留学：学校情報） ──────────────────────────────── */}
           {isPtype && (
             <>
-              <div className="section page-break">申請人等作成用　Part 2 P　— 在籍学校・費用支弁</div>
+              <div className="section">申請人等作成用　Part 2 P　— 在籍学校・費用支弁</div>
               <div className="section3">在籍学校の情報</div>
               <table>
                 <tbody>
@@ -873,7 +873,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           {isVtype && (
             <>
               {/* ═══ 申請人等作成用 ２ V ═══ */}
-              <div className="section page-break">
+              <div className="section">
                 申請人等作成用 ２　　　Ｖ　（「特定技能（１号）」・「特定技能（２号）」）
               </div>
 
@@ -918,7 +918,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               </>)}
 
               {/* ═══ 申請人等作成用 ３ V — 項目22〜28 ═══ */}
-              <div className="section page-break">
+              <div className="section">
                 申請人等作成用 ３　　　Ｖ　（「特定技能（１号）」・「特定技能（２号）」）
               </div>
               <table className="v-tbl"><tbody>
@@ -1003,7 +1003,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
 
               {/* ═══ 所属機関等作成用 ２ V — 派遣先・職業紹介・取次機関 ═══ */}
               <div className="omittable-vDispatch">
-                <div className="section page-break">
+                <div className="section">
                   所属機関等作成用 ２　　　Ｖ　— 派遣先・職業紹介事業者・取次機関
                 </div>
 
@@ -1039,7 +1039,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
 
               {/* ═══ 所属機関等作成用 ３ V — コンプライアンス(11)〜(21) ═══ */}
               <div className="omittable-vCompliance1">
-                <div className="section page-break">
+                <div className="section">
                   所属機関等作成用 ３　　　Ｖ　— コンプライアンス確認（(11)〜(21)）
                 </div>
                 <table className="v-tbl"><tbody>
@@ -1066,7 +1066,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
 
               {/* ═══ 所属機関等作成用 ４ V — コンプライアンス(22)〜(33) ═══ */}
               <div className="omittable-vCompliance2">
-                <div className="section page-break">
+                <div className="section">
                   所属機関等作成用 ４　　　Ｖ　— コンプライアンス確認（(22)〜(33)）
                 </div>
                 <table className="v-tbl"><tbody>
@@ -1101,7 +1101,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
 
               {/* ═══ 所属機関等作成用 ５ V — 登録支援機関 ═══ */}
               <div className="omittable-vRso">
-                <div className="section page-break">
+                <div className="section">
                   所属機関等作成用 ５　　　Ｖ　— 登録支援機関（支援計画の全部を委託する場合）
                 </div>
 
@@ -1165,7 +1165,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           {/* ── その他種別のフリーフィールド ──────────────────────────────── */}
           {!isNtype && !isTtype && !isRtype && !isPtype && !isVtype && form.freeformPart2Notes && (
             <>
-              <div className="section page-break">申請人等作成用　Part 2　— 補足情報</div>
+              <div className="section">申請人等作成用　Part 2　— 補足情報</div>
               <table>
                 <tbody>
                   <tr>
@@ -1328,7 +1328,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               {/* 所属機関 Part 2（派遣先等） */}
               {form.dispatchOrgName && (
                 <>
-                  <div className="section page-break">所属機関等作成用　Part 2 N　— 派遣先等（項目 {orgDispatchNo}）</div>
+                  <div className="section">所属機関等作成用　Part 2 N　— 派遣先等（項目 {orgDispatchNo}）</div>
                   <table>
                     <tbody>
                       <tr>

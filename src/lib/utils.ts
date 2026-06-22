@@ -57,6 +57,39 @@ export const VISA_TYPE_LABELS: Record<string, string> = {
   technical_intern_3ro: "技能実習3号ロ",
 };
 
+/**
+ * 所属機関の記載・書類提出が実務上必要となる在留資格区分（visaType）の一覧。
+ * 所属機関マスターの書類管理画面で、区分別アップロード欄を表示する対象を絞り込むために使う。
+ * 家族滞在・永住者・配偶者等・短期滞在など、所属機関（雇用主・受入企業）が
+ * 存在しない区分は含めない。
+ */
+export const ORG_RELEVANT_VISA_TYPES: string[] = [
+  "engineer_humanities",
+  "intra_company_transferee",
+  "skilled_labor",
+  "specified_skilled_worker_1",
+  "specified_skilled_worker_2",
+  "professor",
+  "journalist",
+  "business_manager",
+  "legal_accounting",
+  "medical_services",
+  "researcher",
+  "instructor",
+  "highly_skilled_professional_1",
+  "highly_skilled_professional_2",
+  "highly_skilled_professional_3",
+  "student",
+  "training",
+  "designated_activities",
+  "technical_intern_1i",
+  "technical_intern_1ro",
+  "technical_intern_2i",
+  "technical_intern_2ro",
+  "technical_intern_3i",
+  "technical_intern_3ro",
+];
+
 // ─── 就労資格（所属機関の紐付けが必要な在留資格） ───────────────────────────────
 // VISA_TYPE_LABELS のうち、就労が認められる在留資格のキーのみを列挙する。
 // 家族滞在・留学・永住者・定住者・日本人の配偶者等・特定活動・研修などは含めない。

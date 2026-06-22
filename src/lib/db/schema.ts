@@ -201,11 +201,17 @@ export const applicationDocumentChecklist = pgTable("application_document_checkl
     fileName: string;
     fileSize: number;
     mimeType: string;
+    // このエントリがマスター（applicantDocuments）から反映されたものかどうか。
+    // trueの場合、マスター側も同じBlob URLを参照しているため物理削除してはならない。
+    sourcedFromMaster?: boolean;
   }>>(),
   expertNotes: text("expert_notes"),
   // 現在のfileUrl/additionalFilesが申請人マスター（applicantDocuments）から
   // 自動反映されたものかどうか。trueの場合、マスター同期処理が再度上書きしてよい。
   fileSourcedFromMaster: boolean("file_sourced_from_master").default(false).notNull(),
+  // 'applicant' | 'organization' | null。fileSourcedFromMasterがtrueの場合のみ意味を持ち、
+  // どちらのマスターから反映されたかをUIバッジの文言分岐に使う。
+  fileSourcedFromMasterType: text("file_sourced_from_master_type"),
   submittedAt: timestamp("submitted_at"),
   reviewedAt: timestamp("reviewed_at"),
   reviewedBy: uuid("reviewed_by").references(() => users.id),
@@ -278,6 +284,23 @@ export const applicantDocuments = pgTable("applicant_documents", {
   mimeType: text("mime_type"),
   ocrExtractedData: jsonb("ocr_extracted_data"),
   ocrProcessedAt: timestamp("ocr_processed_at"),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+});
+
+// ─── Organization documents（所属機関マスター書類） ──────────────────────────────
+// visaType が null の行は「共通書類（すべての在留資格に適用）」。
+// 値がある場合は applications.visaType / documentRequirementMaster.visaType と
+// 同じ粒度の文字列（例: "engineer_humanities", "specified_skilled_worker_2"）。
+export const organizationDocuments = pgTable("organization_documents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizationMaster.id, { onDelete: "cascade" }),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  visaType: text("visa_type"),
+  documentName: text("document_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
 });
 

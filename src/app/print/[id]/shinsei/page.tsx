@@ -440,7 +440,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     <td className="lbl">支店・事業所名</td><td>{fmt(form.employerBranchName)}</td>
                   </tr>
                   <tr>
-                    <td className="lbl">所在地（主たる勤務場所）</td><td>{fmtAddr(form.employerAddress)}</td>
+                    <td className="lbl lbl-wrap">所在地（主たる勤務場所）</td><td>{fmtAddr(form.employerAddress)}</td>
                     <td className="lbl">電話番号</td><td>{fmt(form.employerPhone)}</td>
                   </tr>
                 </tbody>

@@ -139,16 +139,32 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           }
           /* PDFの実際の用紙幅も --pdf-print-width に連動させる。
              ※ @page の size は CSS変数(var())を解釈できないため、PDF_PRINT_WIDTH の値を
-                直接埋め込んでいる。PDF_PRINT_WIDTH は "210mm" のような長さ単位で指定すること。 */
-          @page{size:${PDF_PRINT_WIDTH} 297mm;margin:0;}
+                直接埋め込んでいる。PDF_PRINT_WIDTH は "210mm" のような長さ単位で指定すること。
+             ※ margin は @page 側に持たせる（ページボックス自体の余白のため、強制改ページ・
+                自然な改ページで生成されるすべての物理ページに自動で適用される）。
+                以前は margin:0 とし .page の padding で余白を表現していたが、padding は
+                要素全体に1回しか効かないため、改ページ後のページで余白が消える不具合があった。 */
+          @page{size:${PDF_PRINT_WIDTH} 297mm;margin:6mm 8mm;}
           .page{background:#fff;max-width:var(--pdf-print-width);margin:0 auto;padding:14mm 16mm;min-height:297mm;}
           @media screen{.page{margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.12);border-radius:4px;}}
           @media print{
-            body{background:#fff;}
+            body{background:#fff;font-size:8.5px;line-height:1.1;}
             *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
-            /* @page で確保した用紙幅いっぱい(100%)に追従させる */
-            .page{padding:10mm 13mm;width:100%;max-width:100%;min-height:auto;}
+            /* 余白は @page の margin に一本化したため、.page 側の padding は 0 にする */
+            .page{padding:0;width:100%;max-width:100%;min-height:auto;}
             .no-print{display:none!important;}
+            /* 行・表ヘッダーの途中分断を防止 */
+            tr{break-inside:avoid;page-break-inside:avoid;}
+            thead{display:table-header-group;}
+            /* セル・テーブル間隔を圧縮 */
+            td,th{padding:1.5px 4px;font-size:8.5px;line-height:1.1;}
+            table{margin-bottom:3px;}
+            /* セクション見出しの直後分断を防止しつつ間隔を圧縮 */
+            .section{margin:4px 0 2px;}
+            .section2{margin:3px 0 2px;}
+            .section3{margin:2px 0 1px;}
+            .section,.section2,.section3{break-after:avoid;page-break-after:avoid;}
+            .bilingual{font-size:6.5px;}
           }
 
           .form-title{text-align:center;font-size:15px;font-weight:bold;border:2px solid #000;padding:7px 14px;margin-bottom:10px;letter-spacing:0.05em;}
@@ -180,6 +196,12 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
 
           .sign-table td{height:44px;}
           .page-break{page-break-before:always;}
+
+          /* ロール識別バナー（申請人用／所属機関用／扶養者用の境目を明示） */
+          .role-banner{
+            text-align:center;font-size:10px;font-weight:bold;letter-spacing:0.15em;
+            background:#000;color:#fff;padding:3px 0;margin-bottom:2px;
+          }
 
           /* 署名日・年月日の表示/非表示切替 */
           .sign-date{transition:visibility 0s;white-space:nowrap;}

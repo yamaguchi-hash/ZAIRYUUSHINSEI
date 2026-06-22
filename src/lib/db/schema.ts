@@ -336,6 +336,11 @@ export const applicantDocumentsRelations = relations(applicantDocuments, ({ one 
   tenant: one(tenants, { fields: [applicantDocuments.tenantId], references: [tenants.id] }),
 }));
 
+export const organizationDocumentsRelations = relations(organizationDocuments, ({ one }) => ({
+  organization: one(organizationMaster, { fields: [organizationDocuments.organizationId], references: [organizationMaster.id] }),
+  tenant: one(tenants, { fields: [organizationDocuments.tenantId], references: [tenants.id] }),
+}));
+
 export const applicantResidenceCardHistoriesRelations = relations(applicantResidenceCardHistories, ({ one }) => ({
   applicant: one(applicantMaster, { fields: [applicantResidenceCardHistories.applicantId], references: [applicantMaster.id] }),
   tenant: one(tenants, { fields: [applicantResidenceCardHistories.tenantId], references: [tenants.id] }),
@@ -345,6 +350,7 @@ export const organizationMasterRelations = relations(organizationMaster, ({ one,
   tenant: one(tenants, { fields: [organizationMaster.tenantId], references: [tenants.id] }),
   applications: many(applications),
   applicants: many(applicantMaster),
+  documents: many(organizationDocuments),
 }));
 
 export const applicationsRelations = relations(applications, ({ one, many }) => ({

@@ -298,7 +298,7 @@ export async function syncMasterDocumentsToChecklist(applicationId: string): Pro
                   fileUrl: backDoc.fileUrl,
                   fileName: backDoc.fileName,
                   fileSize: backDoc.fileSize ?? 0,
-                  mimeType: backDoc.mimeType ?? "",
+                  mimeType: backDoc.mimeType ?? "image/jpeg",
                 }],
               } : {}),
               fileSourcedFromMaster: true,
@@ -315,7 +315,7 @@ export async function syncMasterDocumentsToChecklist(applicationId: string): Pro
     await Promise.all(updates);
     revalidatePath(`/applications/${applicationId}`);
   } catch (err: any) {
-    console.error("[syncMasterDocumentsToChecklist] error:", err?.message);
+    console.error("[syncMasterDocumentsToChecklist] error:", { applicationId, err });
     // ベストエフォート処理のため、エラーはログのみで握る（呼び出し元はページ表示を継続する）
   }
 }

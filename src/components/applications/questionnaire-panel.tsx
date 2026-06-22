@@ -144,7 +144,7 @@ function QuestionCard({
             )}
           </p>
         </div>
-        {isExpert && (
+        {isExpert && !saved && (
           <button
             type="button"
             onClick={handleDelete}

@@ -706,7 +706,8 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               </table>
 
               {/* ── 扶養者用Ｒ（別ページ） ─────────────────────────────────────── */}
-              <div className="section page-break">
+              <div className="role-banner page-break">【扶養者用】</div>
+              <div className="section">
                 扶養者等作成用　１　Ｒ　—「家族滞在」{isChange ? '在留資格変更用' : '在留期間更新用'}
               </div>
 
@@ -950,7 +951,8 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               </div>
 
               {/* ═══ 所属機関等作成用 １ V — 雇用契約・所属機関 ═══ */}
-              <div className="section page-break">
+              <div className="role-banner page-break">【所属機関用】</div>
+              <div className="section">
                 所属機関等作成用 １　　　Ｖ　（「特定技能（１号）」・「特定技能（２号）」）
               </div>
 
@@ -1215,7 +1217,8 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           {/* ══ 所属機関等作成用 Part 1（就労系のみ） ══════════════════════════ */}
           {needsOrg && isNtype && (
             <>
-              <div className="section page-break">所属機関等作成用　Part 1 N　— 機関情報・雇用条件</div>
+              <div className="role-banner page-break">【所属機関用】</div>
+              <div className="section">所属機関等作成用　Part 1 N　— 機関情報・雇用条件</div>
 
               <div className="section3">2. 契約形態　／　3. 所属機関等</div>
               <table>
@@ -1371,7 +1374,8 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           {/* 所属機関情報（N型以外・就労系の場合のフリーフィールド） */}
           {needsOrg && !isNtype && form.freeformOrgNotes && (
             <>
-              <div className="section page-break">所属機関等作成用</div>
+              <div className="role-banner page-break">【所属機関用】</div>
+              <div className="section">所属機関等作成用</div>
               <table>
                 <tbody>
                   <tr>

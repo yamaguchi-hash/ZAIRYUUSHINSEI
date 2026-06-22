@@ -440,11 +440,8 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     <td className="lbl">支店・事業所名</td><td>{fmt(form.employerBranchName)}</td>
                   </tr>
                   <tr>
-                    <td className="lbl">所在地（主たる勤務場所）</td><td colSpan={3}>{fmtAddr(form.employerAddress)}</td>
-                  </tr>
-                  <tr>
+                    <td className="lbl">所在地（主たる勤務場所）</td><td>{fmtAddr(form.employerAddress)}</td>
                     <td className="lbl">電話番号</td><td>{fmt(form.employerPhone)}</td>
-                    <td className="lbl"></td><td></td>
                   </tr>
                 </tbody>
               </table>
@@ -881,8 +878,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
               <div className="section3">17. 特定技能所属機関</div>
               <table className="v-tbl"><tbody>
                 <tr><td className="lbl" style={{width:'30%'}}>(1) 氏名又は名称</td><td colSpan={3}>{fmt(form.employerName)}</td></tr>
-                <tr><td className="lbl">(2) 住所（所在地）</td><td colSpan={3}>{fmtAddr(form.employerAddress)}</td></tr>
-                <tr><td className="lbl">　　電話番号</td><td colSpan={3}>{fmt(form.employerPhone)}</td></tr>
+                <tr><td className="lbl">(2) 住所（所在地）</td><td>{fmtAddr(form.employerAddress)}</td><td className="lbl">電話番号</td><td>{fmt(form.employerPhone)}</td></tr>
               </tbody></table>
 
               <div className="section3">18. 技能水準</div>
@@ -992,8 +988,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 <tr><td className="lbl" style={{width:'30%'}}>(1) 氏名又は名称</td><td colSpan={3}>{fmt(form.orgName)}</td></tr>
                 <tr><td className="lbl">(2) 法人番号（13桁）</td><td>{fmt(form.orgCorporateNumber)}</td><td className="lbl" style={{width:'25%'}}>(3) 雇用保険番号（11桁）</td><td>{fmt(form.orgEmploymentInsuranceNo)}</td></tr>
                 <tr><td className="lbl lbl-wrap">(4) 業種番号</td><td>{fmt(form.orgBusinessTypeCode)}</td><td className="lbl">追加業種番号</td><td>{fmt(form.orgBusinessTypeOtherCode)}</td></tr>
-                <tr><td className="lbl">(5) 住所（所在地）</td><td colSpan={3}>{fmtAddr(form.orgAddress)}</td></tr>
-                <tr><td className="lbl">　電話番号</td><td colSpan={3}>{fmt(form.orgPhone)}</td></tr>
+                <tr><td className="lbl">(5) 住所（所在地）</td><td>{fmtAddr(form.orgAddress)}</td><td className="lbl">電話番号</td><td>{fmt(form.orgPhone)}</td></tr>
                 <tr><td className="lbl">(6) 資本金</td><td>{form.orgCapital ? Number(form.orgCapital).toLocaleString() + '円' : '　'}</td><td className="lbl">(7) 年間売上金額</td><td>{form.orgAnnualSales ? Number(form.orgAnnualSales).toLocaleString() + '円' : '　'}</td></tr>
                 <tr><td className="lbl">(8) 常勤職員数</td><td>{form.orgEmployeeCount ? `${form.orgEmployeeCount}名` : '　'}</td><td className="lbl">(9) 代表者の氏名</td><td>{fmt(form.position)}</td></tr>
                 {form.orgBranchName && <tr><td className="lbl">(10) 勤務させる事業所名</td><td>{fmt(form.orgBranchName)}</td><td className="lbl">所在地</td><td>{fmt(form.activityDetails)}</td></tr>}

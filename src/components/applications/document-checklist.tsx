@@ -550,8 +550,8 @@ export function DocumentChecklist({
       try { data = await res.json(); } catch { throw new Error(`サーバーエラー（HTTP ${res.status}）`); }
       if (!res.ok) throw new Error(data?.error ?? "再分類に失敗しました");
       setLocalChecklist((prev) => prev.map((i) => {
-        if (i.id === fromId) return { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, status: "not_submitted" };
-        if (i.id === toId) return { ...i, fileUrl: data.item.fileUrl, fileName: data.item.fileName, fileSize: data.item.fileSize, mimeType: data.item.mimeType, status: data.item.status };
+        if (i.id === fromId) return { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, fileSourcedFromMaster: false, status: "not_submitted" };
+        if (i.id === toId) return { ...i, fileUrl: data.item.fileUrl, fileName: data.item.fileName, fileSize: data.item.fileSize, mimeType: data.item.mimeType, fileSourcedFromMaster: data.item.fileSourcedFromMaster, status: data.item.status };
         return i;
       }));
       setNeedsManualClassification((prev) => {

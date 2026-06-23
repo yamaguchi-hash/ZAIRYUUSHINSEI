@@ -53,6 +53,7 @@ interface ChecklistItem {
   mimeType?: string | null;
   additionalFiles?: AdditionalFile[] | null;
   fileSourcedFromMaster?: boolean;
+  fileSourcedFromMasterType?: string | null;
 }
 
 interface DocumentChecklistProps {
@@ -104,6 +105,7 @@ interface ChecklistFile {
   fileSize: number | null;
   mimeType: string | null;
   fileSourcedFromMaster?: boolean;
+  fileSourcedFromMasterType?: string | null;
 }
 
 interface UploadedFileResult extends ChecklistFile {
@@ -228,9 +230,17 @@ const ChecklistDropzone = memo(function ChecklistDropzone({
           {file.fileSourcedFromMaster && (
             <span
               className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 flex-shrink-0 whitespace-nowrap"
-              title="申請人マスターに登録済みの書類が自動的に反映されました"
+              title={
+                file.fileSourcedFromMasterType === "organization"
+                  ? "所属機関マスターに登録済みの書類が自動的に反映されました"
+                  : "申請人マスターに登録済みの書類が自動的に反映されました"
+              }
             >
-              マスターから反映
+              {file.fileSourcedFromMasterType === "organization"
+                ? "アップロード済み（所属機関マスターから反映）"
+                : file.fileSourcedFromMasterType === "applicant"
+                ? "アップロード済み（申請人マスターから反映）"
+                : "マスターから反映"}
             </span>
           )}
           <button
@@ -505,7 +515,7 @@ export function DocumentChecklist({
   const handleFileUploaded = useCallback((targetItemId: string, file: UploadedFileResult, meta?: UploadMeta) => {
     setLocalChecklist((prev) =>
       prev.map((i) => (i.id === targetItemId
-        ? { ...i, fileUrl: file.fileUrl, fileName: file.fileName, fileSize: file.fileSize, mimeType: file.mimeType, status: file.status, fileSourcedFromMaster: false }
+        ? { ...i, fileUrl: file.fileUrl, fileName: file.fileName, fileSize: file.fileSize, mimeType: file.mimeType, status: file.status, fileSourcedFromMaster: false, fileSourcedFromMasterType: null }
         : i))
     );
     setNeedsManualClassification((prev) => {
@@ -528,7 +538,7 @@ export function DocumentChecklist({
   const handleFileDeleted = useCallback((itemId: string) => {
     setLocalChecklist((prev) =>
       prev.map((i) => (i.id === itemId
-        ? { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, status: "not_submitted", fileSourcedFromMaster: false }
+        ? { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, status: "not_submitted", fileSourcedFromMaster: false, fileSourcedFromMasterType: null }
         : i))
     );
     setNeedsManualClassification((prev) => {
@@ -550,8 +560,8 @@ export function DocumentChecklist({
       try { data = await res.json(); } catch { throw new Error(`サーバーエラー（HTTP ${res.status}）`); }
       if (!res.ok) throw new Error(data?.error ?? "再分類に失敗しました");
       setLocalChecklist((prev) => prev.map((i) => {
-        if (i.id === fromId) return { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, fileSourcedFromMaster: false, status: "not_submitted" };
-        if (i.id === toId) return { ...i, fileUrl: data.item.fileUrl, fileName: data.item.fileName, fileSize: data.item.fileSize, mimeType: data.item.mimeType, fileSourcedFromMaster: data.item.fileSourcedFromMaster, status: data.item.status };
+        if (i.id === fromId) return { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, fileSourcedFromMaster: false, fileSourcedFromMasterType: null, status: "not_submitted" };
+        if (i.id === toId) return { ...i, fileUrl: data.item.fileUrl, fileName: data.item.fileName, fileSize: data.item.fileSize, mimeType: data.item.mimeType, fileSourcedFromMaster: data.item.fileSourcedFromMaster, fileSourcedFromMasterType: data.item.fileSourcedFromMasterType, status: data.item.status };
         return i;
       }));
       setNeedsManualClassification((prev) => {
@@ -871,6 +881,7 @@ export function DocumentChecklist({
                           fileSize: item.fileSize ?? null,
                           mimeType: item.mimeType ?? null,
                           fileSourcedFromMaster: item.fileSourcedFromMaster ?? false,
+                          fileSourcedFromMasterType: item.fileSourcedFromMasterType ?? null,
                         }}
                         onUploaded={handleFileUploaded}
                         onDeleted={handleFileDeleted}

@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { getApplicationById, syncMasterDocumentsToChecklist } from "@/actions/applications";
+import { getApplicationById, syncMasterDocumentsToChecklist, syncOrgMasterDocumentsToChecklist } from "@/actions/applications";
 import { notFound, redirect } from "next/navigation";
 import {
   Card, CardContent, CardHeader, CardTitle,
@@ -81,6 +81,13 @@ export default async function ApplicationDetailPage({
     await syncMasterDocumentsToChecklist(id);
   } catch (e) {
     console.error("[ApplicationDetailPage] syncMasterDocumentsToChecklist failed:", e);
+    // マスター連携に失敗してもページ表示は継続する
+  }
+
+  try {
+    await syncOrgMasterDocumentsToChecklist(id);
+  } catch (e) {
+    console.error("[ApplicationDetailPage] syncOrgMasterDocumentsToChecklist failed:", e);
     // マスター連携に失敗してもページ表示は継続する
   }
 

@@ -285,11 +285,8 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 2: 所属機関等作成用 2 V — 派遣先・職業紹介事業者・取次機関
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
+          {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
           <FormHeader
-            showGov
-            formNumber={formNumber}
-            title={formTitle.ja}
-            titleEn={formTitle.en}
             partLabel="所属機関等作成用　２"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For organization, Part 2 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
@@ -459,11 +456,8 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 3: 所属機関等作成用 3 V — コンプライアンス確認（(11)〜(21)）
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
+          {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
           <FormHeader
-            showGov
-            formNumber={formNumber}
-            title={formTitle.ja}
-            titleEn={formTitle.en}
             partLabel="所属機関等作成用　３"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For organization, Part 3 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
@@ -507,11 +501,8 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 4: 所属機関等作成用 4 V — コンプライアンス(22)〜(33) ＋ 所属機関署名
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
+          {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
           <FormHeader
-            showGov
-            formNumber={formNumber}
-            title={formTitle.ja}
-            titleEn={formTitle.en}
             partLabel="所属機関等作成用　４"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For organization, Part 4 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
@@ -599,11 +590,8 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 5: 所属機関等作成用 4 V — 1号特定技能外国人支援計画（(34)〜(42)・4(1)〜(16)）＋ 取次者・署名
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
+          {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
           <FormHeader
-            showGov
-            formNumber={formNumber}
-            title={formTitle.ja}
-            titleEn={formTitle.en}
             partLabel="所属機関等作成用　５"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For organization, Part 4 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)") — Support plan`}

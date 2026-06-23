@@ -17,7 +17,7 @@ import {
   fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes,
   fmtAdditionalOccupations, buildAddress,
   FormHeader, SignatureSection,
-  FORM_TITLE_MAP, getFormNumber,
+  FORM_TITLE_MAP, FORM_DECLARATION_MAP, getFormNumber,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
 
@@ -31,6 +31,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
   // ── ヘッド部分（様式番号・タイトル）: 申請書類の種別に応じて動的に切り替え ──
   const formNumber = getFormNumber(formType, cat);
   const formTitle = FORM_TITLE_MAP[formType];
+  const formDeclaration = FORM_DECLARATION_MAP[formType];
 
   return (
     <html lang="ja">
@@ -57,10 +58,10 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
           />
 
           <p style={{ fontSize: "8px", color: "#333", textAlign: "center", marginBottom: "6px" }}>
-            出入国管理及び難民認定法第20条第2項の規定に基づき，次のとおり在留資格の変更を申請します。
+            {formDeclaration.ja}
             <br />
             <span className="bilingual">
-              Pursuant to the provisions of Article 20, Paragraph 2 of the Immigration Control and Refugee Recognition Act, I hereby apply for change of status of residence as follows.
+              {formDeclaration.en}
             </span>
           </p>
 
@@ -242,11 +243,8 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         <>
         {/* Page 2: 申請人等作成用 ２ V（「特定技能（１号）」・「特定技能（２号）」） */}
         <div className="page">
+          {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
           <FormHeader
-            showGov
-            formNumber={formNumber}
-            title={formTitle.ja}
-            titleEn={formTitle.en}
             partLabel="申請人等作成用　２"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For applicant, Part 2 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
@@ -375,11 +373,8 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             Page 3: 申請人等作成用 ３ V（「特定技能（１号）」・「特定技能（２号）」）
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
+          {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
           <FormHeader
-            showGov
-            formNumber={formNumber}
-            title={formTitle.ja}
-            titleEn={formTitle.en}
             partLabel="申請人等作成用　３"
             partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
             partLabelEn={`For applicant, Part 3 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}

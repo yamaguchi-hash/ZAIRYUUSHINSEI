@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, Loader2, FileText, Eye, ExternalLink } from "lucide-react";
+import { Plus, Trash2, Loader2, FileText, Eye, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { saveOrganizationDocument, deleteOrganizationDocument } from "@/actions/organization-documents";
 import { DocumentLink, isImageFile } from "@/components/applicants/document-viewer";
 import { VISA_TYPE_LABELS, ORG_RELEVANT_VISA_TYPES } from "@/lib/utils";
@@ -74,6 +74,9 @@ function DocumentCategorySection({
   const [docName, setDocName] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
+  // 既に書類がある区分は開いた状態で初期表示し、空の区分は折りたたんでおく
+  // （所属機関が必要としない区分が多いため、空のカードで画面が埋まらないようにする）
+  const [isExpanded, setIsExpanded] = useState(documents.length > 0);
 
   function handleFileSelected(file: File) {
     if (!docName.trim()) {
@@ -123,8 +126,21 @@ function DocumentCategorySection({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm">{title}</CardTitle>
+        <button
+          type="button"
+          onClick={() => setIsExpanded((v) => !v)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <CardTitle className="text-sm">
+            {title}
+            {documents.length > 0 && (
+              <span className="ml-2 text-xs font-normal text-gray-400">（{documents.length}件）</span>
+            )}
+          </CardTitle>
+          {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        </button>
       </CardHeader>
+      {isExpanded && (
       <CardContent className="space-y-2">
         {documents.length === 0 ? (
           <p className="text-xs text-gray-400">登録済みの書類はありません</p>
@@ -182,6 +198,7 @@ function DocumentCategorySection({
         </div>
         {error && <p className="text-xs text-red-500">{error}</p>}
       </CardContent>
+      )}
     </Card>
   );
 }

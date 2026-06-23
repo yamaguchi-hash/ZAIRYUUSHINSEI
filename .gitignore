@@ -49,3 +49,4 @@ zairyu-data.db
 
 .vercel
 .env*
+.superpowers/

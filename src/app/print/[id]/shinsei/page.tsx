@@ -177,6 +177,12 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           .sign-table td{height:44px;}
           .page-break{page-break-before:always;}
 
+          /* 所属機関署名欄の印影枠（プレースホルダー） */
+          .seal-box{
+            width:40px;height:40px;border:1px dashed #ff0000;border-radius:50%;
+            color:#ff0000;text-align:center;line-height:40px;font-size:8pt;flex-shrink:0;
+          }
+
           /* ロール識別バナー（申請人用／所属機関用／扶養者用の境目を明示） */
           .role-banner{
             text-align:center;font-size:10px;font-weight:bold;letter-spacing:0.15em;
@@ -1316,7 +1322,15 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                 <tbody>
                   <tr>
                     <td className="lbl" style={{ width: "30%" }}>機関代表者・担当者署名</td>
-                    <td style={{ width: "40%" }}></td>
+                    <td style={{ width: "40%" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: "bold" }}>{fmt(org?.nameJa) || fmt(form.orgName)}</div>
+                          <div>{fmt(org?.representativeTitle)} {fmt(org?.representativeName) || fmt(form.position)}</div>
+                        </div>
+                        <div className="seal-box">印</div>
+                      </div>
+                    </td>
                     <td className="lbl" style={{ width: "15%" }}>署名日</td>
                     <td style={{ width: "15%" }}></td>
                   </tr>
@@ -1355,7 +1369,15 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
                     <tbody>
                       <tr>
                         <td className="lbl" style={{ width: "30%" }}>機関代表者・担当者署名</td>
-                        <td style={{ width: "40%" }}></td>
+                        <td style={{ width: "40%" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: "bold" }}>{fmt(org?.nameJa) || fmt(form.orgName)}</div>
+                              <div>{fmt(org?.representativeTitle)} {fmt(org?.representativeName) || fmt(form.position)}</div>
+                            </div>
+                            <div className="seal-box">印</div>
+                          </div>
+                        </td>
                         <td className="lbl" style={{ width: "15%" }}>署名日</td>
                         <td style={{ width: "15%" }}></td>
                       </tr>

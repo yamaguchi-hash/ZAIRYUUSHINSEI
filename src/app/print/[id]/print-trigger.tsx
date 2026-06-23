@@ -15,16 +15,20 @@ const OMITTABLE_SECTIONS = [
   { key: "vWorkHistory", label: "職歴" },
 ] as const;
 
-export function PrintTrigger({ applicationId }: { applicationId: string }) {
+export function PrintTrigger({
+  applicationId, disableAutoPrint,
+}: { applicationId: string; disableAutoPrint?: boolean }) {
   const [showDate, setShowDate] = useState(true);
   const [omitSections, setOmitSections] = useState<Record<string, boolean>>({});
   const [showOmitPanel, setShowOmitPanel] = useState(false);
 
-  // 自動印刷（800ms後）
+  // 自動印刷（800ms後）。余白ドラッグ調整UIがある画面では、調整前に
+  // 印刷ダイアログが開いてしまうため disableAutoPrint で無効化できる。
   useEffect(() => {
+    if (disableAutoPrint) return;
     const timer = setTimeout(() => window.print(), 800);
     return () => clearTimeout(timer);
-  }, []);
+  }, [disableAutoPrint]);
 
   // 年月日の表示/非表示を body クラスで制御
   useEffect(() => {

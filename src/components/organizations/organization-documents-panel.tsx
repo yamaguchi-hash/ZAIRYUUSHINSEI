@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, Loader2, FileText, Eye, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { Trash2, Loader2, FileText, Eye, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { saveOrganizationDocument, deleteOrganizationDocument } from "@/actions/organization-documents";
 import { DocumentLink, isImageFile } from "@/components/applicants/document-viewer";
 import { VISA_TYPE_LABELS, ORG_RELEVANT_VISA_TYPES } from "@/lib/utils";
+import { FileDropzone } from "@/components/ui/file-dropzone";
+import { cn } from "@/lib/utils";
 
 interface OrgDoc {
   id: string;
@@ -78,6 +80,28 @@ function DocumentCategorySection({
   // （所属機関が必要としない区分が多いため、空のカードで画面が埋まらないようにする）
   const [isExpanded, setIsExpanded] = useState(documents.length > 0);
 
+  async function uploadAndSave(file: File, name: string) {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: form });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error ?? "アップロードに失敗しました");
+    }
+    const { url, fileName, fileSize, mimeType } = await res.json();
+
+    const saved = await saveOrganizationDocument({
+      organizationId,
+      visaType,
+      documentName: name,
+      fileUrl: url,
+      fileName,
+      fileSize,
+      mimeType,
+    });
+    onAdded({ id: saved.id, visaType: saved.visaType, documentName: saved.documentName, fileUrl: saved.fileUrl, fileName: saved.fileName });
+  }
+
   function handleFileSelected(file: File) {
     if (!docName.trim()) {
       setError("先に書類名を入力してください");
@@ -86,26 +110,19 @@ function DocumentCategorySection({
     setError("");
     startTransition(async () => {
       try {
-        const form = new FormData();
-        form.append("file", file);
-        const res = await fetch("/api/upload", { method: "POST", body: form });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error ?? "アップロードに失敗しました");
-        }
-        const { url, fileName, fileSize, mimeType } = await res.json();
-
-        const saved = await saveOrganizationDocument({
-          organizationId,
-          visaType,
-          documentName: docName.trim(),
-          fileUrl: url,
-          fileName,
-          fileSize,
-          mimeType,
-        });
-        onAdded({ id: saved.id, visaType: saved.visaType, documentName: saved.documentName, fileUrl: saved.fileUrl, fileName: saved.fileName });
+        await uploadAndSave(file, docName.trim());
         setDocName("");
+      } catch (err: any) {
+        setError(err.message ?? "アップロードに失敗しました");
+      }
+    });
+  }
+
+  function handleReplace(doc: OrgDoc, file: File) {
+    setError("");
+    startTransition(async () => {
+      try {
+        await uploadAndSave(file, doc.documentName);
       } catch (err: any) {
         setError(err.message ?? "アップロードに失敗しました");
       }
@@ -172,29 +189,20 @@ function DocumentCategorySection({
           ))
         )}
 
-        <div className="flex items-center gap-2 pt-1">
+        <div className="space-y-1.5 pt-1">
           <input
             type="text"
             value={docName}
             onChange={(e) => setDocName(e.target.value)}
             placeholder="書類名（例: 登記事項証明書）"
-            className="flex-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5"
+            className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5"
           />
-          <label className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 cursor-pointer px-2 py-1.5 border border-blue-200 rounded-lg">
-            {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-            追加
-            <input
-              type="file"
-              accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf,image/jpeg,image/png,image/webp,image/heic,application/pdf"
-              className="hidden"
-              disabled={isPending}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileSelected(file);
-                e.target.value = "";
-              }}
-            />
-          </label>
+          <FileDropzone
+            label="ファイルをドラッグ＆ドロップ、またはクリックして選択"
+            description="JPEG・PNG・PDF対応"
+            isUploading={isPending}
+            onFile={handleFileSelected}
+          />
         </div>
         {error && <p className="text-xs text-red-500">{error}</p>}
       </CardContent>

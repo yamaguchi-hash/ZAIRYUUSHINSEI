@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Pencil, X, Mail, Phone, Shield, User, TrendingUp, Trash2, AlertTriangle } from "lucide-react";
+import { Building2, Pencil, X, Mail, Phone, Shield, User, TrendingUp, Trash2, AlertTriangle, FileText } from "lucide-react";
 import { AddOrganizationForm } from "./add-organization-form";
 import { deleteOrganization } from "@/actions/organizations";
 
@@ -184,6 +185,14 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                           {org.nameEn && <p className="text-xs text-gray-400">{org.nameEn}</p>}
                         </div>
                         <div className="opacity-0 group-hover:opacity-100 flex items-center gap-2 flex-shrink-0 transition-opacity">
+                          <Link
+                            href={`/organizations/${org.id}`}
+                            className="inline-flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800"
+                          >
+                            <FileText className="w-3 h-3" />
+                            書類管理
+                          </Link>
+                          <span className="text-gray-300">|</span>
                           <button
                             onClick={() => setEditingId(org.id)}
                             className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"

@@ -827,7 +827,22 @@ export async function deleteApplication(
 export async function addCustomDocumentToChecklist(
   applicationId: string,
   documentName: string
-): Promise<{ success: boolean; error?: string; newItemId?: string }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+  newItemId?: string;
+  /** マスター同期処理後の最新の状態（マッチした場合はファイル情報込み）。
+   *  画面リロードなしでチェックリスト表示を即時更新するために使う。 */
+  item?: {
+    fileUrl: string | null;
+    fileName: string | null;
+    fileSize: number | null;
+    mimeType: string | null;
+    status: string;
+    fileSourcedFromMaster: boolean;
+    fileSourcedFromMasterType: string | null;
+  };
+}> {
   try {
     const session = await auth();
     if (!session?.user) return { success: false, error: "認証が必要です" };
@@ -853,8 +868,27 @@ export async function addCustomDocumentToChecklist(
       })
       .returning({ id: applicationDocumentChecklist.id });
 
+    // 追加直後にマスターとの自動反映を試みる（画面リロード不要にするため）。
+    // 両関数とも「未提出の全項目」を対象にするため、今INSERTした新規行も対象に含まれる。
+    await syncMasterDocumentsToChecklist(applicationId);
+    await syncOrgMasterDocumentsToChecklist(applicationId);
+
+    const [updated] = await db
+      .select({
+        fileUrl: applicationDocumentChecklist.fileUrl,
+        fileName: applicationDocumentChecklist.fileName,
+        fileSize: applicationDocumentChecklist.fileSize,
+        mimeType: applicationDocumentChecklist.mimeType,
+        status: applicationDocumentChecklist.status,
+        fileSourcedFromMaster: applicationDocumentChecklist.fileSourcedFromMaster,
+        fileSourcedFromMasterType: applicationDocumentChecklist.fileSourcedFromMasterType,
+      })
+      .from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.id, inserted.id))
+      .limit(1);
+
     revalidatePath(`/applications/${applicationId}`);
-    return { success: true, newItemId: inserted.id };
+    return { success: true, newItemId: inserted.id, item: updated };
   } catch (err: any) {
     return { success: false, error: err.message ?? "追加に失敗しました" };
   }

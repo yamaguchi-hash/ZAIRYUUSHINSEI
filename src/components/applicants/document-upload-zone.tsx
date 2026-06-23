@@ -2,9 +2,10 @@
 
 import { useRef, useState } from "react";
 import { saveApplicantDocument, deleteApplicantDocument } from "@/actions/ocr";
-import { Upload, X, CheckCircle, Loader2, FileText, Eye, ExternalLink } from "lucide-react";
+import { X, CheckCircle, Loader2, FileText, Eye, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DocumentLink, isImageFile } from "./document-viewer";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 
 type DocType = "passport_data_page" | "residence_card_front" | "residence_card_back";
 
@@ -26,7 +27,6 @@ export function DocumentUploadZone({
   onUploaded,
 }: DocumentUploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -117,41 +117,16 @@ export function DocumentUploadZone({
         </div>
       ) : (
         /* ─── 未アップロード: コンパクトなインライン型ドロップゾーン ─── */
-        <div
-          className={cn(
-            "flex items-center gap-3 border-2 border-dashed rounded-lg px-3 py-2.5 cursor-pointer transition-colors select-none",
-            isDragging
-              ? "border-blue-400 bg-blue-50"
-              : "border-gray-200 hover:border-blue-300 hover:bg-blue-50/40",
-            isUploading && "pointer-events-none opacity-60"
-          )}
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragging(false);
-            const file = e.dataTransfer.files[0];
-            if (file) handleFile(file);
-          }}
+        <FileDropzone
+          label={label}
+          description={`${description}　·　クリックまたはドラッグ＆ドロップ`}
+          isUploading={isUploading}
+          onFile={handleFile}
         >
-          {isUploading ? (
-            <Loader2 className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" />
-          ) : (
-            <Upload className="w-4 h-4 text-gray-300 flex-shrink-0" />
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-700 truncate">{label}</p>
-            <p className="text-[10px] text-gray-400 truncate">
-              {isUploading
-                ? "アップロード中..."
-                : `${description}　·　クリックまたはドラッグ＆ドロップ`}
-            </p>
-          </div>
           <span className="text-[10px] text-gray-300 flex-shrink-0 hidden sm:inline">
             JPEG · PNG · PDF
           </span>
-        </div>
+        </FileDropzone>
       )}
 
       {error && <p className="text-xs text-red-500 mt-1 px-1">{error}</p>}

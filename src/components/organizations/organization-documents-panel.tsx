@@ -58,6 +58,66 @@ export function OrganizationDocumentsPanel({ organizationId, initialDocuments }:
   );
 }
 
+function ExistingDocumentRow({
+  doc,
+  isPending,
+  onReplace,
+  onDelete,
+}: {
+  doc: OrgDoc;
+  isPending: boolean;
+  onReplace: (file: File) => void;
+  onDelete: () => void;
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragLeave={() => setIsDragging(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        if (confirm(`「${doc.fileName}」を新しいファイルに上書きしますか？`)) {
+          onReplace(file);
+        }
+      }}
+      className={cn(
+        "flex items-center gap-2 border rounded-lg px-3 py-2 transition-colors",
+        isDragging ? "border-blue-400 bg-blue-50" : "bg-gray-50 border-gray-100"
+      )}
+    >
+      <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-gray-700 truncate">{doc.documentName}</p>
+        {isDragging ? (
+          <p className="text-xs text-blue-600">ここにドロップして上書き</p>
+        ) : (
+          <DocumentLink
+            url={doc.fileUrl}
+            fileName={doc.fileName}
+            documentType={doc.documentName}
+            className="text-xs text-gray-500 hover:text-blue-600 truncate flex items-center gap-1 text-left"
+          >
+            <span className="truncate">{doc.fileName}</span>
+            {isImageFile(doc.fileName) ? <Eye className="w-3 h-3 text-gray-300 flex-shrink-0" /> : <ExternalLink className="w-3 h-3 text-gray-300 flex-shrink-0" />}
+          </DocumentLink>
+        )}
+      </div>
+      <button
+        onClick={onDelete}
+        disabled={isPending}
+        className="p-0.5 text-gray-300 hover:text-red-500 disabled:opacity-50 flex-shrink-0"
+        title="削除"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function DocumentCategorySection({
   title,
   organizationId,
@@ -163,29 +223,13 @@ function DocumentCategorySection({
           <p className="text-xs text-gray-400">登録済みの書類はありません</p>
         ) : (
           documents.map((doc) => (
-            <div key={doc.id} className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
-              <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-gray-700 truncate">{doc.documentName}</p>
-                <DocumentLink
-                  url={doc.fileUrl}
-                  fileName={doc.fileName}
-                  documentType={doc.documentName}
-                  className="text-xs text-gray-500 hover:text-blue-600 truncate flex items-center gap-1 text-left"
-                >
-                  <span className="truncate">{doc.fileName}</span>
-                  {isImageFile(doc.fileName) ? <Eye className="w-3 h-3 text-gray-300 flex-shrink-0" /> : <ExternalLink className="w-3 h-3 text-gray-300 flex-shrink-0" />}
-                </DocumentLink>
-              </div>
-              <button
-                onClick={() => handleDelete(doc.id)}
-                disabled={isPending}
-                className="p-0.5 text-gray-300 hover:text-red-500 disabled:opacity-50 flex-shrink-0"
-                title="削除"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <ExistingDocumentRow
+              key={doc.id}
+              doc={doc}
+              isPending={isPending}
+              onReplace={(file) => handleReplace(doc, file)}
+              onDelete={() => handleDelete(doc.id)}
+            />
           ))
         )}
 

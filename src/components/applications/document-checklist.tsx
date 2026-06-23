@@ -641,16 +641,18 @@ export function DocumentChecklist({
           documentName: name,
           documentRequirementId: null,
           isRequiredByExpert: true,
-          status: "not_submitted",
+          status: result.item?.status ?? "not_submitted",
           expertNotes: null,
           ocrExtractedData: null,
           masterDescription: null,
           masterSortOrder: 9999,
           createdAt: new Date().toISOString(),
-          fileUrl: null,
-          fileName: null,
-          fileSize: null,
-          mimeType: null,
+          fileUrl: result.item?.fileUrl ?? null,
+          fileName: result.item?.fileName ?? null,
+          fileSize: result.item?.fileSize ?? null,
+          mimeType: result.item?.mimeType ?? null,
+          fileSourcedFromMaster: result.item?.fileSourcedFromMaster ?? false,
+          fileSourcedFromMasterType: result.item?.fileSourcedFromMasterType ?? null,
         };
         setLocalChecklist(prev => [...prev, newEntry]);
         setCustomDocName("");

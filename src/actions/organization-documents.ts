@@ -93,6 +93,7 @@ export async function deleteOrganizationDocument(documentId: string, organizatio
     .where(
       and(
         eq(organizationDocuments.id, documentId),
+        eq(organizationDocuments.organizationId, organizationId),
         eq(organizationDocuments.tenantId, tenantId),
       )
     );

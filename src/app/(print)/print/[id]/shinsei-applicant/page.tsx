@@ -34,13 +34,10 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
   const formDeclaration = FORM_DECLARATION_MAP[formType];
 
   return (
-    <html lang="ja">
-      <head>
+    <>
         <meta charSet="utf-8" />
         <title>申請人等作成用 - {form.familyNameEn} {form.givenNameEn}</title>
         <style>{PRINT_STYLES}</style>
-      </head>
-      <body>
         <ShinseiPrintToolbar applicationId={id} label="申請人等作成用（3ページ）" />
 
         {/* ══════════════════════════════════════════════════════════════════════
@@ -446,7 +443,6 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         </>
         )}
 
-      </body>
-    </html>
+    </>
   );
 }

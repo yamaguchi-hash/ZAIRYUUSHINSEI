@@ -83,8 +83,7 @@ export default async function ChecklistPrintPage({
   const applicantNameJa = [applicant?.familyNameJa, applicant?.givenNameJa].filter(Boolean).join(" ");
 
   return (
-    <html lang="ja">
-      <head>
+    <>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>必要書類チェックリスト - {applicantName}</title>
@@ -149,8 +148,6 @@ export default async function ChecklistPrintPage({
             .page { margin: 20px auto; box-shadow: 0 4px 24px rgba(0,0,0,0.12); border-radius: 4px; }
           }
         `}</style>
-      </head>
-      <body>
         {/* 画面表示のみ：印刷ボタンバー */}
         <PrintTrigger applicationId={application.id} />
 
@@ -267,7 +264,6 @@ export default async function ChecklistPrintPage({
             提出済：{requiredItems.filter(i => i.status !== "not_submitted").length} 件
           </div>
         </div>
-      </body>
-    </html>
+    </>
   );
 }

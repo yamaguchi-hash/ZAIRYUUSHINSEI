@@ -123,8 +123,7 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
   const p2Base = isCoe ? 22 : 17;
 
   return (
-    <html lang="ja">
-      <head>
+    <>
         <meta charSet="utf-8" />
         <title>申請書 - {form.familyNameEn} {form.givenNameEn}</title>
         <style>{`
@@ -216,8 +215,6 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
             .section,.section2,.section3{break-after:avoid;page-break-after:avoid;}
           }
         `}</style>
-      </head>
-      <body>
         <PrintTrigger applicationId={id} disableAutoPrint />
         <ShinseiMarginControls />
         <div className="page" style={{ paddingTop: "56px" }}>
@@ -1654,7 +1651,6 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
           </div>
 
         </div>
-      </body>
-    </html>
+    </>
   );
 }

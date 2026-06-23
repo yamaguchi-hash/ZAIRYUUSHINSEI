@@ -91,8 +91,7 @@ export default async function AzukariPrintPage({
   const applicantNameEn = [applicant?.familyNameEn, applicant?.givenNameEn].filter(Boolean).join(" ") || "";
 
   return (
-    <html lang="ja">
-      <head>
+    <>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{docTitle} - {applicantNameEn || applicantNameJa}</title>
@@ -267,8 +266,6 @@ export default async function AzukariPrintPage({
             }
           }
         `}</style>
-      </head>
-      <body>
         {/* 印刷ボタンバー（クライアントコンポーネント） */}
         <AzukariPrintTrigger applicantName={applicantNameEn || applicantNameJa} title={docTitle} />
 
@@ -349,7 +346,6 @@ export default async function AzukariPrintPage({
             行政書士<br />職印
           </div>
         </div>
-      </body>
-    </html>
+    </>
   );
 }

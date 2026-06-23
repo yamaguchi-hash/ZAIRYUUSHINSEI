@@ -89,8 +89,7 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
   const bodyBlocks = parseBody(form.riyushoBody || "");
 
   return (
-    <html lang="ja">
-      <head>
+    <>
         <meta charSet="utf-8" />
         <title>理由書 - {applicantNameEn}</title>
         <style>{`
@@ -236,8 +235,6 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
             margin: 30mm 25mm 25mm 25mm;
           }
         `}</style>
-      </head>
-      <body>
         <PrintTrigger applicationId={id} />
 
         <div className="riyusho-page">
@@ -294,7 +291,6 @@ export default async function RiyushoPrintPage({ params }: { params: Promise<{ i
           </div>
 
         </div>
-      </body>
-    </html>
+    </>
   );
 }

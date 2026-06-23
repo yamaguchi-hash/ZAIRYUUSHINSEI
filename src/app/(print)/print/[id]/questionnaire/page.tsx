@@ -64,8 +64,7 @@ export default async function QuestionnairePrintPage({
     .filter(Boolean).join(" ") || "（氏名不明）";
 
   return (
-    <html lang="ja">
-      <head>
+    <>
         <meta charSet="utf-8" />
         <title>顧客確認質問書 — {applicantName}</title>
         <style>{`
@@ -94,8 +93,6 @@ export default async function QuestionnairePrintPage({
 
           .sign-area { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
         `}</style>
-      </head>
-      <body>
         <div className="page">
           <h1>在留申請　ご確認・ご記入のお願い</h1>
           <p className="meta">
@@ -161,7 +158,6 @@ export default async function QuestionnairePrintPage({
             <span>出力日：{today}　|　案件番号：{app.caseNumber}</span>
           </div>
         </div>
-      </body>
-    </html>
+    </>
   );
 }

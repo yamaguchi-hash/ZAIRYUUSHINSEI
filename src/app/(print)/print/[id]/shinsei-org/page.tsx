@@ -35,13 +35,10 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
   const formTitle = FORM_TITLE_MAP[formType];
 
   return (
-    <html lang="ja">
-      <head>
+    <>
         <meta charSet="utf-8" />
         <title>所属機関等作成用 - {fmt(form.orgName)}</title>
         <style>{PRINT_STYLES}</style>
-      </head>
-      <body>
         <ShinseiPrintToolbar applicationId={id} label="所属機関等作成用（5ページ）" />
 
         {!isVtype && (
@@ -715,7 +712,6 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
         </>
         )}
 
-      </body>
-    </html>
+    </>
   );
 }

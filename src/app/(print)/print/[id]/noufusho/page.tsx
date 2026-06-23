@@ -42,8 +42,7 @@ export default async function NoufushoPrintPage({
   ];
 
   return (
-    <html lang="ja">
-      <head>
+    <>
         <meta charSet="utf-8" />
         <title>手数料納付書</title>
         <style>{`
@@ -157,8 +156,6 @@ body{font-family:"MS PMincho","ＭＳ Ｐ明朝","Yu Mincho","YuMincho","Hiragin
   .page{margin:0 auto;box-shadow:0 3px 20px rgba(0,0,0,.2);border-radius:2px}
 }
 `}</style>
-      </head>
-      <body>
         <NoufushoPrintTrigger label={payerName || appNum} />
         <div className="wrapper">
         <div className="page" style={{padding:"22mm 5mm 8mm 5mm"}}>
@@ -283,7 +280,6 @@ body{font-family:"MS PMincho","ＭＳ Ｐ明朝","Yu Mincho","YuMincho","Hiragin
 
         </div>{/* /page */}
         </div>
-      </body>
-    </html>
+    </>
   );
 }

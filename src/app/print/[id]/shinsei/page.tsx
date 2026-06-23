@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import type { ApplicationFormData, FamilyMember, WorkHistoryEntry } from "@/lib/form-types";
 import { FORM_TYPE_LABELS, VISA_CATEGORY_NEEDS_ORG, VISA_CATEGORY_PART2, OCCUPATION_TYPES } from "@/lib/form-types";
 import { PrintTrigger } from "../print-trigger";
+import { ShinseiMarginControls } from "../shinsei-margin-controls";
 import { PDF_PRINT_WIDTH } from "../shinsei-shared";
 
 function fmt(v: string | null | undefined) { return v || "　"; }
@@ -217,7 +218,8 @@ export default async function ShinseiPrintPage({ params }: { params: Promise<{ i
         `}</style>
       </head>
       <body>
-        <PrintTrigger applicationId={id} />
+        <PrintTrigger applicationId={id} disableAutoPrint />
+        <ShinseiMarginControls />
         <div className="page" style={{ paddingTop: "56px" }}>
 
           {/* ══ タイトル ══════════════════════════════════════════════════════ */}

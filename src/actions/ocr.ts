@@ -109,8 +109,9 @@ export async function saveApplicantDocument(data: {
       givenNameJa: applicantMaster.givenNameJa,
     })
     .from(applicantMaster)
-    .where(eq(applicantMaster.id, data.applicantId))
+    .where(and(eq(applicantMaster.id, data.applicantId), eq(applicantMaster.tenantId, tenantId)))
     .limit(1);
+  if (!applicant) throw new Error("申請人が見つかりません");
 
   // 同じ書類タイプの既存ファイルは置き換えられるため、衝突判定からは除外する
   const otherDocs = await db

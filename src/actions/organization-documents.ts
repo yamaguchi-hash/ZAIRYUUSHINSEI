@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { organizationDocuments } from "@/lib/db/schema";
+import { organizationDocuments, organizationMaster } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
@@ -31,6 +31,18 @@ export async function saveOrganizationDocument(data: {
   const tenantId = requireTenantId((session.user as any).tenantId);
 
   if (!data.documentName.trim()) throw new Error("書類名を入力してください");
+
+  const [organization] = await db
+    .select({ id: organizationMaster.id })
+    .from(organizationMaster)
+    .where(
+      and(
+        eq(organizationMaster.id, data.organizationId),
+        eq(organizationMaster.tenantId, tenantId),
+      )
+    )
+    .limit(1);
+  if (!organization) throw new Error("所属機関が見つかりません");
 
   await db
     .delete(organizationDocuments)

@@ -11,12 +11,14 @@ import {
   applicationSnapshots,
   auditLog,
   applicantDocuments,
+  organizationDocuments,
 } from "@/lib/db/schema";
 import { eq, and, ne, inArray, desc, ilike, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
 import { matchMasterDocumentType } from "@/lib/master-document-matching";
+import { matchChecklistItem } from "@/lib/document-classifier";
 
 function requireTenantId(tenantId: string | undefined | null): string {
   if (!tenantId) throw new Error("テナントIDが不正です");
@@ -249,6 +251,7 @@ export async function syncMasterDocumentsToChecklist(applicationId: string): Pro
               fileSize: passportDoc.fileSize,
               mimeType: passportDoc.mimeType,
               fileSourcedFromMaster: true,
+              fileSourcedFromMasterType: "applicant",
               status: "submitted",
               submittedAt: new Date(),
               updatedAt: new Date(),
@@ -264,6 +267,7 @@ export async function syncMasterDocumentsToChecklist(applicationId: string): Pro
               fileSize: frontDoc.fileSize,
               mimeType: frontDoc.mimeType,
               fileSourcedFromMaster: true,
+              fileSourcedFromMasterType: "applicant",
               status: "submitted",
               submittedAt: new Date(),
               updatedAt: new Date(),
@@ -279,6 +283,7 @@ export async function syncMasterDocumentsToChecklist(applicationId: string): Pro
               fileSize: backDoc.fileSize,
               mimeType: backDoc.mimeType,
               fileSourcedFromMaster: true,
+              fileSourcedFromMasterType: "applicant",
               status: "submitted",
               submittedAt: new Date(),
               updatedAt: new Date(),
@@ -299,9 +304,11 @@ export async function syncMasterDocumentsToChecklist(applicationId: string): Pro
                   fileName: backDoc.fileName,
                   fileSize: backDoc.fileSize ?? 0,
                   mimeType: backDoc.mimeType ?? "image/jpeg",
+                  sourcedFromMaster: true,
                 }],
               } : {}),
               fileSourcedFromMaster: true,
+              fileSourcedFromMasterType: "applicant",
               status: "submitted",
               submittedAt: new Date(),
               updatedAt: new Date(),
@@ -316,6 +323,84 @@ export async function syncMasterDocumentsToChecklist(applicationId: string): Pro
     revalidatePath(`/applications/${applicationId}`);
   } catch (err: any) {
     console.error("[syncMasterDocumentsToChecklist] error:", { applicationId, err });
+    // ベストエフォート処理のため、エラーはログのみで握る（呼び出し元はページ表示を継続する）
+  }
+}
+
+/**
+ * 所属機関マスター（organizationDocuments）に登録済みの書類を、
+ * 案件の必要書類チェックリストへ自動反映する（書き込み同期）。
+ * - 案件のorganizationId・visaTypeをキーに、共通書類（visaType IS NULL）と
+ *   案件の在留資格専用書類の両方を取得し、専用書類を優先する候補リストを作る
+ * - 未提出（fileUrlがnull）のチェックリスト項目ごとに、matchChecklistItem()で
+ *   候補リストとのファジーマッチングを行い、一致したものを反映する
+ * - ベストエフォート処理: 失敗してもページ表示を妨げないよう例外を投げない
+ */
+export async function syncOrgMasterDocumentsToChecklist(applicationId: string): Promise<void> {
+  try {
+    const session = await auth();
+    if (!session?.user) return;
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [application] = await db
+      .select()
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!application || !application.organizationId) return;
+
+    const checklistItems = await db
+      .select()
+      .from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.applicationId, applicationId));
+
+    const unsynced = checklistItems.filter((item) => !item.fileUrl);
+    if (unsynced.length === 0) return;
+
+    const orgDocs = await db
+      .select()
+      .from(organizationDocuments)
+      .where(and(
+        eq(organizationDocuments.organizationId, application.organizationId),
+        eq(organizationDocuments.tenantId, tenantId),
+      ));
+
+    // 案件のvisaType専用書類を先頭、共通書類（visaType IS NULL）を後方に配置する。
+    // matchChecklistItemは候補リストを先頭から走査して最初に一致したものを返すため、
+    // この並び順だけで「専用書類を優先」が実現できる。
+    const specificDocs = orgDocs.filter((d) => d.visaType === application.visaType);
+    const commonDocs = orgDocs.filter((d) => d.visaType === null);
+    const prioritizedOrgDocs = [...specificDocs, ...commonDocs];
+    if (prioritizedOrgDocs.length === 0) return;
+
+    const updates: Promise<unknown>[] = [];
+
+    for (const item of unsynced) {
+      const matched = matchChecklistItem(item.documentName, prioritizedOrgDocs);
+      if (!matched) continue;
+
+      updates.push(
+        db.update(applicationDocumentChecklist)
+          .set({
+            fileUrl: matched.fileUrl,
+            fileName: matched.fileName,
+            fileSize: matched.fileSize,
+            mimeType: matched.mimeType,
+            fileSourcedFromMaster: true,
+            fileSourcedFromMasterType: "organization",
+            status: "submitted",
+            submittedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(applicationDocumentChecklist.id, item.id))
+      );
+    }
+
+    if (updates.length === 0) return;
+    await Promise.all(updates);
+    revalidatePath(`/applications/${applicationId}`);
+  } catch (err: any) {
+    console.error("[syncOrgMasterDocumentsToChecklist] error:", { applicationId, err });
     // ベストエフォート処理のため、エラーはログのみで握る（呼び出し元はページ表示を継続する）
   }
 }

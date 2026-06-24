@@ -4,8 +4,6 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 
 const MIN_MARGIN_MM = 2;
 const MAX_MARGIN_MM = 25;
-/** @page の左右マージン（固定・調整対象外）。shinsei/page.tsx の @page{margin:6mm 8mm} と合わせること */
-const PAGE_SIDE_MARGIN_MM = 8;
 /** 96dpi基準でのCSS上の mm→px 換算（1mm = 96/25.4 px） */
 const PX_PER_MM = 96 / 25.4;
 
@@ -17,9 +15,22 @@ type HandleKind = "top" | "bottom" | "roleGap";
 
 type DragState = { kind: HandleKind; startY: number; startMm: number };
 
-export function ShinseiMarginControls() {
-  const [topMargin, setTopMargin] = useState(6);
-  const [bottomMargin, setBottomMargin] = useState(6);
+interface ShinseiMarginControlsProps {
+  /** 初期上余白（mm）。呼び出し元の @page margin-top の現状値と合わせること */
+  initialTopMm?: number;
+  /** 初期下余白（mm）。呼び出し元の @page margin-bottom の現状値と合わせること */
+  initialBottomMm?: number;
+  /** @page の左右マージン（固定・調整対象外）。呼び出し元の @page margin-left/right の現状値と合わせること */
+  sideMm?: number;
+}
+
+export function ShinseiMarginControls({
+  initialTopMm = 6,
+  initialBottomMm = 6,
+  sideMm = 8,
+}: ShinseiMarginControlsProps = {}) {
+  const [topMargin, setTopMargin] = useState(initialTopMm);
+  const [bottomMargin, setBottomMargin] = useState(initialBottomMm);
   const [roleGapMargin, setRoleGapMargin] = useState(0);
   const [positions, setPositions] = useState<{ top: number; bottom: number; roleGaps: number[] }>({
     top: 0, bottom: 0, roleGaps: [],
@@ -27,22 +38,23 @@ export function ShinseiMarginControls() {
   const draggingRef = useRef<DragState | null>(null);
 
   const recomputePositions = useCallback(() => {
-    const pageEl = document.querySelector(".page");
-    if (!pageEl) return;
-    const pageRect = pageEl.getBoundingClientRect();
+    const pageEls = Array.from(document.querySelectorAll(".page"));
+    if (pageEls.length === 0) return;
+    const firstRect = pageEls[0].getBoundingClientRect();
+    const lastRect = pageEls[pageEls.length - 1].getBoundingClientRect();
     const roleBannerEls = Array.from(document.querySelectorAll(".role-banner"));
     setPositions({
-      top: pageRect.top,
-      bottom: pageRect.bottom,
+      top: firstRect.top,
+      bottom: lastRect.bottom,
       roleGaps: roleBannerEls.map((el) => el.getBoundingClientRect().top),
     });
   }, []);
 
   useEffect(() => {
     recomputePositions();
-    const pageEl = document.querySelector(".page");
+    const pageEls = document.querySelectorAll(".page");
     const ro = new ResizeObserver(() => recomputePositions());
-    if (pageEl) ro.observe(pageEl);
+    pageEls.forEach((el) => ro.observe(el));
     window.addEventListener("resize", recomputePositions);
     window.addEventListener("scroll", recomputePositions, true);
     return () => {
@@ -88,7 +100,7 @@ export function ShinseiMarginControls() {
       <style>{`
         @page{
           margin-top:${topMargin}mm;margin-bottom:${bottomMargin}mm;
-          margin-left:${PAGE_SIDE_MARGIN_MM}mm;margin-right:${PAGE_SIDE_MARGIN_MM}mm;
+          margin-left:${sideMm}mm;margin-right:${sideMm}mm;
         }
         @media screen{
           .page{margin-top:${topMargin}mm;margin-bottom:${bottomMargin}mm;}

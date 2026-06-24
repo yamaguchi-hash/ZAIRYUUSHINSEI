@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { updateApplicationStatus } from "@/actions/applications";
 import { CheckCircle, ArrowRight, ArrowLeft, Loader2, Info, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,7 @@ export function WorkflowStepper({
   applicationId,
   userRole,
 }: WorkflowStepperProps) {
+  const router = useRouter();
   const [optimisticStep, setOptimisticStep] = useState(currentStep);
   const [isLoading, setIsLoading] = useState(false);
   const [processingMessage, setProcessingMessage] = useState("");
@@ -91,11 +93,12 @@ export function WorkflowStepper({
     if (targetIndex < 0 || targetIndex === currentIndex) return;
 
     // 次ステップへの自動処理は「進む」方向のみ
+    const isForward = targetIndex > currentIndex;
     setIsLoading(true);
     setErrorMessage("");
 
     try {
-      if (targetIndex > currentIndex) {
+      if (isForward) {
         // 前進: ステップ間の自動処理
         await runAutoProcess(targetKey);
       }
@@ -109,7 +112,11 @@ export function WorkflowStepper({
         return;
       }
       setOptimisticStep(targetKey);
-      window.location.reload();
+      if (isForward && targetKey === "ocr_processing") {
+        router.push(`/applications/${applicationId}/shinsei-form`);
+      } else {
+        window.location.reload();
+      }
     } catch (err: any) {
       setErrorMessage(err?.message ?? "ステップの移動に失敗しました");
       setIsLoading(false);
@@ -139,7 +146,11 @@ export function WorkflowStepper({
         return;
       }
       setOptimisticStep(nextStep);
-      window.location.reload();
+      if (nextStep === "ocr_processing") {
+        router.push(`/applications/${applicationId}/shinsei-form`);
+      } else {
+        window.location.reload();
+      }
     } catch (err: any) {
       setErrorMessage(err?.message ?? "ステップ移行に失敗しました");
       setIsLoading(false);

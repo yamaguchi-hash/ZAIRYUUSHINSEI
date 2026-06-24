@@ -28,7 +28,12 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
   const data = await loadShinseiData(id);
   if (!data) notFound();
 
-  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, cat, isVtype } = data;
+  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, cat, isVtype, isNtype, isRtype, needsOrg } = data;
+
+  // COE/Change/Extension の項目番号差異（N型: 派遣先の項目番号）— shinsei.tsx と同一の算出方法
+  const isCoe = formType === "coe";
+  const orgDispatchNo = isCoe ? 12 : 11;
+  const businessTypeLabel = (code: string) => code ? `${code}番` : "　";
 
   // ── ヘッド部分（様式番号・タイトル）: 申請書類の種別に応じて動的に切り替え ──
   const formNumber = getFormNumber(formType, cat);
@@ -41,11 +46,169 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
         <style>{PRINT_STYLES}</style>
         <ShinseiPrintToolbar applicationId={id} label="所属機関等作成用（5ページ）" />
 
-        {!isVtype && (
+        {!isVtype && !isNtype && !isRtype && !needsOrg && (
           <div className="no-print" style={{ padding: "60px 24px", textAlign: "center", color: "#64748b", fontSize: "14px", lineHeight: "1.8" }}>
-            この書類（所属機関等作成用）は、在留資格区分が「特定技能」の場合のみ作成されます。<br />
+            この在留資格区分では、所属機関用・扶養者用の書類は作成されません。<br />
             現在の申請内容では、この書類は出力されません。
           </div>
+        )}
+
+        {isNtype && (
+        <div className="page">
+          <FormHeader
+            showGov
+            formNumber={formNumber}
+            title={formTitle.ja}
+            titleEn={formTitle.en}
+            partLabel="所属機関等作成用　１"
+            partLabelEn="For organization, Part 1"
+          />
+
+          <div className="section">所属機関等作成用　Part 1 N　— 機関情報・雇用条件</div>
+
+          <div className="section3">2. 契約形態　／　3. 所属機関等</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl">2. 契約形態</td>
+                <td colSpan={3}>{form.contractType === "その他" ? `その他：${fmt(form.contractTypeOther)}` : fmt(form.contractType)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">3. 機関の名称</td><td>{fmt(form.orgName)}</td>
+                <td className="lbl">法人番号</td><td>{fmt(form.orgCorporateNumber)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">支店・事業所名</td><td>{fmt(form.orgBranchName)}</td>
+                <td className="lbl">雇用保険番号</td><td>{fmt(form.orgEmploymentInsuranceNo)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">業種番号</td>
+                <td>
+                  {businessTypeLabel(form.orgBusinessTypeCode ?? "")}
+                  {form.orgBusinessTypeOtherCode ? `　他：${form.orgBusinessTypeOtherCode}` : ""}
+                </td>
+                <td className="lbl">所在地</td><td>{fmtAddr(form.orgAddress)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">電話番号</td><td>{fmt(form.orgPhone)}</td>
+                <td className="lbl">資本金</td><td>{fmtMoney(form.orgCapital)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">年間売上高</td><td>{fmtMoney(form.orgAnnualSales)}</td>
+                <td className="lbl">従業員数（全体）</td><td>{form.orgEmployeeCount ? `${form.orgEmployeeCount}名` : "　"}</td>
+              </tr>
+              <tr>
+                <td className="lbl">うち外国人</td><td>{form.orgForeignEmployeeCount ? `${form.orgForeignEmployeeCount}名` : "　"}</td>
+                <td className="lbl">うち技能実習生</td><td>{form.orgTechInternCount ? `${form.orgTechInternCount}名` : "　"}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* 研究室：COEのみ（項目4） */}
+          {isCoe && (form.researchRoomName || form.researchRoomProfessor) && (
+            <>
+              <div className="section3">4. 研究室（高度専門職・研究のみ）</div>
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl">研究室名</td><td>{fmt(form.researchRoomName)}</td>
+                    <td className="lbl">指導教員氏名</td><td>{fmt(form.researchRoomProfessor)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </>
+          )}
+
+          <div className="section3">
+            {isCoe ? "5-11." : "4-10."} 就労条件・給与・職種・活動内容
+          </div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl">{isCoe ? "5." : "4."} 就労予定期間</td>
+                <td>{(form.workPeriodFixed === "定めあり" || form.workPeriodFixed?.startsWith("定めあり")) ? `定めあり：${fmt(form.workPeriodDuration)}` : "定めなし"}</td>
+                <td className="lbl">{isCoe ? "6." : "5."} 雇用開始予定日</td>
+                <td>
+                  {fmtDate(form.employmentStartDate)}
+                  {form.employmentStartDateStatus ? `（${form.employmentStartDateStatus}）` : ""}
+                </td>
+              </tr>
+              <tr>
+                <td className="lbl">{isCoe ? "7." : "6."} 給与・報酬</td>
+                <td>{fmtMoney(form.salary)}{form.salaryType ? `（${form.salaryType}）` : ""}</td>
+                <td className="lbl">{isCoe ? "8." : "7."} 実務経験年数</td>
+                <td>{form.businessExperienceYears ? `${form.businessExperienceYears}年` : "　"}</td>
+              </tr>
+              <tr>
+                <td className="lbl">{isCoe ? "9." : "8."} 職務上の地位</td>
+                <td>{form.positionExists === "あり（Yes）" ? `あり：${fmt(form.position)}` : "なし"}</td>
+                <td className="lbl">{isCoe ? "10." : "9."} 職種コード</td>
+                <td>
+                  {fmt(form.occupationCode)}
+                  {form.occupationCodeOthers ? ` / 他：${form.occupationCodeOthers}` : ""}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">{isCoe ? "11." : "10."} 活動内容詳細</div>
+          <table>
+            <tbody>
+              <tr>
+                <td style={{ whiteSpace: "pre-wrap", lineHeight: "1.3", minHeight: "28px", padding: "3px" }}>
+                  {fmt(form.activityDetails)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* ── 【所属機関署名欄】（共通コンポーネント・自動記名＋角印枠） ── */}
+          <SignatureSection
+            role="organization"
+            orgName={fmt(org?.nameJa) || fmt(form.orgName)}
+            representativeTitle={fmt(org?.representativeTitle)}
+            representativeName={fmt(org?.representativeName) || fmt(form.position)}
+          />
+
+          {/* 所属機関 Part 2（派遣先等） */}
+          {form.dispatchOrgName && (
+            <>
+              <div className="section">所属機関等作成用　Part 2 N　— 派遣先等（項目 {orgDispatchNo}）</div>
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl">{orgDispatchNo}. 派遣先名称</td><td>{fmt(form.dispatchOrgName)}</td>
+                    <td className="lbl">法人番号</td><td>{fmt(form.dispatchOrgCorporateNumber)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">支店・事業所名</td><td>{fmt(form.dispatchOrgBranchName)}</td>
+                    <td className="lbl">雇用保険番号</td><td>{fmt(form.dispatchOrgEmploymentInsuranceNo)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">業種コード</td><td>{businessTypeLabel(form.dispatchOrgBusinessTypeCode ?? "")}</td>
+                    <td className="lbl">所在地</td><td>{fmt(form.dispatchOrgAddress)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">電話番号</td><td>{fmt(form.dispatchOrgPhone)}</td>
+                    <td className="lbl">派遣予定期間</td><td>{fmt(form.dispatchPeriod)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">資本金</td><td>{fmtMoney(form.dispatchOrgCapital)}</td>
+                    <td className="lbl">年間売上高</td><td>{fmtMoney(form.dispatchOrgAnnualSales)}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* ── 【所属機関署名欄】（共通コンポーネント・自動記名＋角印枠） ── */}
+              <SignatureSection
+                role="organization"
+                orgName={fmt(org?.nameJa) || fmt(form.orgName)}
+                representativeTitle={fmt(org?.representativeTitle)}
+                representativeName={fmt(org?.representativeName) || fmt(form.position)}
+              />
+            </>
+          )}
+        </div>
         )}
 
         {isVtype && (

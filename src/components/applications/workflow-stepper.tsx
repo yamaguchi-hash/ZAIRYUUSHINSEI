@@ -114,6 +114,7 @@ export function WorkflowStepper({
       setOptimisticStep(targetKey);
       if (isForward && targetKey === "ocr_processing") {
         router.push(`/applications/${applicationId}/shinsei-form`);
+        router.refresh();
       } else {
         window.location.reload();
       }
@@ -148,6 +149,7 @@ export function WorkflowStepper({
       setOptimisticStep(nextStep);
       if (nextStep === "ocr_processing") {
         router.push(`/applications/${applicationId}/shinsei-form`);
+        router.refresh();
       } else {
         window.location.reload();
       }

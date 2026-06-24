@@ -325,6 +325,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             partLabelEn="For organization"
           />
 
+          <div className="role-banner">【所属機関用】</div>
           <div className="section">所属機関等作成用</div>
           <table>
             <tbody>

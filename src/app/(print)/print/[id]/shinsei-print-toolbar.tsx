@@ -11,14 +11,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-export function ShinseiPrintToolbar({ applicationId, label }: { applicationId: string; label: string }) {
+export function ShinseiPrintToolbar({
+  applicationId, label, disableAutoPrint,
+}: { applicationId: string; label: string; disableAutoPrint?: boolean }) {
   const [printSignDate, setPrintSignDate] = useState(true);
 
-  // 自動印刷（800ms後）
+  // 自動印刷（800ms後）。余白ドラッグ調整UIがある画面では、調整前に
+  // 印刷ダイアログが開いてしまうため disableAutoPrint で無効化できる。
   useEffect(() => {
+    if (disableAutoPrint) return;
     const timer = setTimeout(() => window.print(), 800);
     return () => clearTimeout(timer);
-  }, []);
+  }, [disableAutoPrint]);
 
   // 署名日の表示/非表示（.sign-date を CSS で制御）
   useEffect(() => {

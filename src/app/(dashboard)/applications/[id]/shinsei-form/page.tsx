@@ -45,6 +45,17 @@ export default async function ShinseiFormPage({
   const showRiyusho = application.visaType === "dependent"
     && (application.applicationType === "certification" || application.applicationType === "change");
 
+  // 資格外活動許可申請書PDF表示条件: 資格外活動の入力があり、必要事項が入力されている場合
+  // isYes()はshinsei-shared.tsxのyes()と同じ判定基準をこのファイル内で再現したもの
+  // （(print)配下と(dashboard)配下をまたぐimportを避けるため、ロジックのみ複製する）
+  const isYes = (v: string | null | undefined) =>
+    !!v && (v === "有" || v.startsWith("有（") || v === "あり" || v.startsWith("あり（"));
+  const isRtypeForm = initialForm.visaFormCategory === 'R';
+  const isPtypeForm = initialForm.visaFormCategory === 'P';
+  const showGaikatsu =
+    (isYes(initialForm.gaikatsuNeeded) || (isRtypeForm && isYes(initialForm.partTimeWorkExistsR)) || isPtypeForm) &&
+    !!(initialForm.gaikatsuActivityType || initialForm.gaikatsuCurrentActivity || initialForm.gaikatsuEmployerName);
+
   return (
     <div className="p-6 max-w-5xl">
       {/* ヘッダー */}
@@ -91,6 +102,16 @@ export default async function ShinseiFormPage({
             >
               <FileDown className="w-4 h-4" />
               理由書PDF
+            </Link>
+          )}
+          {showGaikatsu && (
+            <Link
+              href={`/print/${id}/gaikatsu`}
+              target="_blank"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-300"
+            >
+              <FileDown className="w-4 h-4" />
+              資格外活動許可申請書PDF
             </Link>
           )}
         </div>

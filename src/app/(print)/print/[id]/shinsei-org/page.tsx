@@ -20,6 +20,7 @@ import {
   FORM_TITLE_MAP, getFormNumber,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
+import { ShinseiMarginControls } from "../shinsei-margin-controls";
 
 export default async function ShinseiOrgPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -42,7 +43,8 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
         <meta charSet="utf-8" />
         <title>所属機関等作成用 - {fmt(form.orgName)}</title>
         <style>{PRINT_STYLES}</style>
-        <ShinseiPrintToolbar applicationId={id} label="所属機関等作成用（5ページ）" />
+        <ShinseiPrintToolbar applicationId={id} label="所属機関等作成用（5ページ）" disableAutoPrint />
+        <ShinseiMarginControls initialTopMm={7} initialBottomMm={7} sideMm={9} />
 
         {!isVtype && !isNtype && !isRtype && !needsOrg && (
           <div className="no-print" style={{ padding: "60px 24px", textAlign: "center", color: "#64748b", fontSize: "14px", lineHeight: "1.8" }}>

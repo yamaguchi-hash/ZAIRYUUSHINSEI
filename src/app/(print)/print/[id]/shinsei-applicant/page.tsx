@@ -20,6 +20,7 @@ import {
   FORM_TITLE_MAP, FORM_DECLARATION_MAP, getFormNumber,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
+import { ShinseiMarginControls } from "../shinsei-margin-controls";
 
 export default async function ShinseiApplicantPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -42,7 +43,8 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         <meta charSet="utf-8" />
         <title>申請人等作成用 - {form.familyNameEn} {form.givenNameEn}</title>
         <style>{PRINT_STYLES}</style>
-        <ShinseiPrintToolbar applicationId={id} label="申請人等作成用（3ページ）" />
+        <ShinseiPrintToolbar applicationId={id} label="申請人等作成用（3ページ）" disableAutoPrint />
+        <ShinseiMarginControls initialTopMm={7} initialBottomMm={7} sideMm={9} />
 
         {/* ══════════════════════════════════════════════════════════════════════
             Page 1: 別記第三十号様式（第二十条関係）申請人等作成用 １

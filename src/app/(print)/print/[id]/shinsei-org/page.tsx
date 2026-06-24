@@ -808,16 +808,16 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
           </div>
           <table className="v-tbl"><tbody>
             {([
-              { has: form.orgGangsterControl, detail: form.orgGangsterControlDetail, label: "(22) 暴力団員等がその事業活動を支配する者に該当するか", en: "Business controlled by organized crime" },
-              { has: form.orgActivityDocumentKept, detail: null, label: "(23) 特定技能外国人の活動の内容に係る文書を作成し，特定技能雇用契約の終了の日から1年以上保存することとしているか", en: "Retention of activity documents for 1+ year" },
-              { has: form.orgAwareOfDeposit, detail: form.orgAwareOfDepositDetail, label: "(24) 保証金の徴収その他財産の管理を受けていること又は違約金を定める契約を締結していることを認識して雇用契約を締結していないか", en: "Awareness of deposit/penalty contracts" },
-              { has: form.orgPenaltyContractExists, detail: form.orgPenaltyContractDetail, label: "(25) 特定技能雇用契約の不履行について違約金を定める契約等を締結していないか", en: "Penalty contract for non-performance" },
-              { has: form.orgSupportCostNotBurdened, detail: null, label: "(26) 1号特定技能外国人支援に要する費用を，直接又は間接に外国人に負担させないこととしているか（特定技能1号の場合）", en: "Support costs not charged to worker" },
-              { has: form.orgDispatchMeetsCondition, detail: form.orgDispatchConditionDetail, label: "(27) 労働者派遣の場合，派遣先が法定の要件のいずれかに該当すること", en: "Dispatch destination meets legal requirements" },
-              { has: form.orgDispatchMeetsCompliance, detail: form.orgDispatchComplianceDetail, label: "(28) 労働者派遣の場合，派遣先が(11)〜(22)に該当しないこと", en: "Dispatch destination compliance" },
-              { has: form.orgAccidentInsurance, detail: form.orgAccidentInsuranceDetail, label: "(29) 労災保険関係の成立の届出等の措置を講じていること", en: "Workers' compensation insurance" },
-              { has: form.orgContinuousPerformance, detail: null, label: "(30) 特定技能雇用契約を継続して履行する体制が適切に整備されていること", en: "Continuous contract performance system" },
-              { has: form.orgSalaryPaymentVerifiable, detail: null, label: "(31) 外国人の報酬を，当該外国人の指定する銀行その他の金融機関に対する振込み又は現実に支払われた額を確認できる方法によって支払われることとしており，かつ，後者の場合には，出入国在留管理庁長官に報酬の支払を裏付ける客観的な資料を提出し，その確認を受けることとしていることの有無", en: "Remuneration paid by wire transfer or verifiable method" },
+              { has: form.orgGangsterControl, detail: form.orgGangsterControlDetail, label: "(22) 暴力団員等がその事業活動を支配する者に該当するか", en: "Business controlled by organized crime", omit: false },
+              { has: form.orgActivityDocumentKept, detail: null, label: "(23) 特定技能外国人の活動の内容に係る文書を作成し，特定技能雇用契約の終了の日から1年以上保存することとしているか", en: "Retention of activity documents for 1+ year", omit: false },
+              { has: form.orgAwareOfDeposit, detail: form.orgAwareOfDepositDetail, label: "(24) 保証金の徴収その他財産の管理を受けていること又は違約金を定める契約を締結していることを認識して雇用契約を締結していないか", en: "Awareness of deposit/penalty contracts", omit: false },
+              { has: form.orgPenaltyContractExists, detail: form.orgPenaltyContractDetail, label: "(25) 特定技能雇用契約の不履行について違約金を定める契約等を締結していないか", en: "Penalty contract for non-performance", omit: false },
+              { has: form.orgSupportCostNotBurdened, detail: null, label: "(26) 1号特定技能外国人支援に要する費用を，直接又は間接に外国人に負担させないこととしているか（特定技能1号の場合）", en: "Support costs not charged to worker", omit: is2Go },
+              { has: form.orgDispatchMeetsCondition, detail: form.orgDispatchConditionDetail, label: "(27) 労働者派遣の場合，派遣先が法定の要件のいずれかに該当すること", en: "Dispatch destination meets legal requirements", omit: false },
+              { has: form.orgDispatchMeetsCompliance, detail: form.orgDispatchComplianceDetail, label: "(28) 労働者派遣の場合，派遣先が(11)〜(22)に該当しないこと", en: "Dispatch destination compliance", omit: false },
+              { has: form.orgAccidentInsurance, detail: form.orgAccidentInsuranceDetail, label: "(29) 労災保険関係の成立の届出等の措置を講じていること", en: "Workers' compensation insurance", omit: false },
+              { has: form.orgContinuousPerformance, detail: null, label: "(30) 特定技能雇用契約を継続して履行する体制が適切に整備されていること", en: "Continuous contract performance system", omit: false },
+              { has: form.orgSalaryPaymentVerifiable, detail: null, label: "(31) 外国人の報酬を，当該外国人の指定する銀行その他の金融機関に対する振込み又は現実に支払われた額を確認できる方法によって支払われることとしており，かつ，後者の場合には，出入国在留管理庁長官に報酬の支払を裏付ける客観的な資料を提出し，その確認を受けることとしていることの有無", en: "Remuneration paid by wire transfer or verifiable method", omit: false },
             ] as const).map((item, i) => (
               <tr key={i}>
                 <td className="lbl lbl-wrap" style={{ width: "82%", fontSize: "8.5px", lineHeight: "1.25" }}>
@@ -825,10 +825,14 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
                   <span className="bilingual-block">{item.en}</span>
                 </td>
                 <td style={{ textAlign: "center", width: "18%", fontSize: "9.5px" }}>
-                  {fmtYesNo(item.has)}
-                  {yes(item.has) && item.detail ? (
-                    <><br /><span style={{ fontSize: "8px", color: "#333" }}>{item.detail}</span></>
-                  ) : null}
+                  {item.omit ? "省略" : (
+                    <>
+                      {fmtYesNo(item.has)}
+                      {yes(item.has) && item.detail ? (
+                        <><br /><span style={{ fontSize: "8px", color: "#333" }}>{item.detail}</span></>
+                      ) : null}
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

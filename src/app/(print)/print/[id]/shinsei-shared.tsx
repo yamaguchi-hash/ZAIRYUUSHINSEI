@@ -46,6 +46,13 @@ export function fmtAdditionalOccupations(v: string | string[] | null | undefined
   if (codes.length === 0) return "";
   return codes.join(", ");
 }
+export function businessTypeLabel(code: string): string {
+  return code ? `${code}番` : "　";
+}
+/** is2Goがtrueの場合、表示値を「省略」に置き換える（特定技能1号の場合のみ必要な項目用） */
+export function omitFor2Go(is2Go: boolean, formattedValue: string): string {
+  return is2Go ? "省略" : formattedValue;
+}
 
 // ─── データ取得 ───────────────────────────────────────────────────────────────
 export interface ShinseiData {
@@ -59,6 +66,8 @@ export interface ShinseiData {
   isChange: boolean;
   /** 申請書類の種別（coe/change/extension/permanent） */
   formType: ApplicationFormType;
+  /** 申請書類の種別が COE（在留資格認定証明書交付申請）か */
+  isCoe: boolean;
   /** 在留資格カテゴリ（N/L/I/T/R/P/V） */
   cat: string;
   isNtype: boolean;
@@ -69,6 +78,8 @@ export interface ShinseiData {
   isVtype: boolean;
   /** 所属機関情報の記載が必要な区分か */
   needsOrg: boolean;
+  /** 特定技能2号を選択しているか（1号の場合のみ必要な項目をPDF上で「省略」と表示するために使う） */
+  is2Go: boolean;
 }
 
 export async function loadShinseiData(id: string): Promise<ShinseiData | null> {
@@ -96,6 +107,7 @@ export async function loadShinseiData(id: string): Promise<ShinseiData | null> {
     return "extension";
   };
   const formType = toFormType(form.applicationFormType ?? app.applicationType);
+  const isCoe = formType === "coe";
   const isChange = formType === "change";
   const now = new Date();
   const today = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
@@ -108,6 +120,9 @@ export async function loadShinseiData(id: string): Promise<ShinseiData | null> {
   const isPtype = cat === 'P';
   const isVtype = cat === 'V';   // 特定技能（１号・２号）
   const needsOrg = VISA_CATEGORY_NEEDS_ORG[cat as keyof typeof VISA_CATEGORY_NEEDS_ORG] ?? false;
+  // 特定技能2号を選択している場合、特定技能1号の場合のみ記入の項目をPDF上で「省略」と表示する。
+  // 判定式はshinsei-form-editor.tsxのis2Goと完全に一致させること。
+  const is2Go = isVtype && form.desiredStatusOfResidence === '特定技能2号';
 
   return {
     app, applicant, org, form,
@@ -116,7 +131,8 @@ export async function loadShinseiData(id: string): Promise<ShinseiData | null> {
     today,
     isChange,
     formType,
-    cat, isNtype, isTtype, isRtype, isPtype, isVtype, needsOrg,
+    isCoe,
+    cat, isNtype, isTtype, isRtype, isPtype, isVtype, needsOrg, is2Go,
   };
 }
 
@@ -495,6 +511,63 @@ export function SignatureSection({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * 取次者情報欄（全様式共通・固定内容）
+ * - full: ラベル2列×値2列のグリッド表示（bilingual付き）
+ * - compact: ラベル1列・値1列の縦積み表示（bilingualなし）
+ */
+export function AgentSection({ variant = "full" }: { variant?: "full" | "compact" } = {}) {
+  if (variant === "compact") {
+    return (
+      <>
+        <div className="section3" style={{ marginTop: "10px" }}>※ 取次者</div>
+        <table>
+          <tbody>
+            <tr>
+              <td className="lbl" style={{ width: "20%" }}>(1) 氏名</td>
+              <td colSpan={3}>山口忠士</td>
+            </tr>
+            <tr>
+              <td className="lbl">(3) 所属機関等</td>
+              <td colSpan={3}>兵庫県行政書士会</td>
+            </tr>
+            <tr>
+              <td className="lbl">(2) 住所</td>
+              <td colSpan={3}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
+            </tr>
+            <tr>
+              <td className="lbl">電話番号</td>
+              <td colSpan={3}>090-2596-0128</td>
+            </tr>
+          </tbody>
+        </table>
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="item-title" style={{ marginTop: "10px" }}>
+        ※ 取次者
+        <span className="bilingual">　Agent or other authorized person</span>
+      </div>
+      <table style={{ fontSize: "9px" }}><tbody>
+        <tr>
+          <td className="lbl" style={{ width: "20%" }}>(1) 氏名<br /><span className="bilingual">Name</span></td>
+          <td style={{ width: "30%" }}>山口忠士</td>
+          <td className="lbl" style={{ width: "20%" }}>(2) 住所<br /><span className="bilingual">Address</span></td>
+          <td style={{ width: "30%" }}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
+        </tr>
+        <tr>
+          <td className="lbl">(3) 所属機関等<br /><span className="bilingual">Organization</span></td>
+          <td>兵庫県行政書士会</td>
+          <td className="lbl">電話番号<br /><span className="bilingual">Telephone No.</span></td>
+          <td>090-2596-0128</td>
+        </tr>
+      </tbody></table>
+    </>
   );
 }
 

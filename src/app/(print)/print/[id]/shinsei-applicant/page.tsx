@@ -487,6 +487,149 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
+            Page 2: R型専用ページ（家族滞在）
+            ════════════════════════════════════════════════════════════════════ */}
+        {isRtype && (
+        <div className="page">
+          <FormHeader
+            partLabel="申請人等作成用　２　Ｒ"
+            partLabelEn={`For applicant, Part 2 R ("Dependent")`}
+          />
+
+          <div className="section">
+            申請人等作成用　２　Ｒ　—「家族滞在」{isChange ? '在留資格変更用' : '在留期間更新用'}　（項目 17〜20）
+          </div>
+
+          <div className="section3">17. 婚姻・出生又は縁組の届出先及び届出年月日</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl" style={{width:'25%'}}>(1) 日本国届出先</td>
+                <td style={{width:'25%'}}>{fmt(form.marriageNotificationPlaceJapan)}</td>
+                <td className="lbl" style={{width:'25%'}}>　届出年月日</td>
+                <td style={{width:'25%'}}>{fmtDate(form.marriageNotificationDateJapan)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">(2) 本国等届出先</td>
+                <td>{fmt(form.marriageNotificationPlaceForeign)}</td>
+                <td className="lbl">　届出年月日</td>
+                <td>{fmtDate(form.marriageNotificationDateForeign)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">18. 滞在費支弁方法</div>
+          <table>
+            <tbody>
+              <tr>
+                <td style={{padding:'5px 8px'}}>
+                  {['親族負担','外国からの送金','身元保証人負担'].map(opt => (
+                    <span key={opt} style={{marginRight:'20px'}}>
+                      {form.fundingMethod === opt ? '■' : '□'} {opt}
+                    </span>
+                  ))}
+                  <span>
+                    {form.fundingMethod === 'その他' ? '■' : '□'} その他
+                    {form.fundingMethod === 'その他' && form.fundingMethodOther ? `（${form.fundingMethodOther}）` : '（　　　　　）'}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">19. 資格外活動の有無</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl" style={{width:'30%'}}>資格外活動</td>
+                <td colSpan={3}>
+                  {yes(form.partTimeWorkExistsR)
+                    ? '有'
+                    : '無'}
+                </td>
+              </tr>
+              {yes(form.partTimeWorkExistsR) && (
+                <>
+                  <tr>
+                    <td className="lbl">(1) 内容</td>
+                    <td colSpan={3}>{fmt(form.partTimeWorkTypeR)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(2) 名称</td>
+                    <td>{fmt(form.partTimeWorkOrgNameR)}</td>
+                    <td className="lbl">支店・事業所名</td>
+                    <td>{fmt(form.partTimeWorkBranchNameR)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">　 電話番号</td>
+                    <td colSpan={3}>{fmt(form.partTimeWorkPhoneR)}</td>
+                  </tr>
+                  <tr>
+                    <td className="lbl">(3) 週間稼働時間</td>
+                    <td>{form.partTimeWorkHoursR ? `${form.partTimeWorkHoursR} 時間` : '　'}</td>
+                    <td className="lbl">(4) 報酬</td>
+                    <td>
+                      {form.partTimeWorkSalaryR
+                        ? `${Number(form.partTimeWorkSalaryR).toLocaleString()}円（${form.partTimeWorkSalaryTypeR ?? '月額'}）`
+                        : '　'}
+                    </td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+
+          <div className="section3">20. 代理人（法定代理人による申請の場合に記入）</div>
+          <table className="sign-table">
+            <tbody>
+              <tr>
+                <td className="lbl" style={{width:'25%'}}>(1) 氏名</td>
+                <td style={{width:'25%'}}>{fmt(form.representativeName)}</td>
+                <td className="lbl" style={{width:'25%'}}>(2) 本人との関係</td>
+                <td style={{width:'25%'}}>{fmt(form.representativeRelationship)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">(3) 住所</td>
+                <td colSpan={3}>{fmtAddr(form.representativeAddress)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">電話番号</td>
+                <td>{fmt(form.representativePhone)}</td>
+                <td className="lbl">携帯電話番号</td>
+                <td>{fmt(form.representativeCellular)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+
+          {/* 取次者（固定） */}
+          <div className="section3" style={{marginTop:'10px'}}>※ 取次者</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl" style={{width:'20%'}}>(1) 氏名</td>
+                <td colSpan={3}>山口忠士</td>
+              </tr>
+              <tr>
+                <td className="lbl">(3) 所属機関等</td>
+                <td colSpan={3}>兵庫県行政書士会</td>
+              </tr>
+              <tr>
+                <td className="lbl">(2) 住所</td>
+                <td colSpan={3}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
+              </tr>
+              <tr>
+                <td className="lbl">電話番号</td>
+                <td colSpan={3}>090-2596-0128</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <SignatureSection role="applicant" />
+        </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
             Page 2〜3: 特定技能（V型）専用ページ
             ════════════════════════════════════════════════════════════════════ */}
         {isVtype && (

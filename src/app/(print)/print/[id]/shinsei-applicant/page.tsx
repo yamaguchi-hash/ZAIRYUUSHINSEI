@@ -26,7 +26,11 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
   const data = await loadShinseiData(id);
   if (!data) notFound();
 
-  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, cat, isVtype } = data;
+  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, cat, isVtype, isNtype, isTtype, isRtype, isPtype } = data;
+
+  // Part 2 の項目番号ベース（COE: 22〜, それ以外: 17〜）— shinsei.tsx と同一の算出方法
+  const isCoe = formType === "coe";
+  const p2Base = isCoe ? 22 : 17;
 
   // ── ヘッド部分（様式番号・タイトル）: 申請書類の種別に応じて動的に切り替え ──
   const formNumber = getFormNumber(formType, cat);
@@ -229,9 +233,258 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             </table>
           )}
 
-          {/* ── 【申請人署名欄】（V型以外はPage1で完結するためここに配置） ── */}
-          {!isVtype && <SignatureSection role="applicant" />}
+          {/* ── 【申請人署名欄】（Part2を持たない区分のみPage1で完結するためここに配置） ── */}
+          {!isVtype && !isNtype && !isTtype && !isRtype && !isPtype && <SignatureSection role="applicant" />}
         </div>
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            Page 2: N型専用ページ（技術・人文知識・国際業務 等）
+            ════════════════════════════════════════════════════════════════════ */}
+        {isNtype && (
+        <div className="page">
+          <FormHeader
+            partLabel="申請人等作成用　２"
+            partLabelEn="For applicant, Part 2"
+          />
+
+          <div className="section3">{p2Base}. 勤務先</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl">名称</td><td>{fmt(form.employerName)}</td>
+                <td className="lbl">支店・事業所名</td><td>{fmt(form.employerBranchName)}</td>
+              </tr>
+              <tr>
+                <td className="lbl lbl-wrap">所在地（主たる勤務場所）</td><td>{fmtAddr(form.employerAddress)}</td>
+                <td className="lbl">電話番号</td><td>{fmt(form.employerPhone)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">{p2Base + 1}. 最終学歴</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl">学校所在国</td><td>{fmt(form.educationCountry)}</td>
+                <td className="lbl">学位・区分</td><td>{fmt(form.educationDegree)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">学校名</td><td>{fmt(form.educationSchoolName)}</td>
+                <td className="lbl">卒業年月日</td><td>{fmtDate(form.educationGraduationDate)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">{p2Base + 2}. 専攻・専門分野　　{p2Base + 3}. 情報処理技術者資格</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl">専攻・専門分野</td>
+                <td>{form.majorCategory === "その他" ? `その他：${fmt(form.majorCategoryOther)}` : fmt(form.majorCategory)}</td>
+                <td className="lbl">情報処理技術者資格</td>
+                <td>{form.itQualificationExists === "有（Yes）" ? `有 — ${fmt(form.itQualificationName)}` : "無（None）"}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">{p2Base + 4}. 職歴（直近4件）</div>
+          {workHistory.length === 0 ? (
+            <table><tbody><tr><td style={{ textAlign: "center", color: "#777" }}>なし</td></tr></tbody></table>
+          ) : (
+            <table>
+              <thead>
+                <tr><th style={{ width: "20%" }}>入社年月</th><th style={{ width: "20%" }}>退社年月</th><th>勤務先名称</th></tr>
+              </thead>
+              <tbody>
+                {workHistory.map((w, i) => (
+                  <tr key={i}><td>{fmt(w.joinDate)}</td><td>{fmt(w.leaveDate)}</td><td>{fmt(w.employer)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {/* ── 取次者 ── */}
+          <div className="item-title" style={{ marginTop: "10px" }}>
+            ※ 取次者
+            <span className="bilingual">　Agent or other authorized person</span>
+          </div>
+          <table style={{ fontSize: "9px" }}><tbody>
+            <tr>
+              <td className="lbl" style={{ width: "20%" }}>(1) 氏名<br /><span className="bilingual">Name</span></td>
+              <td style={{ width: "30%" }}>山口忠士</td>
+              <td className="lbl" style={{ width: "20%" }}>(2) 住所<br /><span className="bilingual">Address</span></td>
+              <td style={{ width: "30%" }}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
+            </tr>
+            <tr>
+              <td className="lbl">(3) 所属機関等<br /><span className="bilingual">Organization</span></td>
+              <td>兵庫県行政書士会</td>
+              <td className="lbl">電話番号<br /><span className="bilingual">Telephone No.</span></td>
+              <td>090-2596-0128</td>
+            </tr>
+          </tbody></table>
+
+          <SignatureSection role="applicant" />
+        </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            Page 2: T型専用ページ（日本人の配偶者等 等）
+            ════════════════════════════════════════════════════════════════════ */}
+        {isTtype && (
+        <div className="page">
+          <FormHeader
+            partLabel="申請人等作成用　２"
+            partLabelEn="For applicant, Part 2"
+          />
+
+          <div className="section3">配偶者・日本人等の情報</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl">氏名（ローマ字）</td>
+                <td colSpan={3}>{fmt(form.spouseFamilyNameEn)}　{fmt(form.spouseGivenNameEn)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">生年月日</td><td>{fmtDate(form.spouseDob)}</td>
+                <td className="lbl">国籍・身分</td><td>{fmt(form.spouseResidenceStatus)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">在留カード番号等</td><td>{fmt(form.spouseResidenceCard)}</td>
+                <td className="lbl">職業</td><td>{fmt(form.spouseOccupation)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">勤務先・通学先</td><td>{fmt(form.spouseEmployer)}</td>
+                <td className="lbl"></td><td></td>
+              </tr>
+              <tr>
+                <td className="lbl">住所</td><td colSpan={3}>{fmtAddr(form.spouseAddress)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">婚姻・家族関係</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl">婚姻（届出）年月日</td><td>{fmtDate(form.marriageDate)}</td>
+                <td className="lbl">婚姻届出市区町村</td><td>{fmt(form.marriageRegistrationPlace)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">同居の有無</td>
+                <td colSpan={3}>
+                  {!yes(form.cohabitation)
+                    ? `無 — ${fmt(form.separationReason)}`
+                    : "有（同居）"}
+                </td>
+              </tr>
+              {form.longTermResidentReason && (
+                <tr>
+                  <td className="lbl">定住者の根拠</td>
+                  <td colSpan={3}>{fmt(form.longTermResidentReason)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          {/* ── 取次者 ── */}
+          <div className="item-title" style={{ marginTop: "10px" }}>
+            ※ 取次者
+            <span className="bilingual">　Agent or other authorized person</span>
+          </div>
+          <table style={{ fontSize: "9px" }}><tbody>
+            <tr>
+              <td className="lbl" style={{ width: "20%" }}>(1) 氏名<br /><span className="bilingual">Name</span></td>
+              <td style={{ width: "30%" }}>山口忠士</td>
+              <td className="lbl" style={{ width: "20%" }}>(2) 住所<br /><span className="bilingual">Address</span></td>
+              <td style={{ width: "30%" }}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
+            </tr>
+            <tr>
+              <td className="lbl">(3) 所属機関等<br /><span className="bilingual">Organization</span></td>
+              <td>兵庫県行政書士会</td>
+              <td className="lbl">電話番号<br /><span className="bilingual">Telephone No.</span></td>
+              <td>090-2596-0128</td>
+            </tr>
+          </tbody></table>
+
+          <SignatureSection role="applicant" />
+        </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            Page 2: P型専用ページ（留学）
+            ════════════════════════════════════════════════════════════════════ */}
+        {isPtype && (
+        <div className="page">
+          <FormHeader
+            partLabel="申請人等作成用　２"
+            partLabelEn="For applicant, Part 2"
+          />
+
+          <div className="section3">在籍学校の情報</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl">学校名</td><td colSpan={3}>{fmt(form.schoolName)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">学校の種別</td><td>{fmt(form.schoolType)}</td>
+                <td className="lbl">電話番号</td><td>{fmt(form.schoolPhone)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">所在地</td><td colSpan={3}>{fmtAddr(form.schoolAddress)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">在籍コース・専攻</td><td>{fmt(form.courseOfStudy)}</td>
+                <td className="lbl">年間学費</td><td>{fmtMoney(form.annualTuition)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">入学（予定）年月日</td><td>{fmtDate(form.enrollmentDate)}</td>
+                <td className="lbl">卒業予定年月日</td><td>{fmtDate(form.expectedGraduationDate)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">費用支弁方法</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl">費用支弁方法</td><td>{fmt(form.fundingSource)}</td>
+                <td className="lbl">月額生活費</td><td>{fmtMoney(form.fundingAmount)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">奨学金名称</td><td>{fmt(form.scholarshipName)}</td>
+                <td className="lbl">奨学金月額</td><td>{fmtMoney(form.scholarshipAmount)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">資格外活動許可</td>
+                <td colSpan={3}>{fmt(form.partTimeWorkPermit)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* ── 取次者 ── */}
+          <div className="item-title" style={{ marginTop: "10px" }}>
+            ※ 取次者
+            <span className="bilingual">　Agent or other authorized person</span>
+          </div>
+          <table style={{ fontSize: "9px" }}><tbody>
+            <tr>
+              <td className="lbl" style={{ width: "20%" }}>(1) 氏名<br /><span className="bilingual">Name</span></td>
+              <td style={{ width: "30%" }}>山口忠士</td>
+              <td className="lbl" style={{ width: "20%" }}>(2) 住所<br /><span className="bilingual">Address</span></td>
+              <td style={{ width: "30%" }}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
+            </tr>
+            <tr>
+              <td className="lbl">(3) 所属機関等<br /><span className="bilingual">Organization</span></td>
+              <td>兵庫県行政書士会</td>
+              <td className="lbl">電話番号<br /><span className="bilingual">Telephone No.</span></td>
+              <td>090-2596-0128</td>
+            </tr>
+          </tbody></table>
+
+          <SignatureSection role="applicant" />
+        </div>
+        )}
 
         {/* ══════════════════════════════════════════════════════════════════════
             Page 2〜3: 特定技能（V型）専用ページ

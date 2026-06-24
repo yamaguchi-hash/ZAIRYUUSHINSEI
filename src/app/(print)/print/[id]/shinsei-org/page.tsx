@@ -902,16 +902,16 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
           <table className="v-tbl"><tbody>
             <tr>
               <td className="lbl lbl-wrap" style={{ width: "82%", fontSize: "8.5px", lineHeight: "1.25" }}>(34) 役員又は職員の中から支援責任者を選任していることの有無</td>
-              <td style={{ textAlign: "center", width: "18%", fontSize: "9.5px" }}>{fmtYesNo(form.supportManagerAppointed)}</td>
+              <td style={{ textAlign: "center", width: "18%", fontSize: "9.5px" }}>{omitFor2Go(is2Go, fmtYesNo(form.supportManagerAppointed))}</td>
             </tr>
             <tr>
               <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(35) 役員又は職員の中から，活動をさせる事業所ごとに1名以上の支援担当者を選任していることの有無</td>
-              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportStaffAppointed)}</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{omitFor2Go(is2Go, fmtYesNo(form.supportStaffAppointed))}</td>
             </tr>
             <tr>
               <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>
                 (36) 中長期在留者の受入れ・管理実績等のいずれかに該当することの有無
-                {yes(form.supportExperienceCriteria) && (
+                {!is2Go && yes(form.supportExperienceCriteria) && (
                   <div style={{ fontSize: "8px", color: "#333", marginTop: "2px" }}>
                     {form.supportExperienceCriteriaItem1 && <>①受入れ・管理実績　</>}
                     {form.supportExperienceCriteriaItem2 && <>②生活相談等の従事経験　</>}
@@ -919,36 +919,36 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
                   </div>
                 )}
               </td>
-              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportExperienceCriteria)}</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{omitFor2Go(is2Go, fmtYesNo(form.supportExperienceCriteria))}</td>
             </tr>
             <tr>
               <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(37) 1号特定技能外国人支援計画に基づく支援を，外国人が十分に理解することができる言語によって行うことができる体制を有していることの有無</td>
-              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportLanguageCapability)}</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{omitFor2Go(is2Go, fmtYesNo(form.supportLanguageCapability))}</td>
             </tr>
             <tr>
               <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(38) 1号特定技能外国人支援の状況に関する文書を作成し，1年以上備えて置くこととしていることの有無</td>
-              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportDocumentKept)}</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{omitFor2Go(is2Go, fmtYesNo(form.supportDocumentKept))}</td>
             </tr>
             <tr>
               <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(39) 支援責任者及び支援担当者が，1号特定技能外国人支援計画の中立な実施を行うことができる立場の者であることの有無</td>
-              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportNeutralPosition)}</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{omitFor2Go(is2Go, fmtYesNo(form.supportNeutralPosition))}</td>
             </tr>
             <tr>
               <td className="lbl lbl-wrap" style={{ width: "82%", fontSize: "8.5px", lineHeight: "1.25" }}>(40) 特定技能雇用契約締結の日前5年以内又は契約締結の日以後に適合1号特定技能外国人支援計画に基づく支援を怠ったことの有無</td>
               <td style={{ textAlign: "center", width: "18%", fontSize: "9.5px" }}>
-                {fmtYesNo(form.supportFailureHistory)}
-                {yes(form.supportFailureHistory) && form.supportFailureHistoryDetail ? (
+                {omitFor2Go(is2Go, fmtYesNo(form.supportFailureHistory))}
+                {!is2Go && yes(form.supportFailureHistory) && form.supportFailureHistoryDetail ? (
                   <><br /><span style={{ fontSize: "8px", color: "#333" }}>{form.supportFailureHistoryDetail}</span></>
                 ) : null}
               </td>
             </tr>
             <tr>
               <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(41) 支援責任者又は支援担当者が外国人及びその監督をする立場にある者と定期的な面談を実施できる体制を有していることの有無</td>
-              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportPeriodicInterviewCapability)}</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{omitFor2Go(is2Go, fmtYesNo(form.supportPeriodicInterviewCapability))}</td>
             </tr>
             <tr>
               <td className="lbl lbl-wrap" style={{ fontSize: "8.5px", lineHeight: "1.25" }}>(42) 適合1号特定技能外国人支援計画の適正な実施の確保につき特定産業分野に特有の事情に鑑みて告示で定められる基準に適合していることの有無（当該基準が定められている場合に記入）</td>
-              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{fmtYesNo(form.supportImplementationFieldCriteria)}</td>
+              <td style={{ textAlign: "center", fontSize: "9.5px" }}>{omitFor2Go(is2Go, fmtYesNo(form.supportImplementationFieldCriteria))}</td>
             </tr>
           </tbody></table>
 
@@ -977,7 +977,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             ] as const).map((item, i) => (
               <tr key={i}>
                 <td className="lbl lbl-wrap" style={{ width: "82%", fontSize: "8.5px", lineHeight: "1.25" }}>{item.label}</td>
-                <td style={{ textAlign: "center", width: "18%", fontSize: "9.5px" }}>{fmtYesNo(item.has)}</td>
+                <td style={{ textAlign: "center", width: "18%", fontSize: "9.5px" }}>{omitFor2Go(is2Go, fmtYesNo(item.has))}</td>
               </tr>
             ))}
           </tbody></table>

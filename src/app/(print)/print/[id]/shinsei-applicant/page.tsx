@@ -14,9 +14,9 @@
 import { notFound } from "next/navigation";
 import {
   loadShinseiData, PRINT_STYLES,
-  fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes,
+  fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes, omitFor2Go,
   fmtAdditionalOccupations, buildAddress,
-  FormHeader, SignatureSection,
+  FormHeader, SignatureSection, AgentSection,
   FORM_TITLE_MAP, FORM_DECLARATION_MAP, getFormNumber,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
@@ -27,10 +27,9 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
   const data = await loadShinseiData(id);
   if (!data) notFound();
 
-  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, cat, isVtype, isNtype, isTtype, isRtype, isPtype } = data;
+  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, isCoe, cat, isVtype, isNtype, isTtype, isRtype, isPtype, is2Go } = data;
 
   // Part 2 の項目番号ベース（COE: 22〜, それ以外: 17〜）— shinsei.tsx と同一の算出方法
-  const isCoe = formType === "coe";
   const p2Base = isCoe ? 22 : 17;
 
   // ── ヘッド部分（様式番号・タイトル）: 申請書類の種別に応じて動的に切り替え ──
@@ -306,24 +305,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
           )}
 
           {/* ── 取次者 ── */}
-          <div className="item-title" style={{ marginTop: "10px" }}>
-            ※ 取次者
-            <span className="bilingual">　Agent or other authorized person</span>
-          </div>
-          <table style={{ fontSize: "9px" }}><tbody>
-            <tr>
-              <td className="lbl" style={{ width: "20%" }}>(1) 氏名<br /><span className="bilingual">Name</span></td>
-              <td style={{ width: "30%" }}>山口忠士</td>
-              <td className="lbl" style={{ width: "20%" }}>(2) 住所<br /><span className="bilingual">Address</span></td>
-              <td style={{ width: "30%" }}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
-            </tr>
-            <tr>
-              <td className="lbl">(3) 所属機関等<br /><span className="bilingual">Organization</span></td>
-              <td>兵庫県行政書士会</td>
-              <td className="lbl">電話番号<br /><span className="bilingual">Telephone No.</span></td>
-              <td>090-2596-0128</td>
-            </tr>
-          </tbody></table>
+          <AgentSection />
 
           <SignatureSection role="applicant" />
         </div>
@@ -389,24 +371,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
           </table>
 
           {/* ── 取次者 ── */}
-          <div className="item-title" style={{ marginTop: "10px" }}>
-            ※ 取次者
-            <span className="bilingual">　Agent or other authorized person</span>
-          </div>
-          <table style={{ fontSize: "9px" }}><tbody>
-            <tr>
-              <td className="lbl" style={{ width: "20%" }}>(1) 氏名<br /><span className="bilingual">Name</span></td>
-              <td style={{ width: "30%" }}>山口忠士</td>
-              <td className="lbl" style={{ width: "20%" }}>(2) 住所<br /><span className="bilingual">Address</span></td>
-              <td style={{ width: "30%" }}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
-            </tr>
-            <tr>
-              <td className="lbl">(3) 所属機関等<br /><span className="bilingual">Organization</span></td>
-              <td>兵庫県行政書士会</td>
-              <td className="lbl">電話番号<br /><span className="bilingual">Telephone No.</span></td>
-              <td>090-2596-0128</td>
-            </tr>
-          </tbody></table>
+          <AgentSection />
 
           <SignatureSection role="applicant" />
         </div>
@@ -465,24 +430,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
           </table>
 
           {/* ── 取次者 ── */}
-          <div className="item-title" style={{ marginTop: "10px" }}>
-            ※ 取次者
-            <span className="bilingual">　Agent or other authorized person</span>
-          </div>
-          <table style={{ fontSize: "9px" }}><tbody>
-            <tr>
-              <td className="lbl" style={{ width: "20%" }}>(1) 氏名<br /><span className="bilingual">Name</span></td>
-              <td style={{ width: "30%" }}>山口忠士</td>
-              <td className="lbl" style={{ width: "20%" }}>(2) 住所<br /><span className="bilingual">Address</span></td>
-              <td style={{ width: "30%" }}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
-            </tr>
-            <tr>
-              <td className="lbl">(3) 所属機関等<br /><span className="bilingual">Organization</span></td>
-              <td>兵庫県行政書士会</td>
-              <td className="lbl">電話番号<br /><span className="bilingual">Telephone No.</span></td>
-              <td>090-2596-0128</td>
-            </tr>
-          </tbody></table>
+          <AgentSection />
 
           <SignatureSection role="applicant" />
         </div>
@@ -605,27 +553,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
 
 
           {/* 取次者（固定） */}
-          <div className="section3" style={{marginTop:'10px'}}>※ 取次者</div>
-          <table>
-            <tbody>
-              <tr>
-                <td className="lbl" style={{width:'20%'}}>(1) 氏名</td>
-                <td colSpan={3}>山口忠士</td>
-              </tr>
-              <tr>
-                <td className="lbl">(3) 所属機関等</td>
-                <td colSpan={3}>兵庫県行政書士会</td>
-              </tr>
-              <tr>
-                <td className="lbl">(2) 住所</td>
-                <td colSpan={3}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
-              </tr>
-              <tr>
-                <td className="lbl">電話番号</td>
-                <td colSpan={3}>090-2596-0128</td>
-              </tr>
-            </tbody>
-          </table>
+          <AgentSection variant="compact" />
 
           <SignatureSection role="applicant" />
         </div>
@@ -701,22 +629,22 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
           <table className="v-tbl"><tbody>
             <tr>
               <td className="lbl" style={{ width: "28%" }}>証明方法<br /><span className="bilingual">Method of proof</span></td>
-              <td colSpan={3}>{fmt(form.japaneseAbilityProofMethod)}</td>
+              <td colSpan={3}>{omitFor2Go(is2Go, fmt(form.japaneseAbilityProofMethod))}</td>
             </tr>
-            {form.japaneseAbilityExamName1 && (
+            {(form.japaneseAbilityExamName1 || is2Go) && (
               <tr>
                 <td className="lbl">試験名①</td>
-                <td>{fmt(form.japaneseAbilityExamName1)}</td>
+                <td>{omitFor2Go(is2Go, fmt(form.japaneseAbilityExamName1))}</td>
                 <td className="lbl" style={{ width: "12%" }}>試験地①</td>
-                <td>{fmt(form.japaneseAbilityExamCountry1)}{form.japaneseAbilityExamCountry1 === '国外' ? `（${form.japaneseAbilityExamCountryName1}）` : ''}</td>
+                <td>{omitFor2Go(is2Go, `${fmt(form.japaneseAbilityExamCountry1)}${form.japaneseAbilityExamCountry1 === '国外' ? `（${form.japaneseAbilityExamCountryName1}）` : ''}`)}</td>
               </tr>
             )}
-            {form.japaneseAbilityExamName2 && (
+            {(form.japaneseAbilityExamName2 || is2Go) && (
               <tr>
                 <td className="lbl">試験名②</td>
-                <td>{fmt(form.japaneseAbilityExamName2)}</td>
+                <td>{omitFor2Go(is2Go, fmt(form.japaneseAbilityExamName2))}</td>
                 <td className="lbl">試験地②</td>
-                <td>{fmt(form.japaneseAbilityExamCountry2)}{form.japaneseAbilityExamCountry2 === '国外' ? `（${form.japaneseAbilityExamCountryName2}）` : ''}</td>
+                <td>{omitFor2Go(is2Go, `${fmt(form.japaneseAbilityExamCountry2)}${form.japaneseAbilityExamCountry2 === '国外' ? `（${form.japaneseAbilityExamCountryName2}）` : ''}`)}</td>
               </tr>
             )}
           </tbody></table>
@@ -756,9 +684,10 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             <tr>
               <td className="lbl" style={{ width: "28%" }}>通算在留期間</td>
               <td>
-                {form.cumulativeStayYears ? `${form.cumulativeStayYears}年` : ''}
-                {form.cumulativeStayMonths ? `${form.cumulativeStayMonths}ヶ月` : ''}
-                {!form.cumulativeStayYears && !form.cumulativeStayMonths && ''}
+                {omitFor2Go(
+                  is2Go,
+                  `${form.cumulativeStayYears ? `${form.cumulativeStayYears}年` : ''}${form.cumulativeStayMonths ? `${form.cumulativeStayMonths}ヶ月` : ''}`
+                )}
               </td>
             </tr>
           </tbody></table>
@@ -816,24 +745,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
           )}
 
           {/* ── 取次者 ── */}
-          <div className="item-title" style={{ marginTop: "10px" }}>
-            ※ 取次者
-            <span className="bilingual">　Agent or other authorized person</span>
-          </div>
-          <table style={{ fontSize: "9px" }}><tbody>
-            <tr>
-              <td className="lbl" style={{ width: "20%" }}>(1) 氏名<br /><span className="bilingual">Name</span></td>
-              <td style={{ width: "30%" }}>山口忠士</td>
-              <td className="lbl" style={{ width: "20%" }}>(2) 住所<br /><span className="bilingual">Address</span></td>
-              <td style={{ width: "30%" }}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
-            </tr>
-            <tr>
-              <td className="lbl">(3) 所属機関等<br /><span className="bilingual">Organization</span></td>
-              <td>兵庫県行政書士会</td>
-              <td className="lbl">電話番号<br /><span className="bilingual">Telephone No.</span></td>
-              <td>090-2596-0128</td>
-            </tr>
-          </tbody></table>
+          <AgentSection />
 
           {/* ── 【申請人署名欄】（共通コンポーネント・手書き署名用） ── */}
           <SignatureSection role="applicant" />

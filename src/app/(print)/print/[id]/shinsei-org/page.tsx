@@ -14,9 +14,9 @@
 import { notFound } from "next/navigation";
 import {
   loadShinseiData, PRINT_STYLES,
-  fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes,
-  fmtAdditionalOccupations, buildAddress,
-  FormHeader, SignatureSection,
+  fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes, omitFor2Go,
+  fmtAdditionalOccupations, buildAddress, businessTypeLabel,
+  FormHeader, SignatureSection, AgentSection,
   FORM_TITLE_MAP, getFormNumber,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
@@ -27,12 +27,10 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
   const data = await loadShinseiData(id);
   if (!data) notFound();
 
-  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, cat, isVtype, isNtype, isRtype, needsOrg } = data;
+  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, isCoe, cat, isVtype, isNtype, isRtype, needsOrg, is2Go } = data;
 
   // COE/Change/Extension の項目番号差異（N型: 派遣先の項目番号）— shinsei.tsx と同一の算出方法
-  const isCoe = formType === "coe";
   const orgDispatchNo = isCoe ? 12 : 11;
-  const businessTypeLabel = (code: string) => code ? `${code}番` : "　";
 
   // ── ヘッド部分（様式番号・タイトル）: 申請書類の種別に応じて動的に切り替え ──
   const formNumber = getFormNumber(formType, cat);
@@ -682,68 +680,68 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
           <table className="v-tbl"><tbody>
             <tr>
               <td className="lbl" style={{ width: "30%" }}>支援責任者氏名<br /><span className="bilingual">Support manager</span></td>
-              <td>{fmt(form.supportManagerName)}</td>
+              <td>{omitFor2Go(is2Go, fmt(form.supportManagerName))}</td>
               <td className="lbl" style={{ width: "20%" }}>役職・部署</td>
-              <td>{fmt(form.supportManagerTitle)}</td>
+              <td>{omitFor2Go(is2Go, fmt(form.supportManagerTitle))}</td>
             </tr>
             <tr>
               <td className="lbl">支援担当者氏名<br /><span className="bilingual">Support staff</span></td>
-              <td>{fmt(form.supportStaffName)}</td>
+              <td>{omitFor2Go(is2Go, fmt(form.supportStaffName))}</td>
               <td className="lbl">役職・部署</td>
-              <td>{fmt(form.supportStaffTitle)}</td>
+              <td>{omitFor2Go(is2Go, fmt(form.supportStaffTitle))}</td>
             </tr>
           </tbody></table>
 
           <table className="v-tbl"><tbody>
             <tr>
               <td className="lbl" style={{ width: "30%" }}>(1) 名称<br /><span className="bilingual">Name</span></td>
-              <td colSpan={3}>{fmt(form.rsoName)}</td>
+              <td colSpan={3}>{omitFor2Go(is2Go, fmt(form.rsoName))}</td>
             </tr>
             <tr>
               <td className="lbl">(2) 法人番号（13桁）</td>
-              <td>{fmt(form.rsoCorporateNo)}</td>
+              <td>{omitFor2Go(is2Go, fmt(form.rsoCorporateNo))}</td>
               <td className="lbl" style={{ width: "25%" }}>(3) 雇用保険番号</td>
-              <td>{fmt(form.rsoInsuranceNo)}</td>
+              <td>{omitFor2Go(is2Go, fmt(form.rsoInsuranceNo))}</td>
             </tr>
             <tr>
               <td className="lbl">(4) 所在地<br /><span className="bilingual">Address</span></td>
-              <td colSpan={3}>{fmtAddr(form.rsoAddress)}</td>
+              <td colSpan={3}>{omitFor2Go(is2Go, fmtAddr(form.rsoAddress))}</td>
             </tr>
             <tr>
               <td className="lbl" style={{ paddingLeft: "12px" }}>電話番号</td>
-              <td colSpan={3}>{fmt(form.rsoPhone)}</td>
+              <td colSpan={3}>{omitFor2Go(is2Go, fmt(form.rsoPhone))}</td>
             </tr>
             <tr>
               <td className="lbl">(5) 代表者の氏名</td>
-              <td colSpan={3}>{fmt(form.rsoRepresentative)}</td>
+              <td colSpan={3}>{omitFor2Go(is2Go, fmt(form.rsoRepresentative))}</td>
             </tr>
             <tr>
               <td className="lbl">(6) 登録番号</td>
-              <td>{fmt(form.rsoRegNo)}</td>
+              <td>{omitFor2Go(is2Go, fmt(form.rsoRegNo))}</td>
               <td className="lbl">(7) 登録年月日</td>
-              <td>{fmtDate(form.rsoRegDate)}</td>
+              <td>{omitFor2Go(is2Go, fmtDate(form.rsoRegDate))}</td>
             </tr>
             <tr>
               <td className="lbl">(8) 支援実施事業所名</td>
-              <td colSpan={3}>{fmt(form.rsoSupportBusinessName)}</td>
+              <td colSpan={3}>{omitFor2Go(is2Go, fmt(form.rsoSupportBusinessName))}</td>
             </tr>
             <tr>
               <td className="lbl" style={{ paddingLeft: "12px" }}>支援実施事業所所在地</td>
-              <td colSpan={3}>{fmtAddr(form.rsoSupportBusinessAddress)}</td>
+              <td colSpan={3}>{omitFor2Go(is2Go, fmtAddr(form.rsoSupportBusinessAddress))}</td>
             </tr>
             <tr>
               <td className="lbl">(10) 支援責任者</td>
-              <td>{fmt(form.rsoSupportManager)}</td>
+              <td>{omitFor2Go(is2Go, fmt(form.rsoSupportManager))}</td>
               <td className="lbl">(11) 支援担当者</td>
-              <td>{fmt(form.rsoSupportStaff)}</td>
+              <td>{omitFor2Go(is2Go, fmt(form.rsoSupportStaff))}</td>
             </tr>
             <tr>
               <td className="lbl">(12) 対応可能言語</td>
-              <td colSpan={3}>{fmt(form.rsoAvailableLanguages)}</td>
+              <td colSpan={3}>{omitFor2Go(is2Go, fmt(form.rsoAvailableLanguages))}</td>
             </tr>
             <tr>
               <td className="lbl">(13) 支援委託費用（月額）</td>
-              <td colSpan={3}>{form.rsoFeePerMonth ? Number(form.rsoFeePerMonth).toLocaleString() + '円' : '　'}</td>
+              <td colSpan={3}>{omitFor2Go(is2Go, form.rsoFeePerMonth ? Number(form.rsoFeePerMonth).toLocaleString() + '円' : '　')}</td>
             </tr>
           </tbody></table>
         </div>
@@ -981,24 +979,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
           </tbody></table>
 
           {/* ── 取次者 ── */}
-          <div className="item-title" style={{ marginTop: "10px" }}>
-            ※ 取次者
-            <span className="bilingual">　Agent or other authorized person</span>
-          </div>
-          <table style={{ fontSize: "9px" }}><tbody>
-            <tr>
-              <td className="lbl" style={{ width: "20%" }}>(1) 氏名<br /><span className="bilingual">Name</span></td>
-              <td style={{ width: "30%" }}>山口忠士</td>
-              <td className="lbl" style={{ width: "20%" }}>(2) 住所<br /><span className="bilingual">Address</span></td>
-              <td style={{ width: "30%" }}>〒665-0864 兵庫県宝塚市泉町22-25 島上マンション南棟1-B</td>
-            </tr>
-            <tr>
-              <td className="lbl">(3) 所属機関等<br /><span className="bilingual">Organization</span></td>
-              <td>兵庫県行政書士会</td>
-              <td className="lbl">電話番号<br /><span className="bilingual">Telephone No.</span></td>
-              <td>090-2596-0128</td>
-            </tr>
-          </tbody></table>
+          <AgentSection />
 
           {/* ── 【所属機関署名欄】（共通コンポーネント・自動記名＋角印枠） ── */}
           <SignatureSection

@@ -1,14 +1,12 @@
 /**
- * 所属機関等作成用 PDF（計5ページ）
+ * 所属機関等作成用 / 扶養者用 PDF
  * ─────────────────────────────────
- * Page 1: 所属機関等作成用 １ V — 雇用契約・所属機関
- * Page 2: 所属機関等作成用 2 V — 派遣先・職業紹介事業者・取次機関
- * Page 3: 所属機関等作成用 3 V — コンプライアンス確認（(11)〜(21)）
- * Page 4: 所属機関等作成用 4 V — コンプライアンス確認（(22)〜(33)）
- * Page 5: 所属機関等作成用 4 V — 1号特定技能外国人支援計画（(34)〜(42)・4(1)〜(16)）＋ 所属機関署名
+ * V型（特定技能）: 計5ページ（雇用契約・所属機関／派遣先等／コンプライアンス確認×2／支援計画＋署名）
+ * N型（技術・人文知識・国際業務 等）: 機関情報・就労条件・派遣先＋署名の1ページ
+ * R型（家族滞在）: 扶養者情報＋扶養者署名の1ページ（【扶養者用】バナー付き）
+ * その他の就労系区分（M/L/I/P/Q/Y）でフリーフィールドの入力がある場合: フリーフィールド＋署名の1ページ
  *
- * 本書類は在留資格カテゴリが V（特定技能）の場合のみ作成が必要なため、
- * isVtype が false の場合は何も出力しない（画面上に案内のみ表示）。
+ * 上記のいずれにも該当しない在留資格区分の場合は何も出力しない（画面上に案内のみ表示）。
  *
  * 様式番号・申請書タイトルはヘッド部分（FormHeader）で全ページ共通のデザインに統一しつつ、
  * 申請書類の種別（formType）に応じて getFormNumber() / FORM_TITLE_MAP から動的に取得する。
@@ -208,6 +206,141 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
               />
             </>
           )}
+        </div>
+        )}
+
+        {isRtype && (
+        <div className="page">
+          <FormHeader
+            showGov
+            formNumber={formNumber}
+            title={formTitle.ja}
+            titleEn={formTitle.en}
+            partLabel="扶養者用"
+            partLabelEn="For supporter"
+          />
+          <div className="role-banner">【扶養者用】</div>
+
+          <div className="section">
+            扶養者等作成用　１　Ｒ　—「家族滞在」{isChange ? '在留資格変更用' : '在留期間更新用'}
+          </div>
+
+          <div className="section3">1. 扶養している家族（申請人）の氏名及び在留カード番号</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl" style={{width:'30%'}}>(1) 氏名</td>
+                <td colSpan={3}>
+                  {form.familyNameEn ? `${fmt(form.familyNameEn)} ${fmt(form.givenNameEn)}` : '　'}
+                </td>
+              </tr>
+              <tr>
+                <td className="lbl">(2) 在留カード番号</td>
+                <td colSpan={3}>{fmt(form.residenceCardNumber)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">2. 扶養者</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl" style={{width:'30%'}}>(1) 氏名（ローマ字）</td>
+                <td colSpan={3}>
+                  {fmt(form.supporterNameEn || [form.supporterFamilyNameEn, form.supporterGivenNameEn].filter(Boolean).join(' '))}
+                </td>
+              </tr>
+              <tr>
+                <td className="lbl">(2) 生年月日</td>
+                <td>{fmtDate(form.supporterDob)}</td>
+                <td className="lbl">(3) 国籍・地域</td>
+                <td>{fmt(form.supporterNationality)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">(4) 在留カード番号</td>
+                <td colSpan={3}>{fmt(form.supporterResidenceCard)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">(5) 在留資格</td>
+                <td>{fmt(form.supporterStatusOfResidence)}</td>
+                <td className="lbl">(6) 在留期間</td>
+                <td>{fmt(form.supporterPeriodOfStay)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">(7) 在留期間の満了日</td>
+                <td colSpan={3}>{fmtDate(form.supporterPeriodExpiry)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">(8) 申請人との関係</td>
+                <td colSpan={3}>
+                  {(['夫','妻','父','母','養父','養母'] as string[]).map(opt => (
+                    <span key={opt} style={{marginRight:'16px'}}>
+                      {form.supporterRelationship === opt ? '■' : '□'} {opt}
+                    </span>
+                  ))}
+                  <span>
+                    {form.supporterRelationship === 'その他' ? '■' : '□'} その他
+                    {form.supporterRelationship === 'その他' && form.supporterRelationshipOther
+                      ? `（${form.supporterRelationshipOther}）` : ''}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td className="lbl">(9) 勤務先名称</td>
+                <td>{fmt(form.supporterEmployer)}</td>
+                <td className="lbl">(10) 法人番号</td>
+                <td>{fmt(form.supporterCorporateNumber)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">(11) 支店・事業所名</td>
+                <td colSpan={3}>{fmt(form.supporterBranchName)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">(12) 勤務先所在地</td>
+                <td colSpan={3}>{fmtAddr(form.supporterEmployerAddress || form.supporterAddress)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">　　 電話番号</td>
+                <td colSpan={3}>{fmt(form.supporterEmployerPhone)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">(13) 年収</td>
+                <td colSpan={3}>{form.supporterAnnualIncome ? `${Number(form.supporterAnnualIncome).toLocaleString()} 円` : '　'}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <SignatureSection role="supporter" />
+        </div>
+        )}
+
+        {needsOrg && !isNtype && !isRtype && form.freeformOrgNotes && (
+        <div className="page">
+          <FormHeader
+            showGov
+            formNumber={formNumber}
+            title={formTitle.ja}
+            titleEn={formTitle.en}
+            partLabel="所属機関等作成用"
+            partLabelEn="For organization"
+          />
+
+          <div className="section">所属機関等作成用</div>
+          <table>
+            <tbody>
+              <tr>
+                <td style={{ padding: "8px", whiteSpace: "pre-wrap", lineHeight: "1.7" }}>
+                  {form.freeformOrgNotes}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <SignatureSection role="organization"
+            orgName={fmt(org?.nameJa) || fmt(form.orgName)}
+            representativeTitle={fmt(org?.representativeTitle)}
+            representativeName={fmt(org?.representativeName) || fmt(form.position)}
+          />
         </div>
         )}
 

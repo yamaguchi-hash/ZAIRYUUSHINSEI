@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { db, applications, applicantMaster, organizationMaster } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import type { ApplicationFormData, ApplicationFormType, FamilyMember, WorkHistoryEntry } from "@/lib/form-types";
-import { FORM_TYPE_LABELS, VISA_CATEGORY_NEEDS_ORG, OCCUPATION_TYPES } from "@/lib/form-types";
+import { FORM_TYPE_LABELS, FORM_TYPE_ARTICLE, VISA_CATEGORY_NEEDS_ORG, OCCUPATION_TYPES } from "@/lib/form-types";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 
 // ─── フォーマッタ ─────────────────────────────────────────────────────────────
@@ -163,6 +163,27 @@ export function getFormNumber(formType: ApplicationFormType, cat?: string): stri
   return FORM_NUMBER_MAP[formType] ?? FORM_NUMBER_MAP.change;
 }
 
+// 申請書冒頭の申請文（和文・英文）。法令上の根拠条文（FORM_TYPE_ARTICLE）と
+// 申請内容（交付／変更／更新／許可）を formType ごとに組み合わせる。
+export const FORM_DECLARATION_MAP: Record<ApplicationFormType, { ja: string; en: string }> = {
+  coe: {
+    ja: `${FORM_TYPE_ARTICLE.coe}に基づき，次のとおり在留資格認定証明書の交付を申請します。`,
+    en: "Pursuant to the provisions of Article 7-2 of the Immigration Control and Refugee Recognition Act, I hereby apply for a certificate of eligibility as follows.",
+  },
+  change: {
+    ja: `${FORM_TYPE_ARTICLE.change}に基づき，次のとおり在留資格の変更を申請します。`,
+    en: "Pursuant to the provisions of Article 20, Paragraph 2 of the Immigration Control and Refugee Recognition Act, I hereby apply for change of status of residence as follows.",
+  },
+  extension: {
+    ja: `${FORM_TYPE_ARTICLE.extension}に基づき，次のとおり在留期間の更新を申請します。`,
+    en: "Pursuant to the provisions of Article 21, Paragraph 2 of the Immigration Control and Refugee Recognition Act, I hereby apply for extension of period of stay as follows.",
+  },
+  permanent: {
+    ja: `${FORM_TYPE_ARTICLE.permanent}に基づき，次のとおり永住許可を申請します。`,
+    en: "Pursuant to the provisions of Article 22, Paragraph 2 of the Immigration Control and Refugee Recognition Act, I hereby apply for permission for permanent residence as follows.",
+  },
+};
+
 // ═════════════════════════════════════════════════════════════════════════════
 // PDF/印刷の幅設定
 // ─────────────────────────────────────────────────────────────────────────────
@@ -262,6 +283,20 @@ export const PRINT_STYLES = `
   .v-tbl{table-layout:fixed;}
   .v-tbl td,.v-tbl th{word-break:break-word;overflow-wrap:break-word;white-space:normal;}
   .v-tbl .lbl{white-space:normal;word-break:break-word;overflow-wrap:break-word;line-height:1.25;}
+
+  /* ── N/T/R/P型コンテンツ移植用（shinsei.tsxの局所スタイルから移植） ── */
+  .section{background:#1c1c1c;color:#fff;font-weight:bold;font-size:11.5px;padding:5px 9px;margin:14px 0 5px;letter-spacing:0.03em;}
+  .section2{background:#444;color:#fff;font-size:10.5px;padding:3px 8px;margin:8px 0 4px;}
+  .section3{background:#777;color:#fff;font-size:10px;padding:3px 7px;margin:5px 0 3px;}
+  .sign-table td{height:44px;}
+  .seal-box{
+    width:40px;height:40px;border:1px dashed #ff0000;border-radius:50%;
+    color:#ff0000;text-align:center;line-height:40px;font-size:8pt;flex-shrink:0;
+  }
+  .role-banner{
+    text-align:center;font-size:10px;font-weight:bold;letter-spacing:0.15em;
+    background:#000;color:#fff;padding:3px 0;margin-bottom:2px;
+  }
 
   .bilingual{font-size:7.5px;color:#333;font-weight:normal;}
   .bilingual-block{display:block;font-size:7.5px;color:#333;font-weight:normal;line-height:1.2;}

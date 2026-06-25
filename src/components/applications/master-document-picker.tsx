@@ -73,7 +73,9 @@ export function MasterDocumentPicker({
     <div className="inline-block">
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => { setError(""); setExpanded((v) => !v); }}
+        aria-expanded={expanded}
+        aria-label={expanded ? "マスター書類選択を閉じる" : "マスター書類選択を開く"}
         className="inline-flex items-center gap-1 px-2 py-1 text-xs text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100"
       >
         <FolderOpen className="w-3.5 h-3.5" />

@@ -204,16 +204,20 @@ export const applicationDocumentChecklist = pgTable("application_document_checkl
     fileName: string;
     fileSize: number;
     mimeType: string;
-    // このエントリがマスター（applicantDocuments）から反映されたものかどうか。
+    // このエントリがマスター（applicantDocuments／organizationDocuments）から反映されたものかどうか。
     // trueの場合、マスター側も同じBlob URLを参照しているため物理削除してはならない。
     sourcedFromMaster?: boolean;
+    // 'applicant' | 'organization' | 'supporter'。sourcedFromMasterがtrueの場合のみ意味を持ち、
+    // どのマスターから反映されたかをUIバッジの文言分岐に使う。
+    sourcedFromMasterType?: 'applicant' | 'organization' | 'supporter';
   }>>(),
   expertNotes: text("expert_notes"),
-  // 現在のfileUrl/additionalFilesが申請人マスター（applicantDocuments）から
-  // 自動反映されたものかどうか。trueの場合、マスター同期処理が再度上書きしてよい。
+  // 現在のfileUrl/additionalFilesが申請人マスター（applicantDocuments）・所属機関マスター
+  // （organizationDocuments）・扶養者（applicantDocumentsをsupporterId経由で参照）から
+  // 自動反映または手動選択されたものかどうか。trueの場合、マスター同期処理が再度上書きしてよい。
   fileSourcedFromMaster: boolean("file_sourced_from_master").default(false).notNull(),
-  // 'applicant' | 'organization' | null。fileSourcedFromMasterがtrueの場合のみ意味を持ち、
-  // どちらのマスターから反映されたかをUIバッジの文言分岐に使う。
+  // 'applicant' | 'organization' | 'supporter' | null。fileSourcedFromMasterがtrueの場合のみ
+  // 意味を持ち、どのマスターから反映されたかをUIバッジの文言分岐に使う。
   fileSourcedFromMasterType: text("file_sourced_from_master_type"),
   submittedAt: timestamp("submitted_at"),
   reviewedAt: timestamp("reviewed_at"),

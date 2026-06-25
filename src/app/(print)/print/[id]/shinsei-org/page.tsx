@@ -8,8 +8,9 @@
  *
  * 上記のいずれにも該当しない在留資格区分の場合は何も出力しない（画面上に案内のみ表示）。
  *
- * 様式番号・申請書タイトルはヘッド部分（FormHeader）で全ページ共通のデザインに統一しつつ、
- * 申請書類の種別（formType）に応じて getFormNumber() / FORM_TITLE_MAP から動的に取得する。
+ * 様式番号・申請書タイトルはヘッド部分（FormHeader）で全ページ共通のデザインに統一する。
+ * すべてのページのヘッダーは categoryLabel（[様式名]－[在留資格種類]）を表示し、
+ * 【扶養者用】【所属機関用】のロールバナーは別要素として保持される。
  */
 import { notFound } from "next/navigation";
 import {
@@ -17,7 +18,7 @@ import {
   fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes, omitFor2Go,
   fmtAdditionalOccupations, buildAddress, businessTypeLabel,
   FormHeader, SignatureSection, AgentSection,
-  FORM_TITLE_MAP, getFormNumber,
+  FORM_TITLE_MAP, getFormNumber, getPdfHeaderCategoryLabel,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
 import { ShinseiMarginControls } from "../shinsei-margin-controls";
@@ -35,6 +36,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
   // ── ヘッド部分（様式番号・タイトル）: 申請書類の種別に応じて動的に切り替え ──
   const formNumber = getFormNumber(formType, cat);
   const formTitle = FORM_TITLE_MAP[formType];
+  const categoryLabel = getPdfHeaderCategoryLabel(formType, app.visaType);
 
   return (
     <>
@@ -58,8 +60,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             formNumber={formNumber}
             title={formTitle.ja}
             titleEn={formTitle.en}
-            partLabel="所属機関等作成用　１"
-            partLabelEn="For organization, Part 1"
+            categoryLabel={categoryLabel}
           />
 
           <div className="section">所属機関等作成用　Part 1 N　— 機関情報・雇用条件</div>
@@ -216,8 +217,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             formNumber={formNumber}
             title={formTitle.ja}
             titleEn={formTitle.en}
-            partLabel="扶養者用"
-            partLabelEn="For supporter"
+            categoryLabel={categoryLabel}
           />
           <div className="role-banner">【扶養者用】</div>
 
@@ -321,8 +321,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             formNumber={formNumber}
             title={formTitle.ja}
             titleEn={formTitle.en}
-            partLabel="所属機関等作成用"
-            partLabelEn="For organization"
+            categoryLabel={categoryLabel}
           />
 
           <div className="role-banner">【所属機関用】</div>
@@ -356,9 +355,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             formNumber={formNumber}
             title={formTitle.ja}
             titleEn={formTitle.en}
-            partLabel="所属機関等作成用　１"
-            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
-            partLabelEn={`For organization, Part 1 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+            categoryLabel={categoryLabel}
           />
 
           {/* 1. 雇用している外国人の氏名 */}
@@ -579,11 +576,9 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 2: 所属機関等作成用 2 V — 派遣先・職業紹介事業者・取次機関
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
+          {/* 2ページ目以降は様式タイトルの重複表示を避け、categoryLabel（様式名－在留資格種類）のみ表示する */}
           <FormHeader
-            partLabel="所属機関等作成用　２"
-            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
-            partLabelEn={`For organization, Part 2 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+            categoryLabel={categoryLabel}
           />
 
           {/* 4. 派遣先 */}
@@ -750,11 +745,9 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 3: 所属機関等作成用 3 V — コンプライアンス確認（(11)〜(21)）
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
+          {/* 2ページ目以降は様式タイトルの重複表示を避け、categoryLabel（様式名－在留資格種類）のみ表示する */}
           <FormHeader
-            partLabel="所属機関等作成用　３"
-            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
-            partLabelEn={`For organization, Part 3 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+            categoryLabel={categoryLabel}
           />
 
           <div className="item-title">
@@ -795,11 +788,9 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 4: 所属機関等作成用 4 V — コンプライアンス(22)〜(33) ＋ 所属機関署名
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
+          {/* 2ページ目以降は様式タイトルの重複表示を避け、categoryLabel（様式名－在留資格種類）のみ表示する */}
           <FormHeader
-            partLabel="所属機関等作成用　４"
-            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
-            partLabelEn={`For organization, Part 4 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+            categoryLabel={categoryLabel}
           />
 
           <div className="item-title">
@@ -888,11 +879,9 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 5: 所属機関等作成用 4 V — 1号特定技能外国人支援計画（(34)〜(42)・4(1)〜(16)）＋ 取次者・署名
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
+          {/* 2ページ目以降は様式タイトルの重複表示を避け、categoryLabel（様式名－在留資格種類）のみ表示する */}
           <FormHeader
-            partLabel="所属機関等作成用　５"
-            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
-            partLabelEn={`For organization, Part 4 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)") — Support plan`}
+            categoryLabel={categoryLabel}
           />
 
           <div className="item-title">

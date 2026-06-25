@@ -17,7 +17,7 @@ import {
   fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes, omitFor2Go,
   fmtAdditionalOccupations, buildAddress,
   FormHeader, SignatureSection, AgentSection,
-  FORM_TITLE_MAP, FORM_DECLARATION_MAP, getFormNumber,
+  FORM_TITLE_MAP, FORM_DECLARATION_MAP, getFormNumber, getPdfHeaderCategoryLabel,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
 import { ShinseiMarginControls } from "../shinsei-margin-controls";
@@ -36,6 +36,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
   const formNumber = getFormNumber(formType, cat);
   const formTitle = FORM_TITLE_MAP[formType];
   const formDeclaration = FORM_DECLARATION_MAP[formType];
+  const categoryLabel = getPdfHeaderCategoryLabel(formType, app.visaType);
 
   return (
     <>
@@ -55,8 +56,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             formNumber={formNumber}
             title={formTitle.ja}
             titleEn={formTitle.en}
-            partLabel="申請人等作成用　１"
-            partLabelEn="For applicant, Part 1"
+            categoryLabel={categoryLabel}
           />
 
           <p style={{ fontSize: "8px", color: "#333", textAlign: "center", marginBottom: "6px" }}>
@@ -244,8 +244,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         {isNtype && (
         <div className="page">
           <FormHeader
-            partLabel="申請人等作成用　２"
-            partLabelEn="For applicant, Part 2"
+            categoryLabel={categoryLabel}
           />
 
           <div className="section3">{p2Base}. 勤務先</div>
@@ -317,8 +316,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         {isTtype && (
         <div className="page">
           <FormHeader
-            partLabel="申請人等作成用　２"
-            partLabelEn="For applicant, Part 2"
+            categoryLabel={categoryLabel}
           />
 
           <div className="section3">配偶者・日本人等の情報</div>
@@ -383,8 +381,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         {isPtype && (
         <div className="page">
           <FormHeader
-            partLabel="申請人等作成用　２"
-            partLabelEn="For applicant, Part 2"
+            categoryLabel={categoryLabel}
           />
 
           <div className="section3">在籍学校の情報</div>
@@ -442,8 +439,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         {isRtype && (
         <div className="page">
           <FormHeader
-            partLabel="申請人等作成用　２　Ｒ"
-            partLabelEn={`For applicant, Part 2 R ("Dependent")`}
+            categoryLabel={categoryLabel}
           />
 
           <div className="section">
@@ -568,9 +564,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         <div className="page">
           {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
           <FormHeader
-            partLabel="申請人等作成用　２"
-            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
-            partLabelEn={`For applicant, Part 2 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+            categoryLabel={categoryLabel}
           />
 
           {/* 17. 特定技能所属機関 */}
@@ -699,9 +693,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         <div className="page">
           {/* 2ページ目以降は様式タイトルの重複表示を避け、Part表記のみ表示する */}
           <FormHeader
-            partLabel="申請人等作成用　３"
-            partLabelV="Ｖ（「特定技能（１号）」・「特定技能（２号）」）"
-            partLabelEn={`For applicant, Part 3 V ("Specified Skilled Worker (i)" / "Specified Skilled Worker (ii)")`}
+            categoryLabel={categoryLabel}
           />
 
           {/* 確認事項（22〜27） */}

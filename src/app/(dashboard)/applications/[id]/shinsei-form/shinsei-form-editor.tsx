@@ -180,6 +180,8 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
     familyNameEn: "", givenNameEn: "", nationality: "", dateOfBirth: "",
     gender: "", residenceCardNumber: "", currentVisaType: "", currentVisaExpiry: "", japanAddress: "",
   });
+  const [localSupporterCandidates, setLocalSupporterCandidates] = useState<SupporterCandidate[]>(supporterCandidates);
+  const [isLinkingSupporter, setIsLinkingSupporter] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isFilling, setIsFilling] = useState(false);
   const [fillProgress, setFillProgress] = useState("");
@@ -256,11 +258,18 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
     setSupporterMsg("");
     setSupporterApplicantId(id || null);
     if (id) {
-      const master = supporterCandidates.find(a => a.id === id);
+      const master = localSupporterCandidates.find(a => a.id === id);
       if (master) applySupporterMaster(master);
     }
-    const result = await setApplicationSupporter(applicationId, id || null);
-    if (!result.success) setSupporterMsg(result.error ?? "扶養者の紐付けに失敗しました");
+    setIsLinkingSupporter(true);
+    try {
+      const result = await setApplicationSupporter(applicationId, id || null);
+      if (!result.success) setSupporterMsg(result.error ?? "扶養者の紐付けに失敗しました");
+    } catch (err: any) {
+      setSupporterMsg(err?.message ?? "扶養者の紐付けに失敗しました");
+    } finally {
+      setIsLinkingSupporter(false);
+    }
   }
 
   async function handleCreateSupporter() {
@@ -273,6 +282,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
     try {
       const created = await createApplicant(newSupporter);
       applySupporterMaster(created);
+      setLocalSupporterCandidates(prev => [...prev, created]);
       setSupporterApplicantId(created.id);
       const result = await setApplicationSupporter(applicationId, created.id);
       if (!result.success) setSupporterMsg(result.error ?? "扶養者の紐付けに失敗しました");
@@ -1336,9 +1346,10 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                         className={cn(selectCls, "flex-1")}
                         value={supporterApplicantId ?? ""}
                         onChange={e => handleSupporterSelect(e.target.value)}
+                        disabled={isLinkingSupporter || isSavingSupporter}
                       >
                         <option value="">選択してください</option>
-                        {supporterCandidates.map(a => (
+                        {localSupporterCandidates.map(a => (
                           <option key={a.id} value={a.id}>{a.familyNameEn} {a.givenNameEn}（{a.nationality}）</option>
                         ))}
                       </select>

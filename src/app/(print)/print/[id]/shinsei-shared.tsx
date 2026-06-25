@@ -179,6 +179,13 @@ export function getFormNumber(formType: ApplicationFormType, cat?: string): stri
   return FORM_NUMBER_MAP[formType] ?? FORM_NUMBER_MAP.change;
 }
 
+/** PDFヘッダーに表示する「様式名－在留資格種類」ラベルを返す（例: 在留資格変更許可申請書－家族滞在） */
+export function getPdfHeaderCategoryLabel(formType: ApplicationFormType, visaType: string): string {
+  const title = FORM_TITLE_MAP[formType]?.ja ?? FORM_TITLE_MAP.change.ja;
+  const visaLabel = VISA_TYPE_LABELS[visaType] ?? visaType;
+  return `${title}－${visaLabel}`;
+}
+
 // 申請書冒頭の申請文（和文・英文）。法令上の根拠条文（FORM_TYPE_ARTICLE）と
 // 申請内容（交付／変更／更新／許可）を formType ごとに組み合わせる。
 export const FORM_DECLARATION_MAP: Record<ApplicationFormType, { ja: string; en: string }> = {
@@ -276,8 +283,6 @@ export const PRINT_STYLES = `
   }
   .form-header .form-title-en{font-size:8.5px;font-weight:normal;letter-spacing:0.02em;margin-top:1px;}
   .form-header .part-label{font-size:10px;font-weight:bold;margin-top:5px;letter-spacing:0.05em;}
-  .form-header .part-label-en{font-size:8px;font-weight:normal;color:#333;}
-  .form-header .part-label-v{font-size:9px;font-weight:bold;margin-top:4px;letter-spacing:0.03em;}
 
   /* ── テーブル（全様式共通: 枠線0.5px・ラベル網掛け） ── */
   table{width:100%;border-collapse:collapse;margin-bottom:4px;}
@@ -373,18 +378,15 @@ export const PRINT_STYLES = `
 
 /** 申請書ヘッダー（全様式共通） */
 export function FormHeader({
-  formNumber, title, titleEn, partLabel, partLabelEn, partLabelV, showGov,
+  formNumber, title, titleEn, categoryLabel, showGov,
 }: {
   /** 様式番号（例: 別記第三十号様式（第二十条関係）） */
   formNumber?: string;
   /** 様式タイトル（例: 在留資格変更許可申請書）— 枠付き表示 */
   title?: string;
   titleEn?: string;
-  /** 作成用ラベル（例: 申請人等作成用　１） */
-  partLabel: string;
-  partLabelEn?: string;
-  /** V型ラベル（例: Ｖ（「特定技能（１号）」・「特定技能（２号）」）） */
-  partLabelV?: string;
+  /** 様式名－在留資格種類（例: 在留資格変更許可申請書－家族滞在） */
+  categoryLabel: string;
   /** 「日本国政府法務省」行の表示 */
   showGov?: boolean;
 }) {
@@ -398,9 +400,7 @@ export function FormHeader({
           {titleEn && <div className="form-title-en">{titleEn}</div>}
         </div>
       )}
-      <div className="part-label">{partLabel}</div>
-      {partLabelV && <div className="part-label-v">{partLabelV}</div>}
-      {partLabelEn && <div className="part-label-en">{partLabelEn}</div>}
+      <div className="part-label">{categoryLabel}</div>
     </div>
   );
 }

@@ -73,6 +73,28 @@ export default async function ApplicantDetailPage({
     )
     .orderBy(desc(applications.updatedAt));
 
+  // 扶養者として紐付けられている申請を取得
+  const supportedApplications = await db
+    .select({
+      id: applications.id,
+      caseNumber: applications.caseNumber,
+      applicationType: applications.applicationType,
+      visaType: applications.visaType,
+      status: applications.status,
+      createdAt: applications.createdAt,
+      updatedAt: applications.updatedAt,
+      isApproved: applications.isApproved,
+    })
+    .from(applications)
+    .where(
+      and(
+        eq(applications.supporterId, id),
+        eq(applications.tenantId, tenantId),
+        ne(applications.status, "cancelled")
+      )
+    )
+    .orderBy(desc(applications.updatedAt));
+
   const visaDays = getDaysUntil(applicant.currentVisaExpiry);
   const passportDays = getDaysUntil(applicant.passportExpiry);
 
@@ -244,6 +266,71 @@ export default async function ApplicantDetailPage({
           )}
         </CardContent>
       </Card>
+
+      {/* ── 扶養者として紐付けられている申請 ── */}
+      {supportedApplications.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              扶養者として紐付けられている申請
+              <span className="text-xs font-normal text-gray-400 ml-1">
+                （{supportedApplications.length}件）
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">案件番号</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">申請種別</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">在留資格</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">ステータス</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">作成日</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">最終更新</th>
+                    <th className="px-4 py-2.5 w-8"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {supportedApplications.map((app) => (
+                    <tr key={app.id} className="hover:bg-gray-50 transition-colors group">
+                      <td className="px-4 py-3">
+                        <Link href={`/applications/${app.id}`} className="font-mono text-xs text-blue-600 hover:underline">
+                          {app.caseNumber ?? app.id.slice(0, 8)}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600">
+                        {APPLICATION_TYPE_LABELS[app.applicationType] ?? app.applicationType}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600">
+                        {VISA_TYPE_LABELS[app.visaType] ?? app.visaType}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[app.status] ?? "bg-gray-100 text-gray-700"}`}>
+                          {APPLICATION_STATUS_LABELS[app.status] ?? app.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {formatDate(app.createdAt)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {formatDate(app.updatedAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link href={`/applications/${app.id}`} className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <ExternalLink className="w-4 h-4" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── 在留カードの変更履歴（折りたたみ） ── */}
       <div className="mt-4">

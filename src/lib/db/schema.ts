@@ -136,6 +136,9 @@ export const applications = pgTable("applications", {
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   applicantId: uuid("applicant_id").notNull().references(() => applicantMaster.id),
   organizationId: uuid("organization_id").references(() => organizationMaster.id),
+  // 扶養者（R型／家族滞在の場合のみ使用）。申請人マスターと同一テーブルを参照する。
+  // applicantId/organizationIdと異なり、作成後も編集画面から変更可能。
+  supporterId: uuid("supporter_id").references(() => applicantMaster.id),
   applicationType: applicationTypeEnum("application_type").notNull(),
   visaType: text("visa_type").notNull(),
   status: applicationStatusEnum("status").notNull().default("draft"),

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { saveApplicationFormData, extractMarriageNotificationFromDocs } from "@/actions/applications";
+import { saveApplicationFormData, extractMarriageNotificationFromDocs, setApplicationSupporter } from "@/actions/applications";
+import { createApplicant } from "@/actions/applicants";
 import { extractSectionFromDocs } from "@/actions/extract-section";
 import { fillAllFieldsFromDocs } from "@/actions/fill-all-fields";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,12 +19,27 @@ import {
   BUSINESS_TYPES, OCCUPATION_TYPES, VISA_CATEGORY_NEEDS_ORG, VISA_CATEGORY_PART2,
 } from "@/lib/form-types";
 
+/** 扶養者ドロップダウンの選択肢（申請人マスターから取得した最小限の項目） */
+interface SupporterCandidate {
+  id: string;
+  familyNameEn: string;
+  givenNameEn: string;
+  nationality: string;
+  dateOfBirth: string | null;
+  residenceCardNumber: string | null;
+  currentVisaType: string | null;
+  currentVisaExpiry: string | null;
+  japanAddress: string | null;
+}
+
 interface Props {
   applicationId: string;
   initialForm: ApplicationFormData;
   applicationType: string;
   userRole?: string;
   isCompleted?: boolean;
+  supporterCandidates?: SupporterCandidate[];
+  initialSupporterId?: string | null;
 }
 
 const inputCls = "w-full text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white";
@@ -152,9 +168,18 @@ const CATEGORY_LABELS: Record<VisaFormCategory, string> = {
 
 type TabKey = "meta" | "p1a" | "p1b" | "p2" | "org1" | "org2" | "gaikatsu" | "statement";
 
-export function ShinseiFormEditor({ applicationId, initialForm, applicationType, userRole, isCompleted }: Props) {
+export function ShinseiFormEditor({ applicationId, initialForm, applicationType, userRole, isCompleted, supporterCandidates = [], initialSupporterId }: Props) {
   const [form, setForm] = useState<ApplicationFormData>(initialForm);
   const [tab, setTab] = useState<TabKey>("meta");
+  // 扶養者の申請人マスター紐付け
+  const [supporterApplicantId, setSupporterApplicantId] = useState<string | null>(initialSupporterId ?? null);
+  const [showNewSupporterForm, setShowNewSupporterForm] = useState(false);
+  const [isSavingSupporter, setIsSavingSupporter] = useState(false);
+  const [supporterMsg, setSupporterMsg] = useState("");
+  const [newSupporter, setNewSupporter] = useState({
+    familyNameEn: "", givenNameEn: "", nationality: "", dateOfBirth: "",
+    gender: "", residenceCardNumber: "", currentVisaType: "", currentVisaExpiry: "", japanAddress: "",
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [isFilling, setIsFilling] = useState(false);
   const [fillProgress, setFillProgress] = useState("");
@@ -209,6 +234,58 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
   function set<K extends keyof ApplicationFormData>(key: K, value: ApplicationFormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }));
     setMsg("");
+  }
+
+  // 選択/新規作成した申請人マスターの値を扶養者フィールドへ反映する（反映後は上書き編集可能）
+  function applySupporterMaster(master: SupporterCandidate) {
+    setForm(prev => ({
+      ...prev,
+      supporterNameEn: [master.familyNameEn, master.givenNameEn].filter(Boolean).join(' '),
+      supporterFamilyNameEn: master.familyNameEn,
+      supporterGivenNameEn: master.givenNameEn,
+      supporterDob: master.dateOfBirth ?? '',
+      supporterNationality: master.nationality,
+      supporterResidenceCard: master.residenceCardNumber ?? '',
+      supporterStatusOfResidence: master.currentVisaType ? (VISA_TYPE_LABELS[master.currentVisaType] ?? master.currentVisaType) : '',
+      supporterPeriodExpiry: master.currentVisaExpiry ?? '',
+      supporterAddress: master.japanAddress ?? '',
+    }));
+  }
+
+  async function handleSupporterSelect(id: string) {
+    setSupporterMsg("");
+    setSupporterApplicantId(id || null);
+    if (id) {
+      const master = supporterCandidates.find(a => a.id === id);
+      if (master) applySupporterMaster(master);
+    }
+    const result = await setApplicationSupporter(applicationId, id || null);
+    if (!result.success) setSupporterMsg(result.error ?? "扶養者の紐付けに失敗しました");
+  }
+
+  async function handleCreateSupporter() {
+    if (!newSupporter.familyNameEn || !newSupporter.givenNameEn || !newSupporter.nationality) {
+      setSupporterMsg("氏名（姓・名）・国籍は必須です");
+      return;
+    }
+    setIsSavingSupporter(true);
+    setSupporterMsg("");
+    try {
+      const created = await createApplicant(newSupporter);
+      applySupporterMaster(created);
+      setSupporterApplicantId(created.id);
+      const result = await setApplicationSupporter(applicationId, created.id);
+      if (!result.success) setSupporterMsg(result.error ?? "扶養者の紐付けに失敗しました");
+      setShowNewSupporterForm(false);
+      setNewSupporter({
+        familyNameEn: "", givenNameEn: "", nationality: "", dateOfBirth: "",
+        gender: "", residenceCardNumber: "", currentVisaType: "", currentVisaExpiry: "", japanAddress: "",
+      });
+    } catch (err: any) {
+      setSupporterMsg(err?.message ?? "新規登録に失敗しました");
+    } finally {
+      setIsSavingSupporter(false);
+    }
   }
 
   // AI読み取りステータスヘルパー
@@ -1250,6 +1327,65 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <label className="block text-xs font-medium text-amber-700 mb-1">
+                      扶養者を申請人マスターから選択（任意・自由入力のまま使う場合は未選択のままでよい）
+                    </label>
+                    <div className="flex gap-2 items-start">
+                      <select
+                        className={cn(selectCls, "flex-1")}
+                        value={supporterApplicantId ?? ""}
+                        onChange={e => handleSupporterSelect(e.target.value)}
+                      >
+                        <option value="">選択してください</option>
+                        {supporterCandidates.map(a => (
+                          <option key={a.id} value={a.id}>{a.familyNameEn} {a.givenNameEn}（{a.nationality}）</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewSupporterForm(v => !v)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-100 whitespace-nowrap"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        新規登録
+                      </button>
+                    </div>
+                    {supporterMsg && <p className="text-xs text-red-600 mt-1">{supporterMsg}</p>}
+                    {showNewSupporterForm && (
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white border border-amber-200 rounded-lg p-3">
+                        <input className={inputCls} placeholder="氏名（姓・ローマ字）※必須" value={newSupporter.familyNameEn} onChange={e => setNewSupporter(prev => ({ ...prev, familyNameEn: e.target.value }))} />
+                        <input className={inputCls} placeholder="氏名（名・ローマ字）※必須" value={newSupporter.givenNameEn} onChange={e => setNewSupporter(prev => ({ ...prev, givenNameEn: e.target.value }))} />
+                        <input className={inputCls} placeholder="国籍・地域 ※必須" value={newSupporter.nationality} onChange={e => setNewSupporter(prev => ({ ...prev, nationality: e.target.value }))} />
+                        <input className={inputCls} type="date" value={newSupporter.dateOfBirth} onChange={e => setNewSupporter(prev => ({ ...prev, dateOfBirth: e.target.value }))} />
+                        <select className={selectCls} value={newSupporter.gender} onChange={e => setNewSupporter(prev => ({ ...prev, gender: e.target.value }))}>
+                          <option value="">性別（任意）</option>
+                          <option value="M">男性</option>
+                          <option value="F">女性</option>
+                        </select>
+                        <input className={inputCls} placeholder="在留カード番号（任意）" value={newSupporter.residenceCardNumber} onChange={e => setNewSupporter(prev => ({ ...prev, residenceCardNumber: e.target.value }))} />
+                        <select className={selectCls} value={newSupporter.currentVisaType} onChange={e => setNewSupporter(prev => ({ ...prev, currentVisaType: e.target.value }))}>
+                          <option value="">在留資格（任意）</option>
+                          {Object.entries(VISA_TYPE_LABELS).map(([v, l]) => (
+                            <option key={v} value={v}>{l}</option>
+                          ))}
+                        </select>
+                        <input className={inputCls} type="date" placeholder="在留期限" value={newSupporter.currentVisaExpiry} onChange={e => setNewSupporter(prev => ({ ...prev, currentVisaExpiry: e.target.value }))} />
+                        <input className={cn(inputCls, "sm:col-span-2")} placeholder="住所（任意）" value={newSupporter.japanAddress} onChange={e => setNewSupporter(prev => ({ ...prev, japanAddress: e.target.value }))} />
+                        <div className="sm:col-span-2 flex justify-end">
+                          <button
+                            type="button"
+                            disabled={isSavingSupporter}
+                            onClick={handleCreateSupporter}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg"
+                          >
+                            {isSavingSupporter ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                            登録して反映
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <Field label="(1) 氏名（ローマ字）">
                     <input className={inputCls} value={form.supporterNameEn || [form.supporterFamilyNameEn, form.supporterGivenNameEn].filter(Boolean).join(' ')} onChange={e => set("supporterNameEn", e.target.value)} placeholder="例: YAMADA Taro" />
                   </Field>

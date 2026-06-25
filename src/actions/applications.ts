@@ -1205,6 +1205,49 @@ export async function saveApplicationFormData(
   }
 }
 
+// ── 扶養者（申請人マスター参照）の紐付け更新 ──────────────────────────────────
+export async function setApplicationSupporter(
+  applicationId: string,
+  supporterId: string | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [current] = await db
+      .select({ supporterId: applications.supporterId })
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+
+    if (!current) return { success: false, error: "申請案件が見つかりません" };
+
+    await db
+      .update(applications)
+      .set({ supporterId, updatedAt: new Date() })
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
+
+    await db.insert(auditLog).values({
+      tenantId,
+      applicationId,
+      userId: session.user.id,
+      action: "supporter_change",
+      entityType: "application",
+      entityId: applicationId,
+      fieldKey: "supporterId",
+      oldValue: current.supporterId,
+      newValue: supporterId,
+    });
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("[setApplicationSupporter]", err);
+    return { success: false, error: err.message ?? "扶養者の紐付け更新に失敗しました" };
+  }
+}
+
 // ── 申請書フォームデータをAIで自動入力 ───────────────────────────────────────
 export async function prefillApplicationFormData(
   applicationId: string

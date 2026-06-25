@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { getApplicationById } from "@/actions/applications";
+import { getApplicants } from "@/actions/applicants";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, FileDown, AlertCircle } from "lucide-react";
@@ -22,6 +23,22 @@ export default async function ShinseiFormPage({
   try { data = await getApplicationById(id); } catch { notFound(); }
 
   const { application, applicant, organization } = data;
+
+  // 扶養者選択ドロップダウン用の申請人一覧（この申請の申請人本人は除外）
+  const allApplicants = await getApplicants();
+  const supporterCandidates = allApplicants
+    .filter((a) => a.id !== application.applicantId)
+    .map((a) => ({
+      id: a.id,
+      familyNameEn: a.familyNameEn,
+      givenNameEn: a.givenNameEn,
+      nationality: a.nationality,
+      dateOfBirth: a.dateOfBirth,
+      residenceCardNumber: a.residenceCardNumber,
+      currentVisaType: a.currentVisaType,
+      currentVisaExpiry: a.currentVisaExpiry,
+      japanAddress: a.japanAddress,
+    }));
 
   // 取次者情報（固定値）
   const fixedAgentFields = {
@@ -141,6 +158,8 @@ export default async function ShinseiFormPage({
         applicationType={application.applicationType}
         userRole={userRole}
         isCompleted={application.status === "completed"}
+        supporterCandidates={supporterCandidates}
+        initialSupporterId={application.supporterId}
       />
     </div>
   );

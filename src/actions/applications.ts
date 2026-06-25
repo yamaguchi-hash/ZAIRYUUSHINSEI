@@ -2075,3 +2075,205 @@ export async function saveAzukariData(
     return { success: false, error: err.message ?? "保存に失敗しました" };
   }
 }
+
+// ── チェックリスト用: 利用可能なマスター書類一覧（申請人・所属機関・扶養者） ──────
+const APPLICANT_DOC_TYPE_LABELS: Record<string, string> = {
+  passport_front: "パスポート（表紙）",
+  passport_data_page: "パスポート（顔写真ページ）",
+  residence_card_front: "在留カード（表面）",
+  residence_card_back: "在留カード（裏面）",
+  residence_card: "在留カード",
+  residence_card_renewal: "最新の在留カード",
+};
+
+export type MasterFileOption = {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize: number | null;
+  mimeType: string | null;
+  label: string;
+};
+
+export async function getAvailableMasterDocumentsForApplication(applicationId: string): Promise<{
+  applicant: MasterFileOption[];
+  organization: MasterFileOption[];
+  supporter: MasterFileOption[];
+}> {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+  const tenantId = requireTenantId((session.user as any).tenantId);
+
+  const [app] = await db
+    .select({
+      applicantId: applications.applicantId,
+      organizationId: applications.organizationId,
+      supporterId: applications.supporterId,
+    })
+    .from(applications)
+    .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+    .limit(1);
+  if (!app) throw new Error("申請案件が見つかりません");
+
+  const applicantDocs = await db
+    .select()
+    .from(applicantDocuments)
+    .where(and(eq(applicantDocuments.applicantId, app.applicantId), eq(applicantDocuments.tenantId, tenantId)));
+
+  const organizationDocs = app.organizationId
+    ? await db
+        .select()
+        .from(organizationDocuments)
+        .where(and(eq(organizationDocuments.organizationId, app.organizationId), eq(organizationDocuments.tenantId, tenantId)))
+    : [];
+
+  const supporterDocs = app.supporterId
+    ? await db
+        .select()
+        .from(applicantDocuments)
+        .where(and(eq(applicantDocuments.applicantId, app.supporterId), eq(applicantDocuments.tenantId, tenantId)))
+    : [];
+
+  return {
+    applicant: applicantDocs.map((d) => ({
+      id: d.id, fileName: d.fileName, fileUrl: d.fileUrl, fileSize: d.fileSize, mimeType: d.mimeType,
+      label: APPLICANT_DOC_TYPE_LABELS[d.documentType] ?? d.documentType,
+    })),
+    organization: organizationDocs.map((d) => ({
+      id: d.id, fileName: d.fileName, fileUrl: d.fileUrl, fileSize: d.fileSize, mimeType: d.mimeType,
+      label: d.documentName,
+    })),
+    supporter: supporterDocs.map((d) => ({
+      id: d.id, fileName: d.fileName, fileUrl: d.fileUrl, fileSize: d.fileSize, mimeType: d.mimeType,
+      label: APPLICANT_DOC_TYPE_LABELS[d.documentType] ?? d.documentType,
+    })),
+  };
+}
+
+// ── チェックリスト用: 選択したマスター書類をチェックリスト項目に反映 ──────────────
+export async function useMasterDocumentForChecklistItem(
+  applicationId: string,
+  itemId: string,
+  source: "applicant" | "organization" | "supporter",
+  masterDocumentId: string,
+  slot: "primary" | "extra"
+): Promise<{
+  success: boolean;
+  error?: string;
+  item?: {
+    fileUrl: string | null;
+    fileName: string | null;
+    fileSize: number | null;
+    mimeType: string | null;
+    status: string;
+    fileSourcedFromMaster: boolean;
+    fileSourcedFromMasterType: string | null;
+  };
+  addedFile?: {
+    fileUrl: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    sourcedFromMaster: boolean;
+    sourcedFromMasterType: "applicant" | "organization" | "supporter";
+  };
+}> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db
+      .select({
+        applicantId: applications.applicantId,
+        organizationId: applications.organizationId,
+        supporterId: applications.supporterId,
+      })
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    let masterDoc: { fileUrl: string; fileName: string; fileSize: number | null; mimeType: string | null } | undefined;
+
+    if (source === "organization") {
+      if (!app.organizationId) return { success: false, error: "所属機関が設定されていません" };
+      const [doc] = await db
+        .select()
+        .from(organizationDocuments)
+        .where(and(
+          eq(organizationDocuments.id, masterDocumentId),
+          eq(organizationDocuments.organizationId, app.organizationId),
+          eq(organizationDocuments.tenantId, tenantId)
+        ))
+        .limit(1);
+      masterDoc = doc;
+    } else {
+      const ownerId = source === "applicant" ? app.applicantId : app.supporterId;
+      if (!ownerId) return { success: false, error: "対象の人物が設定されていません" };
+      const [doc] = await db
+        .select()
+        .from(applicantDocuments)
+        .where(and(
+          eq(applicantDocuments.id, masterDocumentId),
+          eq(applicantDocuments.applicantId, ownerId),
+          eq(applicantDocuments.tenantId, tenantId)
+        ))
+        .limit(1);
+      masterDoc = doc;
+    }
+    if (!masterDoc) return { success: false, error: "書類が見つかりません" };
+
+    const [item] = await db
+      .select()
+      .from(applicationDocumentChecklist)
+      .where(and(eq(applicationDocumentChecklist.id, itemId), eq(applicationDocumentChecklist.applicationId, applicationId)))
+      .limit(1);
+    if (!item) return { success: false, error: "チェックリスト項目が見つかりません" };
+
+    if (slot === "primary") {
+      await db
+        .update(applicationDocumentChecklist)
+        .set({
+          fileUrl: masterDoc.fileUrl,
+          fileName: masterDoc.fileName,
+          fileSize: masterDoc.fileSize,
+          mimeType: masterDoc.mimeType,
+          status: "submitted",
+          fileSourcedFromMaster: true,
+          fileSourcedFromMasterType: source,
+          submittedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(applicationDocumentChecklist.id, itemId));
+
+      revalidatePath(`/applications/${applicationId}`);
+      return {
+        success: true,
+        item: {
+          fileUrl: masterDoc.fileUrl, fileName: masterDoc.fileName, fileSize: masterDoc.fileSize, mimeType: masterDoc.mimeType,
+          status: "submitted", fileSourcedFromMaster: true, fileSourcedFromMasterType: source,
+        },
+      };
+    } else {
+      const addedFile = {
+        fileUrl: masterDoc.fileUrl,
+        fileName: masterDoc.fileName,
+        fileSize: masterDoc.fileSize ?? 0,
+        mimeType: masterDoc.mimeType ?? "",
+        sourcedFromMaster: true,
+        sourcedFromMasterType: source,
+      };
+      const nextFiles = [...(item.additionalFiles ?? []), addedFile];
+      await db
+        .update(applicationDocumentChecklist)
+        .set({ additionalFiles: nextFiles, updatedAt: new Date() })
+        .where(eq(applicationDocumentChecklist.id, itemId));
+
+      revalidatePath(`/applications/${applicationId}`);
+      return { success: true, addedFile };
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "マスター書類の反映に失敗しました" };
+  }
+}

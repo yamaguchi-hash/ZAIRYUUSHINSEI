@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { getApplicationById, syncMasterDocumentsToChecklist, syncOrgMasterDocumentsToChecklist } from "@/actions/applications";
+import { getApplicationById, syncMasterDocumentsToChecklist, syncOrgMasterDocumentsToChecklist, getAvailableMasterDocumentsForApplication } from "@/actions/applications";
 import { notFound, redirect } from "next/navigation";
 import {
   Card, CardContent, CardHeader, CardTitle,
@@ -103,6 +103,10 @@ export default async function ApplicationDetailPage({
   if (!data) notFound();
 
   const { application, applicant, organization, checklist } = data;
+
+  // チェックリストの「マスターから選択」用。既存のmasterDocuments（書類要件マスターの
+  // カタログ）とは別概念のため、availableMasterFilesという別名で区別する。
+  const availableMasterFiles = await getAvailableMasterDocumentsForApplication(application.id);
 
   const effectiveForm = buildEffectiveFormData(application, applicant, organization);
   const interviewFormType = toFormType(effectiveForm.applicationFormType ?? application.applicationType);
@@ -466,6 +470,7 @@ export default async function ApplicationDetailPage({
         accentClass="bg-blue-500"
       >
         <DocumentChecklist
+          availableMasterFiles={availableMasterFiles}
           checklist={checklist.map((c) => ({
             id: c.id,
             documentName: c.documentName,

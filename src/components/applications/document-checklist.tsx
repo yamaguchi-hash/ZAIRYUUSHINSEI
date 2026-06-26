@@ -28,12 +28,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DocumentLink } from "@/components/applicants/document-viewer";
+import { MasterDocumentPicker, type AvailableMasterFiles } from "./master-document-picker";
 
 interface AdditionalFile {
   fileUrl: string;
   fileName: string;
   fileSize: number;
   mimeType: string;
+  sourcedFromMaster?: boolean;
+  sourcedFromMasterType?: "applicant" | "organization" | "supporter";
 }
 
 interface ChecklistItem {
@@ -61,6 +64,7 @@ interface DocumentChecklistProps {
   applicationId: string;
   userRole?: string;
   applicationStatus: string;
+  availableMasterFiles: AvailableMasterFiles;
 }
 
 function getStatusIcon(status: string): React.ReactNode {
@@ -447,6 +451,7 @@ export function DocumentChecklist({
   checklist,
   applicationId,
   userRole,
+  availableMasterFiles,
 }: DocumentChecklistProps) {
   const [isPending, startTransition] = useTransition();
   const [localChecklist, setLocalChecklist] = useState(checklist);

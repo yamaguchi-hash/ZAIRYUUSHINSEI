@@ -246,7 +246,9 @@ const ChecklistDropzone = memo(function ChecklistDropzone({
                   ? "所属機関マスターに登録済みの書類が反映されました"
                   : file.fileSourcedFromMasterType === "supporter"
                   ? "扶養者の書類が反映されました"
-                  : "申請人マスターに登録済みの書類が反映されました"
+                  : file.fileSourcedFromMasterType === "applicant"
+                  ? "申請人マスターに登録済みの書類が反映されました"
+                  : "マスターに登録済みの書類が反映されました"
               }
             >
               {file.fileSourcedFromMasterType === "organization"
@@ -415,7 +417,16 @@ const ExtraFilesSection = memo(function ExtraFilesSection({
             <span className="text-xs text-green-700 truncate max-w-[160px]" title={f.fileName}>{f.fileName}</span>
           )}
           {f.sourcedFromMaster && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 flex-shrink-0 whitespace-nowrap">
+            <span
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 flex-shrink-0 whitespace-nowrap"
+              title={
+                f.sourcedFromMasterType === "organization"
+                  ? "所属機関マスターに登録済みの書類が反映されました"
+                  : f.sourcedFromMasterType === "supporter"
+                  ? "扶養者の書類が反映されました"
+                  : "申請人マスターに登録済みの書類が反映されました"
+              }
+            >
               {f.sourcedFromMasterType === "organization"
                 ? "所属機関マスターから反映"
                 : f.sourcedFromMasterType === "supporter"

@@ -139,17 +139,24 @@ const ChecklistDropzone = memo(function ChecklistDropzone({
   applicationId,
   documentName,
   file,
+  availableMasterFiles,
   onUploaded,
   onDeleted,
   onAiResult,
+  onMasterApplied,
 }: {
   itemId: string;
   applicationId: string;
   documentName: string;
   file: ChecklistFile;
+  availableMasterFiles: AvailableMasterFiles;
   onUploaded: (targetItemId: string, file: UploadedFileResult, meta?: UploadMeta) => void;
   onDeleted: (itemId: string) => void;
   onAiResult: (result: AiFillResult) => void;
+  onMasterApplied: (itemId: string, item: {
+    fileUrl: string | null; fileName: string | null; fileSize: number | null; mimeType: string | null;
+    status: string; fileSourcedFromMaster: boolean; fileSourcedFromMasterType: string | null;
+  }) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -236,12 +243,16 @@ const ChecklistDropzone = memo(function ChecklistDropzone({
               className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 flex-shrink-0 whitespace-nowrap"
               title={
                 file.fileSourcedFromMasterType === "organization"
-                  ? "所属機関マスターに登録済みの書類が自動的に反映されました"
-                  : "申請人マスターに登録済みの書類が自動的に反映されました"
+                  ? "所属機関マスターに登録済みの書類が反映されました"
+                  : file.fileSourcedFromMasterType === "supporter"
+                  ? "扶養者の書類が反映されました"
+                  : "申請人マスターに登録済みの書類が反映されました"
               }
             >
               {file.fileSourcedFromMasterType === "organization"
                 ? "アップロード済み（所属機関マスターから反映）"
+                : file.fileSourcedFromMasterType === "supporter"
+                ? "アップロード済み（扶養者マスターから反映）"
                 : file.fileSourcedFromMasterType === "applicant"
                 ? "アップロード済み（申請人マスターから反映）"
                 : "マスターから反映"}
@@ -260,31 +271,40 @@ const ChecklistDropzone = memo(function ChecklistDropzone({
           </button>
         </div>
       ) : (
-        <div
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragging(false);
-            const fl = Array.from(e.dataTransfer.files);
-            if (fl.length) handleFiles(fl);
-          }}
-          className={cn(
-            "inline-flex items-center gap-1.5 border border-dashed rounded-lg px-2 py-1 cursor-pointer transition-colors text-xs",
-            isDragging
-              ? "border-blue-400 bg-blue-50 text-blue-600"
-              : "border-gray-200 bg-gray-50 text-gray-400 hover:border-blue-300 hover:bg-blue-50/40",
-            isUploading && "pointer-events-none opacity-60"
-          )}
-        >
-          {isUploading ? (
-            <><Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" /><span className="text-blue-600">アップロード中...</span></>
-          ) : isDragging ? (
-            <><Upload className="w-3.5 h-3.5" /><span>ここにドロップ</span></>
-          ) : (
-            <><Upload className="w-3.5 h-3.5" /><span>ドラッグ&amp;ドロップ または クリックで添付</span></>
-          )}
+        <div className="inline-flex items-start gap-1.5 flex-wrap">
+          <div
+            onClick={() => inputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              const fl = Array.from(e.dataTransfer.files);
+              if (fl.length) handleFiles(fl);
+            }}
+            className={cn(
+              "inline-flex items-center gap-1.5 border border-dashed rounded-lg px-2 py-1 cursor-pointer transition-colors text-xs",
+              isDragging
+                ? "border-blue-400 bg-blue-50 text-blue-600"
+                : "border-gray-200 bg-gray-50 text-gray-400 hover:border-blue-300 hover:bg-blue-50/40",
+              isUploading && "pointer-events-none opacity-60"
+            )}
+          >
+            {isUploading ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" /><span className="text-blue-600">アップロード中...</span></>
+            ) : isDragging ? (
+              <><Upload className="w-3.5 h-3.5" /><span>ここにドロップ</span></>
+            ) : (
+              <><Upload className="w-3.5 h-3.5" /><span>ドラッグ&amp;ドロップ または クリックで添付</span></>
+            )}
+          </div>
+          <MasterDocumentPicker
+            applicationId={applicationId}
+            itemId={itemId}
+            slot="primary"
+            availableMasterFiles={availableMasterFiles}
+            onPrimaryApplied={onMasterApplied}
+          />
         </div>
       )}
       {error && <p className="text-xs text-red-500 mt-0.5 whitespace-pre-wrap max-w-[220px]">{error}</p>}
@@ -310,6 +330,7 @@ const ExtraFilesSection = memo(function ExtraFilesSection({
   applicationId,
   documentName,
   extraFiles,
+  availableMasterFiles,
   onFileAdded,
   onFileDeleted,
   onAiResult,
@@ -318,6 +339,7 @@ const ExtraFilesSection = memo(function ExtraFilesSection({
   applicationId: string;
   documentName: string;
   extraFiles: AdditionalFile[];
+  availableMasterFiles: AvailableMasterFiles;
   onFileAdded: (itemId: string, file: AdditionalFile) => void;
   onFileDeleted: (itemId: string, index: number) => void;
   onAiResult: (result: AiFillResult) => void;
@@ -392,6 +414,15 @@ const ExtraFilesSection = memo(function ExtraFilesSection({
           ) : (
             <span className="text-xs text-green-700 truncate max-w-[160px]" title={f.fileName}>{f.fileName}</span>
           )}
+          {f.sourcedFromMaster && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 flex-shrink-0 whitespace-nowrap">
+              {f.sourcedFromMasterType === "organization"
+                ? "所属機関マスターから反映"
+                : f.sourcedFromMasterType === "supporter"
+                ? "扶養者マスターから反映"
+                : "申請人マスターから反映"}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => handleDelete(idx)}
@@ -431,6 +462,14 @@ const ExtraFilesSection = memo(function ExtraFilesSection({
           <><Plus className="w-3 h-3" /><span>2枚目を追加</span></>
         )}
       </div>
+
+      <MasterDocumentPicker
+        applicationId={applicationId}
+        itemId={itemId}
+        slot="extra"
+        availableMasterFiles={availableMasterFiles}
+        onExtraApplied={onFileAdded}
+      />
 
       {error && <p className="w-full text-xs text-red-500 mt-0.5 whitespace-pre-wrap max-w-[240px]">{error}</p>}
       <input
@@ -538,6 +577,17 @@ export function DocumentChecklist({
     } else {
       setMismatchWarning("");
     }
+  }, []);
+
+  const handleMasterApplied = useCallback((targetItemId: string, item: {
+    fileUrl: string | null; fileName: string | null; fileSize: number | null; mimeType: string | null;
+    status: string; fileSourcedFromMaster: boolean; fileSourcedFromMasterType: string | null;
+  }) => {
+    setLocalChecklist((prev) =>
+      prev.map((i) => (i.id === targetItemId
+        ? { ...i, fileUrl: item.fileUrl, fileName: item.fileName, fileSize: item.fileSize, mimeType: item.mimeType, status: item.status, fileSourcedFromMaster: item.fileSourcedFromMaster, fileSourcedFromMasterType: item.fileSourcedFromMasterType }
+        : i))
+    );
   }, []);
 
   const handleFileDeleted = useCallback((itemId: string) => {
@@ -890,9 +940,11 @@ export function DocumentChecklist({
                           fileSourcedFromMaster: item.fileSourcedFromMaster ?? false,
                           fileSourcedFromMasterType: item.fileSourcedFromMasterType ?? null,
                         }}
+                        availableMasterFiles={availableMasterFiles}
                         onUploaded={handleFileUploaded}
                         onDeleted={handleFileDeleted}
                         onAiResult={handleAiResult}
+                        onMasterApplied={handleMasterApplied}
                       />
                       {/* 1枚目が存在する場合のみ2枚目以降のUI */}
                       {item.fileName && (
@@ -901,6 +953,7 @@ export function DocumentChecklist({
                           applicationId={applicationId}
                           documentName={item.documentName}
                           extraFiles={item.additionalFiles ?? []}
+                          availableMasterFiles={availableMasterFiles}
                           onFileAdded={handleExtraFileAdded}
                           onFileDeleted={handleExtraFileDeleted}
                           onAiResult={handleAiResult}

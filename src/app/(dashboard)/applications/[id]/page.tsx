@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { getApplicationById, syncMasterDocumentsToChecklist, syncOrgMasterDocumentsToChecklist, getAvailableMasterDocumentsForApplication } from "@/actions/applications";
+import { getApplicationById, syncMasterDocumentsToChecklist, syncOrgMasterDocumentsToChecklist, getAvailableMasterDocumentsForApplication, type MasterFileOption } from "@/actions/applications";
 import { notFound, redirect } from "next/navigation";
 import {
   Card, CardContent, CardHeader, CardTitle,
@@ -106,7 +106,13 @@ export default async function ApplicationDetailPage({
 
   // チェックリストの「マスターから選択」用。既存のmasterDocuments（書類要件マスターの
   // カタログ）とは別概念のため、availableMasterFilesという別名で区別する。
-  const availableMasterFiles = await getAvailableMasterDocumentsForApplication(application.id);
+  let availableMasterFiles: { applicant: MasterFileOption[]; organization: MasterFileOption[]; supporter: MasterFileOption[] } = { applicant: [], organization: [], supporter: [] };
+  try {
+    availableMasterFiles = await getAvailableMasterDocumentsForApplication(application.id);
+  } catch (e) {
+    console.error("[ApplicationDetailPage] getAvailableMasterDocumentsForApplication failed:", e);
+    // マスター書類一覧の取得に失敗してもページ表示は継続する（チェックリストのマスター選択UIが空になるのみ）
+  }
 
   const effectiveForm = buildEffectiveFormData(application, applicant, organization);
   const interviewFormType = toFormType(effectiveForm.applicationFormType ?? application.applicationType);

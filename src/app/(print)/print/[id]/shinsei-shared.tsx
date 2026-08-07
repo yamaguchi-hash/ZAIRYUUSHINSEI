@@ -392,14 +392,12 @@ export const PRINT_STYLES = `
     body{position:relative;}
     /* 画面用スタンプは印刷に含めない（印刷はシート単位のスタンプに置き換える） */
     .page-number-stamp{display:none!important;}
-    /* ページ番号は各ページ下部中央にフッターとして表示（例 1/2, 2/2）。
-       JSが各物理シートの下端に top を設定し、ここで左右中央寄せする。
-       白背景で本文の最終行にかかっても番号が読めるようにする。 */
+    /* ページ番号は各ページ右上に「種別 n/総数」バッジとして表示（例 申請人用 1/2）。
+       JSが各物理シート先頭の top を設定し、ここで右端に寄せる。 */
     .print-sheet-stamp{
-      display:block;position:absolute;left:50%;transform:translateX(-50%);z-index:50;
-      text-align:center;white-space:nowrap;
-      font-size:8.5px;font-weight:bold;letter-spacing:0.04em;
-      color:#000;background:#fff;padding:0 6px;
+      display:block;position:absolute;right:2mm;z-index:50;white-space:nowrap;
+      font-size:9px;font-weight:bold;letter-spacing:0.03em;
+      background:#1e3a8a;color:#fff;padding:2px 8px;border-radius:3px;
       -webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;
     }
   }

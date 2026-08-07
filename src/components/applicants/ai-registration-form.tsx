@@ -13,11 +13,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-type DocType = "passport_data_page" | "residence_card";
+type DocType = "passport_data_page" | "residence_card_front" | "residence_card_back";
 
 const DOC_CONFIGS: { type: DocType; label: string; hint: string }[] = [
-  { type: "passport_data_page", label: "パスポート（顔写真ページ）", hint: "氏名・番号・有効期限" },
-  { type: "residence_card",     label: "在留カード（表面・裏面）",   hint: "両面を含むPDF可" },
+  { type: "passport_data_page",   label: "パスポート（顔写真ページ）", hint: "氏名・番号・有効期限" },
+  { type: "residence_card_front", label: "在留カード（表面）",         hint: "氏名・番号・在留資格" },
+  { type: "residence_card_back",  label: "在留カード（裏面）",         hint: "住所変更・資格外活動許可等" },
 ];
 
 interface UploadedDoc {
@@ -154,8 +155,8 @@ export function AiRegistrationForm({ organizations }: { organizations: { id: str
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* 4 upload zones */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* upload zones（パスポート・在留カード表面・在留カード裏面） */}
+          <div className="grid grid-cols-3 gap-3">
             {DOC_CONFIGS.map((cfg) => {
               const existing = docs.find((d) => d.type === cfg.type);
               const isLoading = uploadingType === cfg.type;
@@ -269,7 +270,7 @@ export function AiRegistrationForm({ organizations }: { organizations: { id: str
             <span className={cn("w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold", docs.length > 0 ? "bg-purple-600 text-white" : "bg-gray-200 text-gray-500")}>
               {docs.length}
             </span>
-            / 4 件アップロード済み
+            / {DOC_CONFIGS.length} 件アップロード済み
           </div>
 
           {/* AI read button */}

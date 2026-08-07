@@ -392,14 +392,14 @@ export const PRINT_STYLES = `
     body{position:relative;}
     /* 画面用スタンプは印刷に含めない（印刷はシート単位のスタンプに置き換える） */
     .page-number-stamp{display:none!important;}
-    /* 本文と重ならないよう、番号スタンプを右側の用紙余白(9mm)内へ逃がす。
-       right を負値にして本文右端の外（余白帯）に配置する。番号のみ(例:2/2)で
-       幅を余白内に収める。 */
+    /* ページ番号は各ページ下部中央にフッターとして表示（例 1/2, 2/2）。
+       JSが各物理シートの下端に top を設定し、ここで左右中央寄せする。
+       白背景で本文の最終行にかかっても番号が読めるようにする。 */
     .print-sheet-stamp{
-      display:block;position:absolute;right:-8mm;z-index:50;
-      min-width:6mm;text-align:center;
-      font-size:8px;font-weight:bold;letter-spacing:0.02em;white-space:nowrap;
-      background:#1e3a8a;color:#fff;padding:1px 3px;border-radius:3px;
+      display:block;position:absolute;left:50%;transform:translateX(-50%);z-index:50;
+      text-align:center;white-space:nowrap;
+      font-size:8.5px;font-weight:bold;letter-spacing:0.04em;
+      color:#000;background:#fff;padding:0 6px;
       -webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;
     }
   }

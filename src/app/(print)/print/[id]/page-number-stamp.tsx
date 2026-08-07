@@ -75,16 +75,22 @@ export function PageNumberStamp({ kind }: { kind: string }) {
       const contentHeight = docBottom - docTop;
       const total = Math.max(1, Math.ceil((contentHeight - 4) / usablePx));
 
+      // フッター（ページ番号）の高さ相当。各シート下端にこの分だけ上げて配置する。
+      const footerH = Math.round(4 * PX_PER_MM);
+
       for (let i = 0; i < total; i++) {
         const sheetTop = docTop + i * usablePx;
         // 内容の範囲を超える位置にスタンプを置かない
         // （範囲外に絶対配置すると、スタンプ自体が白紙ページを作ってしまうため）
         if (sheetTop >= docBottom - 4) break;
+        // このシートの下端（次の改ページ位置。最終シートは文書末尾）。
+        const sheetBottom = Math.min(docTop + (i + 1) * usablePx, docBottom);
         const stamp = document.createElement("div");
         stamp.className = "print-sheet-stamp";
-        // 番号のみ（右余白9mm内に収めて本文と重ならないようにするため書類種別は付けない）
+        // 例: 1/2, 2/2（各ページ下部中央に必ず表示）
         stamp.textContent = `${i + 1}/${total}`;
-        stamp.style.top = `${sheetTop - bodyDocTop + 2}px`;
+        // ページ下端フッターとして配置（下端からフッター高さ分だけ上へ）。
+        stamp.style.top = `${Math.round(sheetBottom - bodyDocTop - footerH)}px`;
         document.body.appendChild(stamp);
       }
     };

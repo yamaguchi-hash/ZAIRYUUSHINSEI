@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { db, applications, applicantMaster, organizationMaster } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import type { ApplicationFormData, ApplicationFormType, FamilyMember, WorkHistoryEntry } from "@/lib/form-types";
-import { FORM_TYPE_LABELS, FORM_TYPE_ARTICLE, VISA_CATEGORY_NEEDS_ORG, OCCUPATION_TYPES } from "@/lib/form-types";
+import { FORM_TYPE_LABELS, FORM_TYPE_ARTICLE, VISA_CATEGORY_NEEDS_ORG, OCCUPATION_TYPES, BUSINESS_TYPES } from "@/lib/form-types";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 
 // ─── フォーマッタ ─────────────────────────────────────────────────────────────
@@ -47,7 +47,16 @@ export function fmtAdditionalOccupations(v: string | string[] | null | undefined
   return codes.join(", ");
 }
 export function businessTypeLabel(code: string): string {
-  return code ? `${code}番` : "　";
+  if (!code) return "　";
+  const num = Number(code);
+  const hit = BUSINESS_TYPES.find(b => b.code === num);
+  return hit ? `${num}.${hit.label}` : `${code}`;
+}
+export function occupationLabel(code: string): string {
+  if (!code) return "　";
+  const num = Number(code);
+  const hit = OCCUPATION_TYPES.find(o => o.code === num);
+  return hit ? `${num}.${hit.label}` : `${code}`;
 }
 /** is2Goがtrueの場合、表示値を「省略」に置き換える（特定技能1号の場合のみ必要な項目用） */
 export function omitFor2Go(is2Go: boolean, formattedValue: string): string {
@@ -126,7 +135,9 @@ export async function loadShinseiData(id: string): Promise<ShinseiData | null> {
 
   return {
     app, applicant, org, form,
-    familyMembers: (form.familyInJapan ?? []) as FamilyMember[],
+    // 在日親族及び同居者: フォームで「無」を選択している場合は、配列に入力済み
+    // データが残っていてもPDFには出さない（「なし（None）」表示にする）
+    familyMembers: (form.familyInJapanExists === "無" ? [] : (form.familyInJapan ?? [])) as FamilyMember[],
     workHistory: (form.workHistory ?? []) as WorkHistoryEntry[],
     today,
     isChange,
@@ -184,6 +195,33 @@ export function getPdfHeaderCategoryLabel(formType: ApplicationFormType, visaTyp
   const title = FORM_TITLE_MAP[formType]?.ja ?? FORM_TITLE_MAP.change.ja;
   const visaLabel = VISA_TYPE_LABELS[visaType] ?? visaType;
   return `${title}－${visaLabel}`;
+}
+
+/** 手続き種類（在留手続きの種類）の短縮ラベル。ファイル名等に使う。 */
+const PROCEDURE_SHORT_LABEL: Record<ApplicationFormType, string> = {
+  coe: "認定",
+  change: "変更",
+  extension: "更新",
+  permanent: "永住",
+};
+
+/**
+ * 申請書PDFの保存名ベースを組み立てる。
+ * 「申請書　<申請人用/所属機関用>　<手続き種類(更新/変更/認定/永住)>　<在留資格>　<申請人名>」。
+ * 日付（保存日）はクライアント側（ShinseiPrintToolbar）で末尾に付与する。
+ */
+export function buildShinseiFileNameBase(
+  role: "申請人用" | "所属機関用",
+  formType: ApplicationFormType,
+  visaType: string,
+  form: { familyNameEn?: string; givenNameEn?: string; familyNameJa?: string; givenNameJa?: string },
+): string {
+  const procedure = PROCEDURE_SHORT_LABEL[formType] ?? "";
+  const visaLabel = VISA_TYPE_LABELS[visaType] ?? visaType;
+  const nameJa = [form.familyNameJa, form.givenNameJa].filter(Boolean).join(" ").trim();
+  const nameEn = [form.familyNameEn, form.givenNameEn].filter(Boolean).join(" ").trim();
+  const name = nameJa || nameEn;
+  return ["申請書", role, procedure, visaLabel, name].filter((p) => p && p.trim()).join("　");
 }
 
 // 申請書冒頭の申請文（和文・英文）。法令上の根拠条文（FORM_TYPE_ARTICLE）と
@@ -252,9 +290,11 @@ export const PRINT_STYLES = `
     body{background:#fff;font-size:8.5px;line-height:1.25;}
     *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
     .no-print{display:none!important;}
-    /* A4固定・強制改ページを解除し、内容量に応じて自然に流す。
+    /* A4固定・強制改ページを解除し、内容量に応じて自然に流す（印刷枚数の最小化）。
        .page の幅は @page で確保した用紙幅いっぱい(100%)に追従させる。
-       table 等の内部要素は width:100% / 列は%指定のため、ここに連動して伸縮する。 */
+       table 等の内部要素は width:100% / 列は%指定のため、ここに連動して伸縮する。
+       実際の印刷枚数に一致するページ番号は PageNumberStamp が印刷実行時
+       （beforeprint）に物理シート数を計測して .print-sheet-stamp として付与する。 */
     .page{
       width:100%;max-width:100%;min-height:0;
       padding:0;margin:0 auto;box-shadow:none;border-radius:0;
@@ -272,6 +312,27 @@ export const PRINT_STYLES = `
     .form-header{margin-bottom:4px;}
     .bilingual,.bilingual-block{font-size:6.8px;line-height:1.1;}
   }
+
+  /* ── 印刷枚数の計測モード（body.print-measure） ──────────────────────────
+     beforeprint の時点ではブラウザは画面用CSSのままレイアウトしているため、
+     PageNumberStamp が枚数を実測する間だけこのクラスを body に付与し、
+     上の @media print と同じコンパクトレイアウトを画面上で再現する。
+     ※ @media print のレイアウトに影響する値を変更した場合は、ここも必ず同期させること */
+  body.print-measure{
+    background:#fff;font-size:8.5px;line-height:1.25;
+    width:calc(var(--pdf-print-width) - var(--print-margin-side, 9mm)*2);
+    margin:0;
+  }
+  body.print-measure .no-print{display:none!important;}
+  body.print-measure .page{
+    width:100%!important;max-width:100%!important;min-height:0!important;
+    padding:0!important;margin:0 auto!important;box-shadow:none!important;border-radius:0!important;
+  }
+  body.print-measure .page + .page{margin-top:5mm!important;}
+  body.print-measure td,body.print-measure th{padding:1.5px 4px;font-size:8.5px;line-height:1.22;}
+  body.print-measure table{margin-bottom:3px;}
+  body.print-measure .form-header{margin-bottom:4px;}
+  body.print-measure .bilingual,body.print-measure .bilingual-block{font-size:6.8px;line-height:1.1;}
 
   /* ── 申請書ヘッダー（全様式共通） ── */
   .form-header{text-align:center;margin-bottom:6px;}
@@ -317,6 +378,30 @@ export const PRINT_STYLES = `
   .role-banner{
     text-align:center;font-size:10px;font-weight:bold;letter-spacing:0.15em;
     background:#000;color:#fff;padding:3px 0;margin-bottom:2px;
+  }
+  /* ページ右上の書類種別スタンプ（画面プレビュー用・PageNumberStampがJSで各カードに付与） */
+  .page-number-stamp{
+    position:absolute;top:2mm;right:2mm;z-index:50;
+    font-size:9px;font-weight:bold;letter-spacing:0.03em;white-space:nowrap;
+    background:#1e3a8a;color:#fff;padding:2px 8px;border-radius:3px;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+  /* 印刷用: 実際の印刷シートごとの右上スタンプ（beforeprintで物理枚数を計測して付与） */
+  .print-sheet-stamp{display:none;}
+  @media print{
+    body{position:relative;}
+    /* 画面用スタンプは印刷に含めない（印刷はシート単位のスタンプに置き換える） */
+    .page-number-stamp{display:none!important;}
+    /* 本文と重ならないよう、番号スタンプを右側の用紙余白(9mm)内へ逃がす。
+       right を負値にして本文右端の外（余白帯）に配置する。番号のみ(例:2/2)で
+       幅を余白内に収める。 */
+    .print-sheet-stamp{
+      display:block;position:absolute;right:-8mm;z-index:50;
+      min-width:6mm;text-align:center;
+      font-size:8px;font-weight:bold;letter-spacing:0.02em;white-space:nowrap;
+      background:#1e3a8a;color:#fff;padding:1px 3px;border-radius:3px;
+      -webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;
+    }
   }
 
   .bilingual{font-size:7.5px;color:#333;font-weight:normal;}

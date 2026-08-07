@@ -34,6 +34,7 @@ export const VISA_TYPE_LABELS: Record<string, string> = {
   business_manager: "経営・管理",
   legal_accounting: "法律・会計業務",
   medical_services: "医療",
+  nursing_care: "介護",
   researcher: "研究",
   instructor: "教育",
   diplomat: "外交",
@@ -74,6 +75,7 @@ export const ORG_RELEVANT_VISA_TYPES: string[] = [
   "business_manager",
   "legal_accounting",
   "medical_services",
+  "nursing_care",
   "researcher",
   "instructor",
   "highly_skilled_professional_1",
@@ -106,6 +108,7 @@ export const WORK_VISA_TYPES: Set<string> = new Set([
   "business_manager",
   "legal_accounting",
   "medical_services",
+  "nursing_care",
   "researcher",
   "instructor",
   "highly_skilled_professional_1",
@@ -141,8 +144,11 @@ export const APPLICATION_STATUS_LABELS: Record<string, string> = {
   under_review: "⑥申請書反映・確認",
   approved: "承認済",
   submitted: "⑦署名・提出",
-  completed: "⑧許可・完了",
+  applying: "⑧申請中",
+  completed: "⑨許可・完了",
   rejected: "却下",
+  on_hold: "一時停止",
+  withdrawn: "キャンセル",
   cancelled: "削除済",
 };
 
@@ -155,8 +161,11 @@ export const STATUS_COLORS: Record<string, string> = {
   under_review: "bg-indigo-100 text-indigo-700",
   approved: "bg-green-100 text-green-700",
   submitted: "bg-teal-100 text-teal-700",
+  applying: "bg-cyan-100 text-cyan-700",
   completed: "bg-emerald-100 text-emerald-700",
   rejected: "bg-red-100 text-red-700",
+  on_hold: "bg-amber-100 text-amber-700",
+  withdrawn: "bg-rose-100 text-rose-700",
   cancelled: "bg-gray-100 text-gray-500",
 };
 
@@ -166,3 +175,16 @@ export const ROLE_LABELS: Record<string, string> = {
   expert: "専門家（行政書士等）",
   admin: "システム管理者",
 };
+
+/**
+ * 指定日までの残日数を返す（今日の0時基準・期限切れは負数、日付なしは null）。
+ * 在留期限・パスポート期限のアラート表示に共通で使う。
+ */
+export function getDaysUntil(dateStr: string | Date | null | undefined): number | null {
+  if (!dateStr) return null;
+  const expiry = new Date(dateStr);
+  if (isNaN(expiry.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}

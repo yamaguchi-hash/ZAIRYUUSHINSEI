@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { db, applicantDocuments, applicantMaster, applicantResidenceCardHistories } from "@/lib/db";
+import { db, applicantDocuments, applicantMaster, applicantResidenceCardHistories, applicantUpdateHistory } from "@/lib/db";
 import { eq, and, ne, inArray, desc } from "drizzle-orm";
 import { GoogleGenAI, Type } from "@google/genai";
 import { revalidatePath } from "next/cache";
@@ -133,6 +133,33 @@ export async function saveApplicantDocument(data: {
       })
     : data.fileName;
 
+  // 差し替え時: 既存の同種書類を「更新履歴」に退避してから置き換える。
+  // 旧レコードは削除するが、旧ファイル(Blob)自体は消さず oldFileUrl から閲覧可能に残す。
+  const [existingDoc] = await db
+    .select({ fileUrl: applicantDocuments.fileUrl, fileName: applicantDocuments.fileName })
+    .from(applicantDocuments)
+    .where(
+      and(
+        eq(applicantDocuments.applicantId, data.applicantId),
+        eq(applicantDocuments.documentType, data.documentType)
+      )
+    )
+    .limit(1);
+
+  if (existingDoc) {
+    await db.insert(applicantUpdateHistory).values({
+      applicantId: data.applicantId,
+      tenantId,
+      userId: (session.user as any).id ?? null,
+      changeType: "document_replaced",
+      source: "manual",
+      documentType: data.documentType,
+      oldFileUrl: existingDoc.fileUrl,
+      oldFileName: existingDoc.fileName,
+      newValue: fileName,
+    });
+  }
+
   // Upsert: delete existing same type and insert new
   await db
     .delete(applicantDocuments)
@@ -179,6 +206,24 @@ export async function deleteApplicantDocument(documentId: string) {
     .where(eq(applicantDocuments.id, documentId));
 
   revalidatePath("/applicants");
+}
+
+// 申請人の更新履歴を新しい順で取得する（書類差し替え・AI項目変更）
+export async function getApplicantUpdateHistory(applicantId: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+  const tenantId = (session.user as any).tenantId;
+
+  return db
+    .select()
+    .from(applicantUpdateHistory)
+    .where(
+      and(
+        eq(applicantUpdateHistory.applicantId, applicantId),
+        eq(applicantUpdateHistory.tenantId, tenantId)
+      )
+    )
+    .orderBy(desc(applicantUpdateHistory.createdAt));
 }
 
 // ─── プロンプト生成 ───────────────────────────────────────────────────────────
@@ -593,17 +638,46 @@ export async function ocrAndFillApplicant(applicantId: string) {
     if (lookedUp) update.postalCode = lookedUp;
   }
 
-  if (Object.keys(update).length > 1) {
+  const changedFieldKeys = Object.keys(update).filter((k) => k !== "updatedAt");
+  if (changedFieldKeys.length > 0) {
+    // 更新前の現在値を取得し、実際に変化した項目のみ「更新履歴」に記録する。
+    const [current] = await db
+      .select()
+      .from(applicantMaster)
+      .where(eq(applicantMaster.id, applicantId))
+      .limit(1);
+
     await db
       .update(applicantMaster)
       .set(update)
       .where(eq(applicantMaster.id, applicantId));
+
+    if (current) {
+      const userId = (session.user as any).id ?? null;
+      const norm = (v: any) => (v == null ? "" : String(v).trim());
+      const historyRows = changedFieldKeys
+        .map((key) => ({ key, oldV: norm((current as any)[key]), newV: norm((update as any)[key]) }))
+        .filter(({ oldV, newV }) => oldV !== newV)
+        .map(({ key, oldV, newV }) => ({
+          applicantId,
+          tenantId,
+          userId,
+          changeType: "field_updated",
+          source: "ai_ocr",
+          fieldKey: key,
+          oldValue: oldV || null,
+          newValue: newV || null,
+        }));
+      if (historyRows.length > 0) {
+        await db.insert(applicantUpdateHistory).values(historyRows);
+      }
+    }
   }
 
   revalidatePath(`/applicants/${applicantId}`);
   revalidatePath("/applicants");
 
-  return { extracted: allExtracted, updatedFields: Object.keys(update).filter((k) => k !== "updatedAt") };
+  return { extracted: allExtracted, updatedFields: changedFieldKeys };
 }
 
 // ─── 郵便番号フォーマット ─────────────────────────────────────────────────────

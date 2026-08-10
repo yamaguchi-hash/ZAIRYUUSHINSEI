@@ -10,6 +10,7 @@ import {
   varchar,
   date,
   real,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -18,7 +19,10 @@ export const userRoleEnum = pgEnum("user_role", ["applicant", "hr_manager", "exp
 
 export const applicationStatusEnum = pgEnum("application_status", [
   "draft", "documents_requested", "documents_collecting", "ocr_processing",
-  "questionnaire_sent", "under_review", "approved", "submitted", "completed", "rejected", "cancelled",
+  "questionnaire_sent", "under_review", "approved", "submitted", "applying", "completed", "rejected",
+  // on_hold: 一時停止（お客様都合等で中断。再開可能） / withdrawn: キャンセル（取下げ）
+  // cancelled は「削除済」（一覧非表示のソフトデリート）として既に使用しているため別値とする
+  "on_hold", "withdrawn", "cancelled",
 ]);
 
 export const documentStatusEnum = pgEnum("document_status", [
@@ -103,11 +107,15 @@ export const applicantMaster = pgTable("applicant_master", {
   userId: uuid("user_id").references(() => users.id),
   // 所属機関（受入企業）。就労資格保持者のみ設定。1社が複数の申請人を雇用する「1対多」関係。
   organizationId: uuid("organization_id").references(() => organizationMaster.id),
+  // 扶養者（家族滞在の場合のみ設定）。同一テーブルの別レコードを参照する自己参照FK。
+  supporterId: uuid("supporter_id").references((): AnyPgColumn => applicantMaster.id),
   familyNameEn: text("family_name_en").notNull(),
   givenNameEn: text("given_name_en").notNull(),
   familyNameJa: text("family_name_ja"),
   givenNameJa: text("given_name_ja"),
   gender: text("gender"),
+  // 婚姻の有無（配偶者の有無）。申請書の項目6「配偶者の有無」に反映する。値は "有" / "無"。
+  maritalStatus: text("marital_status"),
   dateOfBirth: date("date_of_birth"),
   nationality: text("nationality").notNull(),
   passportNumber: text("passport_number"),
@@ -123,9 +131,31 @@ export const applicantMaster = pgTable("applicant_master", {
   japanCity: text("japan_city"),
   japanAddressLine: text("japan_address_line"),
   japanAddress: text("japan_address"),   // 後方互換用（prefecture+city+addressLine の結合値）
+  placeOfBirth: text("place_of_birth"),
+  homeCountryAddress: text("home_country_address"),
   educationHistory: jsonb("education_history"),
   workHistory: jsonb("work_history"),
+  // ダッシュボードの在留期限アラートから、この申請人を個別に非表示にするフラグ。
+  // 期限が到来していても、対応不要・別案件処理済み等のケースでアラート一覧から除外できる。
+  hideExpiryAlert: boolean("hide_expiry_alert").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── Applicant notes（申請人マスターのメモ記録）─────────────────────────────────
+// 申請人ごとに、タイトル・日付・内容で構成するメモを複数件記録できる。
+export const applicantNotes = pgTable("applicant_notes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  applicantId: uuid("applicant_id").notNull().references(() => applicantMaster.id),
+  /** メモのタイトル */
+  title: text("title").notNull(),
+  /** メモの日付（YYYY-MM-DD） */
+  noteDate: date("note_date"),
+  /** メモ内容 */
+  content: text("content"),
+  createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -177,11 +207,76 @@ export const documentRequirementMaster = pgTable("document_requirement_master", 
   documentName: text("document_name").notNull(),
   documentNameEn: text("document_name_en"),
   description: text("description"),
+  // 書類の作成・取得の担当（申請人/受入企業/弊所、または自由記載）。
+  // チェックリストへ追加する際の初期値として applicationDocumentChecklist.preparedBy にコピーされる
+  preparedBy: text("prepared_by"),
+  // 原本か写しか（原本 / 写し / 原本＋写し 等の文字列）
+  originalOrCopy: text("original_or_copy"),
   isAlwaysRequired: boolean("is_always_required").notNull().default(false),
   conditions: jsonb("conditions"),
   pdfMappingCoordinates: jsonb("pdf_mapping_coordinates"),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── Document requirement templates（必要書類一覧の名前付き保存）────────────────
+// 必要書類マスターの設定内容（在留資格×申請種別ごとの書類一式）を
+// 名前を付けてスナップショット保存し、後から呼び出して復元できるようにする。
+// items には保存時点の書類定義の配列を JSON で丸ごと保持する。
+export const documentRequirementTemplates = pgTable("document_requirement_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  /** テンプレート名（例: 「特定技能2号・変更（建設）標準セット」） */
+  name: text("name").notNull(),
+  /** 対象の在留資格（documentRequirementMaster.visaType と同じ値。"common" を含む） */
+  visaType: text("visa_type").notNull(),
+  /** 対象の申請種別（certification / change / renewal / permanent_residence / all） */
+  applicationType: text("application_type").notNull(),
+  /** 備考・用途メモ */
+  note: text("note"),
+  /** 保存時点の書類定義一式のスナップショット */
+  items: jsonb("items").$type<Array<{
+    documentName: string;
+    description: string | null;
+    preparedBy: string | null;
+    originalOrCopy: string | null;
+    isAlwaysRequired: boolean;
+    sortOrder: number;
+  }>>().notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── Application checklist templates（申請案件チェックリストの名前付き保存）──────
+// 必要書類マスターのテンプレート（documentRequirementTemplates）とは別機能。
+// 「実際の申請案件で作り込んだチェックリスト」（担当・注意事項の案件別上書き・原本/写しを含む）を
+// 名前を付けて保存し、別の申請案件のチェックリストへ呼び出して反映するために使う。
+// マスターには一切書き戻さない。
+export const applicationChecklistTemplates = pgTable("application_checklist_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  /** 保存名（例: 「建設・2号変更 実務セット」） */
+  name: text("name").notNull(),
+  /** 保存元案件の在留資格・申請種別（絞り込み表示の目安。呼び出し自体は制限しない） */
+  visaType: text("visa_type"),
+  applicationType: text("application_type"),
+  /** 備考・用途メモ */
+  note: text("note"),
+  /** 保存時点のチェックリスト内容のスナップショット */
+  items: jsonb("items").$type<Array<{
+    documentName: string;
+    /** 注意事項（案件別上書き ?? マスターの注意事項 の実効値） */
+    description: string | null;
+    preparedBy: string | null;
+    originalOrCopy: string | null;
+    sortOrder: number;
+  }>>().notNull(),
+  /** 保存元の申請案件（参考情報。案件が消えても保存内容は残す） */
+  sourceApplicationId: uuid("source_application_id"),
+  createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -212,6 +307,11 @@ export const applicationDocumentChecklist = pgTable("application_document_checkl
     sourcedFromMasterType?: 'applicant' | 'organization' | 'supporter';
   }>>(),
   expertNotes: text("expert_notes"),
+  // 注意事項の案件別上書き。null の場合は必要書類マスターの description（注意事項）を表示・印刷し、
+  // 値がある場合はこの案件専用の注意事項として優先する（マスターは変更しない）。
+  descriptionOverride: text("description_override"),
+  // 書類の作成・取得の担当。プリセット値（申請人/受入企業/弊所）または自由記載の文字列
+  preparedBy: text("prepared_by"),
   // 現在のfileUrl/additionalFilesが申請人マスター（applicantDocuments）・所属機関マスター
   // （organizationDocuments）・扶養者（applicantDocumentsをsupporterId経由で参照）から
   // 自動反映または手動選択されたものかどうか。trueの場合、マスター同期処理が再度上書きしてよい。
@@ -264,7 +364,7 @@ export const pdfFieldMapping = pgTable("pdf_field_mapping", {
 
 // ─── Application attachments（入管提出用添付書類） ─────────────────────────────
 // 申請案件ごとにアップロードされた添付書類（パスポート写し・雇用契約書等）を
-// 永続保存し、AI抽出のソースおよび提出用Zipパッケージの素材として管理する
+// 永続保存し、AI抽出のソースとして管理する
 export const applicationAttachments = pgTable("application_attachments", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
@@ -321,6 +421,27 @@ export const applicantResidenceCardHistories = pgTable("applicant_residence_card
   oldFileUrl: text("old_file_url"),
   oldFileName: text("old_file_name"),
   replacedAt: timestamp("replaced_at").defaultNow().notNull(),
+});
+
+// ─── Applicant update history（申請人マスターの更新履歴） ─────────────────────────
+// 書類の差し替え（旧ファイルを保持）や、AI自動読み込みで変わったマスター項目
+// （旧値→新値）を時系列で記録し、申請人ページの「更新履歴」から閲覧する。
+export const applicantUpdateHistory = pgTable("applicant_update_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  applicantId: uuid("applicant_id").notNull().references(() => applicantMaster.id, { onDelete: "cascade" }),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").references(() => users.id),
+  // "document_replaced"（書類差し替え） | "field_updated"（項目変更）
+  changeType: text("change_type").notNull(),
+  // "manual"（手動差し替え） | "ai_ocr"（AI自動読み込み）
+  source: text("source"),
+  documentType: text("document_type"),   // document_replaced 用
+  fieldKey: text("field_key"),           // field_updated 用（マスターのカラム名）
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  oldFileUrl: text("old_file_url"),      // document_replaced 用（旧ファイルは残す）
+  oldFileName: text("old_file_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // ─── Relations ────────────────────────────────────────────────────────────────

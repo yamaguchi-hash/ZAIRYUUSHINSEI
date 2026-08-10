@@ -29,6 +29,7 @@ export function DocumentUploadZone({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState("");
 
   async function handleFile(file: File) {
@@ -76,11 +77,36 @@ export function DocumentUploadZone({
   return (
     <div>
       {existingDoc ? (
-        /* ─── アップロード済み: コンパクト行 ─── */
-        <div className="flex items-center gap-2 border border-gray-200 rounded-lg bg-white px-3 py-2">
-          <FileText className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+        /* ─── アップロード済み: コンパクト行（ドラッグ&ドロップで差し替え可能） ─── */
+        <div
+          className={cn(
+            "flex items-center gap-2 border rounded-lg px-3 py-2 transition-colors",
+            isUploading
+              ? "border-blue-300 bg-blue-50"
+              : isDragging
+              ? "border-blue-400 bg-blue-50 ring-2 ring-blue-200"
+              : "border-gray-200 bg-white"
+          )}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file) handleFile(file);
+          }}
+          title="ここにファイルをドラッグ＆ドロップして差し替えできます"
+        >
+          {isUploading ? (
+            <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin flex-shrink-0" />
+          ) : (
+            <FileText className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+          )}
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-gray-400 leading-none mb-0.5">{label}</p>
+            <p className="text-[10px] text-gray-400 leading-none mb-0.5">
+              {label}
+              {isDragging && <span className="text-blue-500 ml-1">ドロップで差し替え</span>}
+            </p>
             <DocumentLink
               url={existingDoc.fileUrl}
               fileName={existingDoc.fileName}

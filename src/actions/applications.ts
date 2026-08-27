@@ -8,13 +8,15 @@ import {
   organizationMaster,
   applicationDocumentChecklist,
   documentRequirementMaster,
+  documentRequirementTemplates,
   applicationSnapshots,
   auditLog,
   applicantDocuments,
   organizationDocuments,
 } from "@/lib/db/schema";
-import { eq, and, ne, inArray, desc, ilike, or } from "drizzle-orm";
+import { eq, and, ne, inArray, desc, ilike } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { syncLedgerCompletion } from "./legal-ledger";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 import { mapOrganizationToFormData } from "@/lib/org-master-mapping";
 import { matchMasterDocumentType } from "@/lib/master-document-matching";
@@ -99,6 +101,8 @@ export async function getApplicationById(id: string) {
       additionalFiles:       applicationDocumentChecklist.additionalFiles,
       ocrExtractedData:      applicationDocumentChecklist.ocrExtractedData,
       expertNotes:           applicationDocumentChecklist.expertNotes,
+      descriptionOverride:   applicationDocumentChecklist.descriptionOverride,
+      preparedBy:            applicationDocumentChecklist.preparedBy,
       fileSourcedFromMaster: applicationDocumentChecklist.fileSourcedFromMaster,
       fileSourcedFromMasterType: applicationDocumentChecklist.fileSourcedFromMasterType,
       submittedAt:           applicationDocumentChecklist.submittedAt,
@@ -114,18 +118,47 @@ export async function getApplicationById(id: string) {
   ];
   const masterDescMap: Record<string, string | null> = {};
   const masterSortOrderMap: Record<string, number> = {};
+  const masterOriginalOrCopyMap: Record<string, string | null> = {};
   if (requirementIds.length > 0) {
     const masters = await db
       .select({
         id: documentRequirementMaster.id,
         description: documentRequirementMaster.description,
         sortOrder: documentRequirementMaster.sortOrder,
+        originalOrCopy: documentRequirementMaster.originalOrCopy,
       })
       .from(documentRequirementMaster)
       .where(inArray(documentRequirementMaster.id, requirementIds));
     for (const m of masters) {
       masterDescMap[m.id] = m.description ?? null;
       masterSortOrderMap[m.id] = m.sortOrder;
+      masterOriginalOrCopyMap[m.id] = m.originalOrCopy ?? null;
+    }
+  }
+
+  // documentRequirementId が無い（またはFK解決できない）チェックリスト項目も、
+  // 書類名が現在有効なマスターと一致すればその並び順に従わせるためのフォールバック。
+  // テンプレート反映・自由記載追加など、FKが張られない経路で追加された書類でも
+  // 必要書類マスターの並び順を遵守できるようにする。
+  const masterSortOrderByName: Record<string, number> = {};
+  {
+    const searchVisaTypes = ["common", String(application.visaType)];
+    const searchAppTypes = ["all", String(application.applicationType)];
+    const allActiveMasters = await db
+      .select({
+        documentName: documentRequirementMaster.documentName,
+        sortOrder: documentRequirementMaster.sortOrder,
+      })
+      .from(documentRequirementMaster)
+      .where(and(
+        eq(documentRequirementMaster.isActive, true),
+        inArray(documentRequirementMaster.visaType, searchVisaTypes),
+        inArray(documentRequirementMaster.applicationType, searchAppTypes),
+      ));
+    for (const m of allActiveMasters) {
+      if (masterSortOrderByName[m.documentName] === undefined || m.sortOrder < masterSortOrderByName[m.documentName]) {
+        masterSortOrderByName[m.documentName] = m.sortOrder;
+      }
     }
   }
 
@@ -150,6 +183,8 @@ export async function getApplicationById(id: string) {
     mimeType:   item.mimeType ?? null,
     additionalFiles: (item.additionalFiles ?? null) as Array<{ fileUrl: string; fileName: string; fileSize: number; mimeType: string }> | null,
     expertNotes: item.expertNotes ?? null,
+    descriptionOverride: item.descriptionOverride ?? null,
+    preparedBy: item.preparedBy ?? null,
     fileSourcedFromMaster: item.fileSourcedFromMaster,
     fileSourcedFromMasterType: item.fileSourcedFromMasterType ?? null,
     // OCR データ: null または plain object（シリアライズ可）
@@ -161,14 +196,21 @@ export async function getApplicationById(id: string) {
       if (Object.keys(ocr as object).length === 0) return null;
       return ocr as Record<string, unknown>;
     })(),
-    // マスターの留意事項
-    masterDescription: item.documentRequirementId
-      ? (masterDescMap[item.documentRequirementId] ?? null)
+    // 注意事項（表示・印刷用の実効値）: 案件別の上書きがあればそれを優先し、
+    // 無ければ必要書類マスターの description（注意事項）を使う
+    masterDescription: item.descriptionOverride
+      ?? (item.documentRequirementId ? (masterDescMap[item.documentRequirementId] ?? null) : null),
+    // マスターの原本/写し区分（チェックリスト・書類一覧PDFのバッジ表示用）
+    masterOriginalOrCopy: item.documentRequirementId
+      ? (masterOriginalOrCopyMap[item.documentRequirementId] ?? null)
       : null,
-    // 並び順: マスターの sort_order を保持（ソートに使用）
-    masterSortOrder: item.documentRequirementId
-      ? (masterSortOrderMap[item.documentRequirementId] ?? 9999)
-      : 9999,
+    // 並び順: マスターの sort_order を保持（ソートに使用）。
+    // documentRequirementId でマスター行が解決できない場合も、書類名が現在有効な
+    // マスターと一致すればその並び順を採用する（テンプレート反映・自由記載追加でも
+    // マスターの並び順を遵守するためのフォールバック）。
+    masterSortOrder: (item.documentRequirementId ? masterSortOrderMap[item.documentRequirementId] : undefined)
+      ?? masterSortOrderByName[item.documentName]
+      ?? 9999,
     // Date オブジェクトは文字列に変換（RSC シリアライズ安全化）
     // Neon HTTP ドライバーが文字列で返す場合も対応
     submittedAt: item.submittedAt
@@ -411,7 +453,11 @@ export async function createApplication(data: {
   applicantId: string;
   organizationId?: string;
   applicationType: string;
-  visaType: string;
+  visaType?: string;
+  // 総合プラットフォーム化: 業務カテゴリと入管以外の独自項目。
+  // 省略時は入管業務(immigration)として扱う（既存フローと後方互換）。
+  businessCategory?: string;
+  customData?: Record<string, unknown> | null;
 }): Promise<{ success: boolean; error?: string; data?: { id: string } }> {
   try {
     const session = await auth();
@@ -419,6 +465,7 @@ export async function createApplication(data: {
     const tenantId = requireTenantId((session.user as any).tenantId);
 
     const caseNumber = `APP-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const businessCategory = data.businessCategory?.trim() || "immigration";
 
     // 初期ステータスは「①基本設定」(draft) から開始
     const [newApp] = await db
@@ -428,7 +475,9 @@ export async function createApplication(data: {
         applicantId: data.applicantId,
         organizationId: data.organizationId,
         applicationType: data.applicationType as any,
-        visaType: data.visaType as any,
+        visaType: (data.visaType ?? "") as any,
+        businessCategory,
+        customData: data.customData ?? null,
         caseNumber,
         status: "draft" as any,
       })
@@ -488,7 +537,11 @@ export async function updateApplicationStatus(
       newValue: status,
     });
 
+    // 事件簿との連動: 完了状態になったら完結日を自動反映（未作成なら何もしない）
+    await syncLedgerCompletion(applicationId, status);
+
     revalidatePath(`/applications/${applicationId}`);
+    revalidatePath("/ledger");
     return { success: true };
   } catch (err: any) {
     console.error("[updateApplicationStatus]", err);
@@ -588,6 +641,49 @@ export async function updateChecklistNotes(
     .where(eq(applicationDocumentChecklist.id, checklistItemId));
 
   revalidatePath("/applications");
+}
+
+/** 注意事項（案件別上書き）を更新する。空文字ならnullに戻し、マスターの注意事項に従う */
+export async function updateChecklistDescription(
+  checklistItemId: string,
+  description: string
+) {
+  const session = await auth();
+  if (!session?.user) throw new Error("認証が必要です");
+
+  await db
+    .update(applicationDocumentChecklist)
+    .set({
+      descriptionOverride: description.trim() || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(applicationDocumentChecklist.id, checklistItemId));
+
+  revalidatePath("/applications");
+}
+
+/** 書類の作成・取得の担当（申請人/受入企業/弊所/自由記載）を更新する */
+export async function updateChecklistPreparedBy(
+  checklistItemId: string,
+  preparedBy: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+
+    await db
+      .update(applicationDocumentChecklist)
+      .set({
+        preparedBy: preparedBy.trim() || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(applicationDocumentChecklist.id, checklistItemId));
+
+    revalidatePath("/applications");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "担当の更新に失敗しました" };
+  }
 }
 
 export async function toggleExpertCheckmark(
@@ -753,6 +849,8 @@ export async function addDocumentsToChecklist(
         documentName: m.documentName,
         isRequiredByExpert: true,
         status: "not_submitted" as const,
+        // マスターの「担当」設定を初期値としてコピー（チェックリスト側で個別変更可能）
+        preparedBy: m.preparedBy ?? null,
       }))
     );
 
@@ -760,6 +858,96 @@ export async function addDocumentsToChecklist(
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message ?? "追加に失敗しました" };
+  }
+}
+
+// ── テンプレート（必要書類マスターで保存した書類一式）をチェックリストへ一括反映 ──
+// 既にチェックリストに同名の書類がある場合はスキップし、テンプレートにしかない
+// 書類だけを新規追加する（重複追加を避ける）。
+export async function applyDocumentTemplateToChecklist(
+  applicationId: string,
+  templateId: string
+): Promise<{ success: boolean; error?: string; count?: number }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db
+      .select({ id: applications.id })
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    const [tpl] = await db
+      .select()
+      .from(documentRequirementTemplates)
+      .where(and(
+        eq(documentRequirementTemplates.id, templateId),
+        eq(documentRequirementTemplates.tenantId, tenantId),
+      ))
+      .limit(1);
+    if (!tpl) return { success: false, error: "テンプレートが見つかりません" };
+
+    const items = Array.isArray(tpl.items) ? tpl.items : [];
+    if (items.length === 0) return { success: false, error: "テンプレートに書類が含まれていません" };
+
+    const existing = await db
+      .select({ documentName: applicationDocumentChecklist.documentName })
+      .from(applicationDocumentChecklist)
+      .where(eq(applicationDocumentChecklist.applicationId, applicationId));
+    const existingNames = new Set(existing.map((e) => e.documentName));
+
+    const newItems = items.filter((it) => !existingNames.has(it.documentName));
+    if (newItems.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    // マスターと書類名で突き合わせ、一致すればdocumentRequirementIdを紐付ける
+    // （原本/写しバッジ表示や今後のマスター連携のため。一致しなくても新規行として追加する）
+    const masters = await db
+      .select({
+        id: documentRequirementMaster.id,
+        documentName: documentRequirementMaster.documentName,
+        preparedBy: documentRequirementMaster.preparedBy,
+        sortOrder: documentRequirementMaster.sortOrder,
+      })
+      .from(documentRequirementMaster)
+      .where(and(
+        eq(documentRequirementMaster.visaType, tpl.visaType),
+        eq(documentRequirementMaster.applicationType, tpl.applicationType),
+        eq(documentRequirementMaster.isActive, true),
+      ));
+    const masterByName = new Map(masters.map((m) => [m.documentName, m]));
+
+    // マスターの現在の並び順（テンプレート保存時点のsortOrderではなく、常に最新の
+    // マスター並び順を優先する）で挿入することで、同一sort_order・同一createdAt同士の
+    // タイブレークでもマスターの順番どおりに並ぶようにする
+    const sortedNewItems = [...newItems].sort((a, b) => {
+      const sa = masterByName.get(a.documentName)?.sortOrder ?? 9999;
+      const sb = masterByName.get(b.documentName)?.sortOrder ?? 9999;
+      return sa - sb;
+    });
+
+    await db.insert(applicationDocumentChecklist).values(
+      sortedNewItems.map((it) => {
+        const m = masterByName.get(it.documentName);
+        return {
+          applicationId,
+          documentRequirementId: m?.id ?? null,
+          documentName: it.documentName,
+          isRequiredByExpert: true,
+          status: "not_submitted" as const,
+          preparedBy: it.preparedBy ?? m?.preparedBy ?? null,
+        };
+      })
+    );
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true, count: newItems.length };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "テンプレートの反映に失敗しました" };
   }
 }
 
@@ -783,6 +971,45 @@ export async function removeDocumentFromChecklist(
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message ?? "削除に失敗しました" };
+  }
+}
+
+// ── チェックリストから書類を一括削除 ─────────────────────────────────────────
+export async function removeDocumentsFromChecklist(
+  applicationId: string,
+  checklistItemIds: string[]
+): Promise<{ success: boolean; error?: string; count?: number }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+    if (checklistItemIds.length === 0) return { success: true, count: 0 };
+
+    const [app] = await db
+      .select({ id: applications.id })
+      .from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+      .limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    // 指定IDのうち、この案件に属するものだけを対象にする（他案件のIDが混入しても無視）
+    const targets = await db
+      .select({ id: applicationDocumentChecklist.id })
+      .from(applicationDocumentChecklist)
+      .where(and(
+        eq(applicationDocumentChecklist.applicationId, applicationId),
+        inArray(applicationDocumentChecklist.id, checklistItemIds),
+      ));
+    if (targets.length === 0) return { success: true, count: 0 };
+
+    await db.delete(applicationDocumentChecklist).where(
+      inArray(applicationDocumentChecklist.id, targets.map((t) => t.id))
+    );
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true, count: targets.length };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "一括削除に失敗しました" };
   }
 }
 
@@ -939,6 +1166,7 @@ export async function duplicateChecklistItem(
         documentName: original.documentName,
         isRequiredByExpert: original.isRequiredByExpert,
         status: "not_submitted",
+        preparedBy: original.preparedBy ?? null,
       })
       .returning({ id: applicationDocumentChecklist.id });
 
@@ -952,74 +1180,6 @@ export async function duplicateChecklistItem(
         isRequiredByExpert: original.isRequiredByExpert,
       },
     };
-  } catch (err: any) {
-    return { success: false, error: err.message ?? "追加に失敗しました" };
-  }
-}
-
-// ── 既存申請に必須書類を追加 ───────────────────────────────────────────────────
-export async function addRequiredDocumentsToChecklist(
-  applicationId: string
-): Promise<{ success: boolean; error?: string; count?: number }> {
-  try {
-    const session = await auth();
-    if (!session?.user) return { success: false, error: "認証が必要です" };
-    const tenantId = requireTenantId((session.user as any).tenantId);
-
-    const [app] = await db
-      .select({ id: applications.id, visaType: applications.visaType, applicationType: applications.applicationType })
-      .from(applications)
-      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
-      .limit(1);
-    if (!app) return { success: false, error: "申請案件が見つかりません" };
-
-    // 必須書類を取得（common + visaType固有、all + applicationType固有）
-    const vtStr = String(app.visaType);
-    const atStr = String(app.applicationType);
-    const requiredDocs = await db
-      .select()
-      .from(documentRequirementMaster)
-      .where(
-        and(
-          or(
-            eq(documentRequirementMaster.visaType, vtStr),
-            eq(documentRequirementMaster.visaType, "common")
-          ),
-          or(
-            eq(documentRequirementMaster.applicationType, atStr),
-            eq(documentRequirementMaster.applicationType, "all")
-          ),
-          eq(documentRequirementMaster.isAlwaysRequired, true),
-          eq(documentRequirementMaster.isActive, true)
-        )
-      )
-      .orderBy(documentRequirementMaster.sortOrder);
-    console.log("[addRequired] requiredDocs count:", requiredDocs.length, "visaType:", vtStr, "applicationType:", atStr);
-
-    // 既にチェックリストにあるものを除外
-    const existing = await db
-      .select({ documentRequirementId: applicationDocumentChecklist.documentRequirementId })
-      .from(applicationDocumentChecklist)
-      .where(eq(applicationDocumentChecklist.applicationId, applicationId));
-    const existingIds = new Set(existing.map((e) => e.documentRequirementId).filter(Boolean));
-
-    const newDocs = requiredDocs.filter((d) => !existingIds.has(d.id));
-    if (newDocs.length === 0) {
-      return { success: true, count: 0 };
-    }
-
-    await db.insert(applicationDocumentChecklist).values(
-      newDocs.map((doc) => ({
-        applicationId,
-        documentRequirementId: doc.id,
-        documentName: doc.documentName,
-        isRequiredByExpert: true,
-        status: "not_submitted" as const,
-      }))
-    );
-
-    revalidatePath(`/applications/${applicationId}`);
-    return { success: true, count: newDocs.length };
   } catch (err: any) {
     return { success: false, error: err.message ?? "追加に失敗しました" };
   }
@@ -1198,10 +1358,149 @@ export async function saveApplicationFormData(
       .set({ formData: { ...formData, lastUpdated: new Date().toISOString() }, updatedAt: new Date() })
       .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
 
+    // ── 学歴・職歴を申請人マスターへ同期 ──────────────────────────────────
+    // 申請書で入力した最終学歴・職歴は申請人本人の属性のため、マスターの
+    // educationHistory / workHistory にも保存し、次回以降の申請案件（新規作成時の
+    // 初期値）で使い回せるようにする。値が入力されている場合のみ上書きする。
+    try {
+      const [appRow] = await db
+        .select({ applicantId: applications.applicantId })
+        .from(applications)
+        .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)))
+        .limit(1);
+
+      if (appRow?.applicantId) {
+        const EDUCATION_KEYS = [
+          "educationCountry", "educationDegree", "educationSchoolName", "educationGraduationDate",
+          "majorCategory", "majorCategoryOther", "itQualificationExists", "itQualificationName",
+        ] as const;
+        const educationHistory: Record<string, string> = {};
+        for (const k of EDUCATION_KEYS) {
+          const v = formData[k];
+          if (typeof v === "string" && v.trim()) educationHistory[k] = v;
+        }
+        const workHistory = Array.isArray(formData.workHistory)
+          ? formData.workHistory.filter(
+              (w: any) => w && (w.joinDate || w.leaveDate || w.employer)
+            )
+          : [];
+
+        const masterUpdate: Record<string, unknown> = {};
+        if (Object.keys(educationHistory).length > 0) masterUpdate.educationHistory = educationHistory;
+        if (workHistory.length > 0) masterUpdate.workHistory = workHistory;
+
+        if (Object.keys(masterUpdate).length > 0) {
+          await db
+            .update(applicantMaster)
+            .set({ ...masterUpdate, updatedAt: new Date() })
+            .where(and(eq(applicantMaster.id, appRow.applicantId), eq(applicantMaster.tenantId, tenantId)));
+        }
+      }
+    } catch (syncErr) {
+      // マスター同期の失敗で申請書保存自体を失敗にしない（保存済みのため成功として返す）
+      console.error("[saveApplicationFormData] 学歴・職歴のマスター同期に失敗:", syncErr);
+    }
+
     revalidatePath(`/applications/${applicationId}`);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message ?? "保存に失敗しました" };
+  }
+}
+
+// ── 一時停止・キャンセル（取下げ）・再開 ──────────────────────────────────────
+// on_hold: お客様都合等での中断（再開可能） / withdrawn: 申請のキャンセル（取下げ）。
+// どちらも再開時に元のステップへ戻れるよう、停止時点のステータスを draftData._suspend に退避する。
+export async function suspendApplication(
+  applicationId: string,
+  mode: "on_hold" | "withdrawn"
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db.select().from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId))).limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+    if (app.status === mode) return { success: true };
+
+    const existing = (app.draftData as Record<string, any>) ?? {};
+    await db.update(applications)
+      .set({
+        status: mode,
+        draftData: {
+          ...existing,
+          _suspend: { resumeTo: app.status, mode, at: new Date().toISOString() },
+        },
+        updatedAt: new Date(),
+      })
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
+
+    await db.insert(auditLog).values({
+      tenantId,
+      applicationId,
+      userId: session.user.id,
+      action: "status_change",
+      entityType: "application",
+      entityId: applicationId,
+      fieldKey: "status",
+      oldValue: app.status,
+      newValue: mode,
+    });
+
+    revalidatePath(`/applications/${applicationId}`);
+    revalidatePath("/applications");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "ステータスの変更に失敗しました" };
+  }
+}
+
+/** 一時停止・キャンセルから再開する（停止時点のステップに戻す。不明な場合は①基本設定へ） */
+export async function resumeApplication(
+  applicationId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db.select().from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId))).limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    const existing = (app.draftData as Record<string, any>) ?? {};
+    const resumeToRaw = existing._suspend?.resumeTo as string | undefined;
+    // 退避先が通常のワークフローステータスでない場合は draft に戻す（安全側）
+    const WORKFLOW_STATUSES = [
+      "draft", "documents_requested", "documents_collecting", "ocr_processing",
+      "questionnaire_sent", "under_review", "submitted", "applying", "completed",
+    ];
+    const resumeTo = resumeToRaw && WORKFLOW_STATUSES.includes(resumeToRaw) ? resumeToRaw : "draft";
+
+    const { _suspend, ...rest } = existing;
+    await db.update(applications)
+      .set({ status: resumeTo as any, draftData: rest, updatedAt: new Date() })
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
+
+    await db.insert(auditLog).values({
+      tenantId,
+      applicationId,
+      userId: session.user.id,
+      action: "status_change",
+      entityType: "application",
+      entityId: applicationId,
+      fieldKey: "status",
+      oldValue: app.status,
+      newValue: resumeTo,
+    });
+
+    revalidatePath(`/applications/${applicationId}`);
+    revalidatePath("/applications");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "再開に失敗しました" };
   }
 }
 
@@ -1419,6 +1718,8 @@ notes(その他重要事項)
       familyNameJa:             applicant?.familyNameJa ?? existingForm.familyNameJa ?? '',
       givenNameJa:              applicant?.givenNameJa ?? existingForm.givenNameJa ?? '',
       sex:                      (applicant?.gender === 'M' ? '男' : applicant?.gender === 'F' ? '女' : null) ?? existingForm.sex ?? '',
+      placeOfBirth:             (applicant as any)?.placeOfBirth ?? existingForm.placeOfBirth ?? '',
+      homeTownCity:             (applicant as any)?.homeCountryAddress ?? existingForm.homeTownCity ?? '',
       postalCodeInJapan:        (applicant as any)?.postalCode ?? existingForm.postalCodeInJapan ?? '',
       prefectureInJapan:        (applicant as any)?.japanPrefecture ?? existingForm.prefectureInJapan ?? '',
       cityInJapan:              (applicant as any)?.japanCity ?? existingForm.cityInJapan ?? '',
@@ -1899,7 +2200,7 @@ export async function saveApplicationDraft(
 export async function saveSubmissionInfo(
   applicationId: string,
   data: { applicationDate: string; applicationNumber: string }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; advanced?: boolean }> {
   try {
     const session = await auth();
     if (!session?.user) return { success: false, error: "認証が必要です" };
@@ -1920,12 +2221,34 @@ export async function saveSubmissionInfo(
       updateData.caseNumber = data.applicationNumber;
     }
 
+    // 申請日と申請番号が両方入力され、かつ現在が「⑦署名・提出（submitted）」の場合、
+    // 「⑧申請中（applying）」へ自動的にステータスを進める。
+    const bothFilled = !!data.applicationDate && !!data.applicationNumber;
+    const shouldAdvance = bothFilled && app.status === "submitted";
+    if (shouldAdvance) {
+      updateData.status = "applying";
+    }
+
     await db.update(applications)
       .set(updateData)
       .where(eq(applications.id, applicationId));
 
+    if (shouldAdvance) {
+      await db.insert(auditLog).values({
+        tenantId,
+        applicationId,
+        userId: session.user.id,
+        action: "status_change",
+        entityType: "application",
+        entityId: applicationId,
+        fieldKey: "status",
+        oldValue: app.status,
+        newValue: "applying",
+      });
+    }
+
     revalidatePath(`/applications/${applicationId}`);
-    return { success: true };
+    return { success: true, advanced: shouldAdvance };
   } catch (err: any) {
     return { success: false, error: err.message ?? "保存に失敗しました" };
   }
@@ -2039,6 +2362,12 @@ export async function saveAzukariData(
     depositedAt?: string;
     /** 返却日（YYYY-MM-DD） */
     returnedAt?: string;
+    /** 案件別にアップロードした在留カード表面画像URL（申請人マスターより優先） */
+    residenceCardFrontUrl?: string | null;
+    /** 案件別にアップロードした在留カード裏面画像URL（申請人マスターより優先） */
+    residenceCardBackUrl?: string | null;
+    /** 案件別にアップロードしたパスポート画像URL（申請人マスターより優先） */
+    passportUrl?: string | null;
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {

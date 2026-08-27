@@ -26,9 +26,12 @@ import Link from "next/link";
 import { WorkflowStepper } from "@/components/applications/workflow-stepper";
 import { DocumentChecklist } from "@/components/applications/document-checklist";
 import { DocumentSelector } from "@/components/applications/document-selector";
+import { ChecklistTemplatePanel } from "@/components/applications/checklist-template-panel";
+import { DocumentPrintButtons } from "@/components/applications/document-print-buttons";
 import { ApproveButton } from "@/components/applications/approve-button";
 import { QuestionnairePanel } from "@/components/applications/questionnaire-panel";
 import { getDocumentRequirements } from "@/actions/applications";
+import { listDocumentTemplates } from "@/actions/document-master";
 import { DeleteApplicationButton } from "./delete-application-button";
 import { FileDown, FolderArchive, Zap } from "lucide-react";
 import { MergePdfButton } from "@/components/applications/merge-pdf-button";
@@ -38,6 +41,9 @@ import { SubmissionInfoPanel } from "@/components/applications/submission-info-p
 import { PermitResultPanel } from "@/components/applications/permit-result-panel";
 import { SignedDocumentsPanel } from "@/components/applications/signed-documents-panel";
 import { CaseNotesPanel } from "@/components/applications/case-notes-panel";
+import { ConsultationLogsPanel } from "@/components/applications/consultation-logs-panel";
+import { DispatchRecordsPanel } from "@/components/applications/dispatch-records-panel";
+import { LedgerInfoPanel } from "@/components/applications/ledger-info-panel";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { NoufushoPanel } from "@/components/applications/noufusho-panel";
 import { AzukariPanel } from "@/components/applications/azukari-panel";
@@ -48,7 +54,7 @@ import { buildEffectiveFormData } from "@/lib/effective-form-data";
 import { computeInterviewQuestions } from "@/lib/interview-diff";
 import { toFormType } from "@/lib/questionnaire-questions";
 
-// 8ステップのワークフロー
+// 9ステップのワークフロー
 const WORKFLOW_STEPS = [
   { key: "draft",                label: "①基本設定" },
   { key: "documents_requested",  label: "②書類リスト" },
@@ -57,7 +63,8 @@ const WORKFLOW_STEPS = [
   { key: "questionnaire_sent",   label: "⑤質問書聴取" },
   { key: "under_review",         label: "⑥申請書反映" },
   { key: "submitted",            label: "⑦署名・提出" },
-  { key: "completed",            label: "⑧許可・完了" },
+  { key: "applying",             label: "⑧申請中" },
+  { key: "completed",            label: "⑨許可・完了" },
 ];
 
 export default async function ApplicationDetailPage({
@@ -138,6 +145,9 @@ export default async function ApplicationDetailPage({
     sortOrder: number;
     visaType: string;
     applicationType: string;
+    /** 必要書類マスターで設定した担当・原本/写し（セレクタでの参考表示用） */
+    preparedBy: string | null;
+    originalOrCopy: string | null;
   };
   let masterDocuments: SafeMasterDoc[] = [];
   try {
@@ -156,9 +166,27 @@ export default async function ApplicationDetailPage({
       isAlwaysRequired: r.isAlwaysRequired,
       conditions:       (r.conditions ?? null) as Record<string, unknown> | null,
       sortOrder:        r.sortOrder,
+      preparedBy:       (r as any).preparedBy ?? null,
+      originalOrCopy:   (r as any).originalOrCopy ?? null,
     }));
   } catch (e) {
     console.error("[ApplicationDetailPage] getDocumentRequirements failed:", e);
+  }
+
+  // この案件の在留資格・申請種別に合わせて保存されている必要書類テンプレート
+  let checklistTemplates: { id: string; name: string; note: string | null; itemCount: number }[] = [];
+  try {
+    const tplResult = await listDocumentTemplates(application.visaType, application.applicationType);
+    if (tplResult.success && tplResult.rows) {
+      checklistTemplates = tplResult.rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        note: r.note,
+        itemCount: r.itemCount,
+      }));
+    }
+  } catch (e) {
+    console.error("[ApplicationDetailPage] listDocumentTemplates failed:", e);
   }
 
   // 申請人マスターのアップロード書類を取得（預証用）
@@ -468,6 +496,33 @@ export default async function ApplicationDetailPage({
         <CaseNotesPanel applicationId={application.id} />
       </CollapsibleSection>
 
+      {/* 1.5 打合せ・相談履歴（面談/電話/メール/LINE のタイムライン） */}
+      <CollapsibleSection
+        title="打合せ・相談履歴"
+        defaultOpen={false}
+        accentClass="bg-blue-500"
+      >
+        <ConsultationLogsPanel applicationId={application.id} />
+      </CollapsibleSection>
+
+      {/* 1.6 郵送・発送記録（追跡番号→日本郵便追跡リンク） */}
+      <CollapsibleSection
+        title="郵送・発送記録"
+        defaultOpen={false}
+        accentClass="bg-teal-500"
+      >
+        <DispatchRecordsPanel applicationId={application.id} />
+      </CollapsibleSection>
+
+      {/* 1.7 事件簿情報（行政書士法第11条: 受任日・報酬額・完結日） */}
+      <CollapsibleSection
+        title="事件簿情報"
+        defaultOpen={false}
+        accentClass="bg-indigo-500"
+      >
+        <LedgerInfoPanel applicationId={application.id} />
+      </CollapsibleSection>
+
       {/* 2. 必要書類チェックリスト（申請書作成用添付書類のアップロードを統合） */}
       <CollapsibleSection
         title="必要書類チェックリスト"
@@ -483,8 +538,11 @@ export default async function ApplicationDetailPage({
             isRequiredByExpert: c.isRequiredByExpert,
             status: c.status,
             expertNotes: c.expertNotes,
+            preparedBy: (c as any).preparedBy ?? null,
+            masterOriginalOrCopy: (c as any).masterOriginalOrCopy ?? null,
             ocrExtractedData: c.ocrExtractedData as Record<string, any> | null,
             masterDescription: c.masterDescription,
+            descriptionOverride: (c as any).descriptionOverride ?? null,
             documentRequirementId: c.documentRequirementId,
             masterSortOrder: c.masterSortOrder,
             createdAt: c.createdAt,
@@ -508,11 +566,22 @@ export default async function ApplicationDetailPage({
             isRequiredByExpert: c.isRequiredByExpert,
             status: c.status,
           }))}
+          templates={checklistTemplates}
         />
+        <ChecklistTemplatePanel applicationId={application.id} />
+
+        {/* パスポート・在留カードのPDF印刷（申請人マスターの画像を使用） */}
+        <div className="mt-4 border border-gray-100 rounded-xl p-3 bg-gray-50/40">
+          <p className="text-sm font-semibold text-gray-700 mb-1">パスポート・在留カードの印刷</p>
+          <p className="text-xs text-gray-500 mb-2">
+            パスポート／在留カード（表・裏）をPDFで印刷します。パスポートと在留カード（裏表）は別々のページに出力されます。
+          </p>
+          <DocumentPrintButtons applicantId={application.applicantId} />
+        </div>
       </CollapsibleSection>
 
       {/* 3. 質問書・顧客聴取（ステップ5以降） */}
-      {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted" || application.status === "completed") && (
+      {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted" || application.status === "applying" || application.status === "completed") && (
         <CollapsibleSection
           title="質問書・顧客聴取"
           badge={interviewQuestions.length > 0 ? `${interviewQuestions.length}件` : undefined}
@@ -528,7 +597,7 @@ export default async function ApplicationDetailPage({
       )}
 
       {/* 4. 署名済み申請書（⑦以降・理由書等の提出書類アップロードを統合） */}
-      {(application.status === "submitted" || application.status === "completed") && (
+      {(application.status === "submitted" || application.status === "applying" || application.status === "completed") && (
         <CollapsibleSection
           title="署名済み申請書"
           badge={((application.draftData as any)?._signedDocuments?.length ?? 0) > 0
@@ -554,7 +623,7 @@ export default async function ApplicationDetailPage({
       )}
 
       {/* 申請日・申請番号の記録（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
+      {(application.status === "submitted" || application.status === "applying" || application.status === "completed") && (
         <CollapsibleSection
           title="申請日・申請番号の記録"
           defaultOpen={!((application.draftData as any)?._submission?.applicationDate)}
@@ -577,7 +646,7 @@ export default async function ApplicationDetailPage({
       </CollapsibleSection>
 
       {/* 6. パスポート・在留カード預証（submitted 以降・変更/更新申請のみ） */}
-      {(application.status === "submitted" || application.status === "completed") &&
+      {(application.status === "submitted" || application.status === "applying" || application.status === "completed") &&
         (application.applicationType === "change" || application.applicationType === "renewal") && (
         <CollapsibleSection
           title="パスポート・在留カード預証"
@@ -600,7 +669,7 @@ export default async function ApplicationDetailPage({
       )}
 
       {/* 7. 納付書作成（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
+      {(application.status === "submitted" || application.status === "applying" || application.status === "completed") && (
         <CollapsibleSection
           title="納付書作成"
           defaultOpen={false}
@@ -619,7 +688,7 @@ export default async function ApplicationDetailPage({
       )}
 
       {/* 8. 許可・完了処理（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
+      {(application.status === "submitted" || application.status === "applying" || application.status === "completed") && (
         <CollapsibleSection
           title="許可・完了処理"
           defaultOpen={!((application.draftData as any)?._result?.completedAt)}

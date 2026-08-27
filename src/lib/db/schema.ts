@@ -171,6 +171,11 @@ export const applications = pgTable("applications", {
   supporterId: uuid("supporter_id").references(() => applicantMaster.id),
   applicationType: applicationTypeEnum("application_type").notNull(),
   visaType: text("visa_type").notNull(),
+  // 業務カテゴリ（総合プラットフォーム化）: immigration(入管) / transportation(運送業) /
+  // construction(建設業) / other。既存案件は入管業務のため既定 'immigration'。
+  businessCategory: text("business_category").notNull().default("immigration"),
+  // 入管以外（運送業等）の独自項目を保持する汎用JSON（draftData と同様の役割）。
+  customData: jsonb("custom_data"),
   status: applicationStatusEnum("status").notNull().default("draft"),
   caseNumber: text("case_number").unique(),
   expertUserId: uuid("expert_user_id").references(() => users.id),
@@ -186,6 +191,52 @@ export const applications = pgTable("applications", {
   notes: text("notes"),
   // 質問書・顧客聴取で手動除外した質問ID一覧（form:xxx / doc:xxx:xxx / ai:xxx 形式）
   interviewExcludedFields: jsonb("interview_excluded_fields").$type<string[]>().default([]).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── Consultation logs（打合せ・相談履歴） ────────────────────────────────────
+// 面談/電話/メール/LINE 等の応対記録。案件(applications)単位で時系列に蓄積する。
+export const consultationLogs = pgTable("consultation_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  applicationId: uuid("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),          // 面談 / 電話 / メール / LINE
+  summary: text("summary"),
+  details: text("details"),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─── Dispatch records（郵送・発送記録） ────────────────────────────────────────
+// レターパック/書留等での発送記録。追跡番号があれば日本郵便の追跡URLへ導線を出す。
+export const dispatchRecords = pgTable("dispatch_records", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  applicationId: uuid("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
+  dispatchDate: date("dispatch_date"),
+  destination: text("destination"),
+  method: text("method"),                // レターパック / 書留 / 普通郵便 等
+  trackingNumber: text("tracking_number"),
+  contents: text("contents"),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─── Legal case ledger（行政書士法第11条 事件簿） ──────────────────────────────
+// applications と 1対1（application_id は unique）。依頼者は個人(applicant)または
+// 法人(organization)のいずれかを nullable FK で保持する（二重マスター設計に適合）。
+export const legalCaseLedger = pgTable("legal_case_ledger", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  applicationId: uuid("application_id").notNull().unique().references(() => applications.id, { onDelete: "cascade" }),
+  caseNumber: text("case_number"),                                         // 事件番号
+  applicantId: uuid("applicant_id").references(() => applicantMaster.id),   // 依頼者(個人)
+  organizationId: uuid("organization_id").references(() => organizationMaster.id), // 依頼者(法人)
+  acceptedAt: date("accepted_at"),        // 受任日
+  completedAt: date("completed_at"),      // 完結日
+  feeAmount: integer("fee_amount"),       // 報酬額（円）
+  status: text("status"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

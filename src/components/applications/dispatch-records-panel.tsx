@@ -5,10 +5,9 @@ import {
   listDispatchRecords,
   addDispatchRecord,
   deleteDispatchRecord,
-  japanPostTrackingUrl,
-  DISPATCH_METHODS,
   type DispatchRecordRow,
 } from "@/actions/dispatch-records";
+import { japanPostTrackingUrl, DISPATCH_METHODS } from "@/lib/case-records-meta";
 import { Send, Plus, Trash2, Loader2, Check, X, AlertCircle, Calendar, MapPin, Package, ExternalLink } from "lucide-react";
 
 const today = () => new Date().toISOString().slice(0, 10);

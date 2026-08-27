@@ -11,8 +11,6 @@ import { applications, consultationLogs } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-export const CONSULTATION_TYPES = ["面談", "電話", "メール", "LINE", "その他"] as const;
-
 export interface ConsultationLogRow {
   id: string;
   type: string;

@@ -5,9 +5,9 @@ import {
   listConsultationLogs,
   addConsultationLog,
   deleteConsultationLog,
-  CONSULTATION_TYPES,
   type ConsultationLogRow,
 } from "@/actions/consultation-logs";
+import { CONSULTATION_TYPES } from "@/lib/case-records-meta";
 import { MessagesSquare, Plus, Trash2, Loader2, Check, X, AlertCircle, Phone, Mail, Users, MessageCircle } from "lucide-react";
 
 const TYPE_STYLE: Record<string, { icon: typeof Phone; color: string; bg: string }> = {

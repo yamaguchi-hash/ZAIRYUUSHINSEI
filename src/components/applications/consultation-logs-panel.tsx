@@ -108,16 +108,16 @@ export function ConsultationLogsPanel({ applicationId }: { applicationId: string
             <input
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
-              placeholder="要約（例: 追加書類の依頼、方針の確認）"
+              placeholder="件名・要約（例: 追加書類の依頼、方針の確認）"
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-400"
               autoFocus
             />
             <textarea
               value={details}
               onChange={(e) => setDetails(e.target.value)}
-              rows={4}
-              placeholder="詳細"
-              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-400"
+              rows={10}
+              placeholder="本文・詳細（メール本文やメッセージ全文をそのまま貼り付けできます）"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 leading-relaxed resize-y min-h-[10rem] focus:outline-none focus:border-blue-400 whitespace-pre-wrap"
             />
             <div className="flex gap-2">
               <button

@@ -301,7 +301,7 @@ export function AttachmentUploadPanel({
   applicationId: string;
   initialAttachments: Attachment[];
   /** 表示するアップロード枠のグループ（省略時は全グループ） */
-  sections?: ("applicant" | "organization" | "output")[];
+  sections?: ("applicant" | "organization" | "output" | "case_file")[];
   /** 説明文・件数表示・提出用Zipダウンロードボタンを表示するか */
   showHeader?: boolean;
 }) {
@@ -318,7 +318,8 @@ export function AttachmentUploadPanel({
   const applicantTypes = sections.includes("applicant") ? ATTACHMENT_TYPES.filter(t => t.side === "applicant") : [];
   const orgTypes = sections.includes("organization") ? ATTACHMENT_TYPES.filter(t => t.side === "organization") : [];
   const outputTypes = sections.includes("output") ? ATTACHMENT_TYPES.filter(t => t.side === "output") : [];
-  const visibleKeys = new Set([...applicantTypes, ...orgTypes, ...outputTypes].map(t => t.key));
+  const caseFileTypes = sections.includes("case_file") ? ATTACHMENT_TYPES.filter(t => t.side === "case_file") : [];
+  const visibleKeys = new Set([...applicantTypes, ...orgTypes, ...outputTypes, ...caseFileTypes].map(t => t.key));
   const totalUploaded = attachments.filter(a => visibleKeys.has(a.documentType)).length;
 
   return (
@@ -386,6 +387,24 @@ export function AttachmentUploadPanel({
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {outputTypes.map(t => (
+              <TypeSlot
+                key={t.key}
+                typeDef={t}
+                files={byType(t.key)}
+                applicationId={applicationId}
+                onUploaded={handleUploaded}
+                onDeleted={handleDeleted}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 案件ファイル（提出控え・預かり資料） */}
+      {caseFileTypes.length > 0 && (
+        <div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {caseFileTypes.map(t => (
               <TypeSlot
                 key={t.key}
                 typeDef={t}

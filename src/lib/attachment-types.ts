@@ -15,8 +15,8 @@ export interface AttachmentTypeDef {
   hint?: string;
   /** AI抽出の対象になるか（申請書フィールドへのマッピングに使用） */
   aiExtractable: boolean;
-  /** 申請人側・所属機関側・提出書類（成果物）のいずれか */
-  side: "applicant" | "organization" | "output";
+  /** 申請人側・所属機関側・提出書類（成果物）・案件ファイル（控え/預かり）のいずれか */
+  side: "applicant" | "organization" | "output" | "case_file";
 }
 
 export const ATTACHMENT_TYPES: AttachmentTypeDef[] = [
@@ -129,6 +129,22 @@ export const ATTACHMENT_TYPES: AttachmentTypeDef[] = [
     hint: "作成・署名済みの理由書（PDF）を申請案件に紐づけて保管します",
     aiExtractable: false,
     side: "output",
+  },
+
+  // ── 案件ファイル（提出控え・預かり資料）────────────────────────────────────
+  {
+    key: "submitted_copy",
+    label: "提出書類控え",
+    hint: "入管等へ提出した書類の控え（PDF・画像）を保管します",
+    aiExtractable: false,
+    side: "case_file",
+  },
+  {
+    key: "custody_material",
+    label: "預かり資料",
+    hint: "依頼者からお預かりした資料（PDF・画像）を保管します",
+    aiExtractable: false,
+    side: "case_file",
   },
 ];
 

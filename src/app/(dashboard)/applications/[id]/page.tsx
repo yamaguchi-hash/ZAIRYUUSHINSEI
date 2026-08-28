@@ -523,6 +523,23 @@ export default async function ApplicationDetailPage({
         <LedgerInfoPanel applicationId={application.id} />
       </CollapsibleSection>
 
+      {/* 1.8 提出書類控え・預かり資料（ドラッグ&ドロップでBlob保管） */}
+      <CollapsibleSection
+        title="提出書類控え・預かり資料"
+        defaultOpen={false}
+        accentClass="bg-cyan-500"
+      >
+        <p className="text-xs text-gray-500 mb-3 px-1">
+          入管等へ提出した書類の控えや、依頼者からお預かりした資料（PDF・画像）をドラッグ＆ドロップで保管します。
+        </p>
+        <AttachmentUploadPanel
+          applicationId={application.id}
+          initialAttachments={attachmentsList}
+          sections={["case_file"]}
+          showHeader={false}
+        />
+      </CollapsibleSection>
+
       {/* 2. 必要書類チェックリスト（申請書作成用添付書類のアップロードを統合） */}
       <CollapsibleSection
         title="必要書類チェックリスト"

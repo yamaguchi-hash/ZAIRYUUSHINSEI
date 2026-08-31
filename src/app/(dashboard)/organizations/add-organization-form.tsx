@@ -21,6 +21,8 @@ type OrgForm = {
   capital: string;
   annualSales: string;
   employeeCount: string;
+  foreignEmployeeCount: string;
+  technicalInternCount: string;
   industry: string;
   employmentInsuranceNo: string;
   laborInsuranceNo: string;
@@ -32,7 +34,8 @@ type OrgForm = {
 const EMPTY_FORM: OrgForm = {
   nameJa: "", nameEn: "", corporateNumber: "", postalCode: "",
   prefecture: "", city: "", addressLine: "", phone: "", fax: "", email: "",
-  category: "", capital: "", annualSales: "", employeeCount: "", industry: "",
+  category: "", capital: "", annualSales: "", employeeCount: "",
+  foreignEmployeeCount: "", technicalInternCount: "", industry: "",
   employmentInsuranceNo: "", laborInsuranceNo: "",
   socialInsuranceSymbol: "",
   representativeTitle: "", representativeName: "",
@@ -54,6 +57,8 @@ type EditingOrg = {
   capital?: number | null;
   annualSales?: number | null;
   employeeCount?: number | null;
+  foreignEmployeeCount?: number | null;
+  technicalInternCount?: number | null;
   industry?: string;
   employmentInsuranceNo?: string;
   laborInsuranceNo?: string;
@@ -90,6 +95,8 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
       capital: editingOrg.capital != null ? String(editingOrg.capital) : "",
       annualSales: editingOrg.annualSales != null ? String(editingOrg.annualSales) : "",
       employeeCount: editingOrg.employeeCount != null ? String(editingOrg.employeeCount) : "",
+      foreignEmployeeCount: editingOrg.foreignEmployeeCount != null ? String(editingOrg.foreignEmployeeCount) : "",
+      technicalInternCount: editingOrg.technicalInternCount != null ? String(editingOrg.technicalInternCount) : "",
       industry: editingOrg.industry ?? "",
       employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? "",
       laborInsuranceNo: editingOrg.laborInsuranceNo ?? "",
@@ -114,6 +121,8 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
           capital:       form.capital       ? parseFloat(form.capital)       : undefined,
           annualSales:   form.annualSales   ? parseFloat(form.annualSales)   : undefined,
           employeeCount: form.employeeCount ? parseInt(form.employeeCount)   : undefined,
+          foreignEmployeeCount: form.foreignEmployeeCount ? parseInt(form.foreignEmployeeCount) : undefined,
+          technicalInternCount: form.technicalInternCount ? parseInt(form.technicalInternCount) : undefined,
         };
         if (isEdit && editingOrg) {
           await updateOrganization(editingOrg.id, payload);
@@ -252,8 +261,8 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                  常勤職員数（名）
-                  <span className="ml-1 text-amber-600 font-normal">※ 要更新</span>
+                  従業員数（名）
+                  <span className="ml-1 text-gray-400 font-normal">常勤職員数</span>
                 </label>
                 <input
                   name="employeeCount"
@@ -261,6 +270,32 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
                   value={form.employeeCount}
                   onChange={handleChange}
                   placeholder="例：50"
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  うち外国人従業員数（名）
+                </label>
+                <input
+                  name="foreignEmployeeCount"
+                  type="number"
+                  value={form.foreignEmployeeCount}
+                  onChange={handleChange}
+                  placeholder="例：10"
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  うち技能実習生数（名）
+                </label>
+                <input
+                  name="technicalInternCount"
+                  type="number"
+                  value={form.technicalInternCount}
+                  onChange={handleChange}
+                  placeholder="例：5"
                   className="input-field"
                 />
               </div>

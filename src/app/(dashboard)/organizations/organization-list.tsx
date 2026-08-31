@@ -23,6 +23,8 @@ type Org = {
   capital: number | null;
   annualSales: number | null;
   employeeCount: number | null;
+  foreignEmployeeCount: number | null;
+  technicalInternCount: number | null;
   industry: string | null;
   employmentInsuranceNo: string | null;
   laborInsuranceNo: string | null;
@@ -132,6 +134,8 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
             capital: editingOrg.capital,
             annualSales: editingOrg.annualSales,
             employeeCount: editingOrg.employeeCount,
+            foreignEmployeeCount: editingOrg.foreignEmployeeCount,
+            technicalInternCount: editingOrg.technicalInternCount,
             industry: editingOrg.industry ?? undefined,
             employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? undefined,
             laborInsuranceNo: editingOrg.laborInsuranceNo ?? undefined,
@@ -219,7 +223,7 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                       </div>
 
                       {/* 財務・規模情報 */}
-                      {(org.capital != null || org.annualSales != null || org.employeeCount != null) && (
+                      {(org.capital != null || org.annualSales != null || org.employeeCount != null || org.foreignEmployeeCount != null || org.technicalInternCount != null) && (
                         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
                           <TrendingUp className="w-2.5 h-2.5 mt-0.5 flex-shrink-0 text-amber-500" />
                           {org.capital != null && (
@@ -229,7 +233,13 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                             <span>年間売上: <span className="font-medium">{org.annualSales.toLocaleString()}円</span></span>
                           )}
                           {org.employeeCount != null && (
-                            <span>常勤: <span className="font-medium">{org.employeeCount}名</span></span>
+                            <span>従業員: <span className="font-medium">{org.employeeCount}名</span></span>
+                          )}
+                          {org.foreignEmployeeCount != null && (
+                            <span>うち外国人: <span className="font-medium">{org.foreignEmployeeCount}名</span></span>
+                          )}
+                          {org.technicalInternCount != null && (
+                            <span>うち技能実習生: <span className="font-medium">{org.technicalInternCount}名</span></span>
                           )}
                         </div>
                       )}

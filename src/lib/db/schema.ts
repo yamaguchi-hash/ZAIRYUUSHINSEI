@@ -84,7 +84,9 @@ export const organizationMaster = pgTable("organization_master", {
   fax: text("fax"),                      // FAX番号
   capital: real("capital"),              // 資本金（円）
   annualSales: real("annual_sales"),     // 年間売上金額（円）
-  employeeCount: integer("employee_count"), // 常勤職員数
+  employeeCount: integer("employee_count"), // 従業員数（常勤職員数）
+  foreignEmployeeCount: integer("foreign_employee_count"),   // うち外国人従業員数
+  technicalInternCount: integer("technical_intern_count"),   // うち技能実習生数
   fiscalYearEnd: text("fiscal_year_end"),
   category: text("category"),
   industry: text("industry"),

@@ -55,6 +55,8 @@ export async function createOrganization(data: {
   capital?: number;
   annualSales?: number;
   employeeCount?: number;
+  foreignEmployeeCount?: number;
+  technicalInternCount?: number;
   fiscalYearEnd?: string;
   category?: string;
   industry?: string;
@@ -104,6 +106,8 @@ export async function updateOrganization(
     capital: number;
     annualSales: number;
     employeeCount: number;
+    foreignEmployeeCount: number;
+    technicalInternCount: number;
     fiscalYearEnd: string;
     category: string;
     industry: string;

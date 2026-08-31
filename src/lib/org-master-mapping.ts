@@ -38,8 +38,8 @@ export const ORG_MASTER_COMMON_FIELD_KEYS = [
   "phone", "fax", "email",
   // 業種（メインの事業内容）・カテゴリー（入管区分。企業規模等で決まる共通属性）
   "industry", "category",
-  // 資本金又は出資金の額 / 直近の年間売上高 / 常勤職員数 / 決算期
-  "capital", "annualSales", "employeeCount", "fiscalYearEnd",
+  // 資本金又は出資金の額 / 直近の年間売上高 / 従業員数 / うち外国人 / うち技能実習生 / 決算期
+  "capital", "annualSales", "employeeCount", "foreignEmployeeCount", "technicalInternCount", "fiscalYearEnd",
   // 雇用保険適用事業所番号 / 健康保険・厚生年金保険事業所整理記号等 / 労働保険番号
   "employmentInsuranceNo", "socialInsuranceSymbol", "laborInsuranceNo",
 ] as const;
@@ -88,6 +88,8 @@ export interface OrgMasterRecord {
   capital?: number | null;
   annualSales?: number | null;
   employeeCount?: number | null;
+  foreignEmployeeCount?: number | null;
+  technicalInternCount?: number | null;
   employmentInsuranceNo?: string | null;
   socialInsuranceSymbol?: string | null;
   laborInsuranceNo?: string | null;

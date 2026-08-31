@@ -121,8 +121,8 @@ export function Sidebar({ userRole: initialUserRole, userName: initialUserName }
           <ShieldCheck className="w-6 h-6 text-blue-400 flex-shrink-0" />
           {!isCollapsed && (
             <div>
-              <p className="text-sm font-bold leading-tight">在留申請</p>
-              <p className="text-xs text-gray-400 leading-tight">書類作成システム</p>
+              <p className="text-sm font-bold leading-tight">行政書士業務</p>
+              <p className="text-xs text-gray-400 leading-tight">システム</p>
             </div>
           )}
         </div>

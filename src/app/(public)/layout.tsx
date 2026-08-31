@@ -10,8 +10,8 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "在留資格申請書類作成システム",
-  description: "在留資格申請書類を効率的・正確・セキュアに一元管理・作成・出力するシステム",
+  title: "行政書士業務システム",
+  description: "行政書士業務の顧客・案件・事件簿・書類を一元管理する業務システム",
 };
 
 export default function PublicLayout({

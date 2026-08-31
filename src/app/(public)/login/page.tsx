@@ -138,7 +138,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-lg">
             <ShieldCheck className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-1">在留資格申請書類作成システム</h1>
+          <h1 className="text-2xl font-bold text-white mb-1">行政書士業務システム</h1>
           <p className="text-gray-400 text-sm">行政書士事務所専用システム</p>
         </div>
         <Suspense fallback={<div className="bg-white rounded-2xl shadow-2xl p-8 text-center text-gray-400">読み込み中...</div>}>

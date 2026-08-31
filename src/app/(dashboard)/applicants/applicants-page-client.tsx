@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, UserCircle, UserPlus, X, Search, RotateCcw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
-import { formatDate, normalizeRomajiName, VISA_TYPE_LABELS } from "@/lib/utils";
+import { formatDate, normalizeRomajiName, VISA_TYPE_LABELS, getDaysUntil } from "@/lib/utils";
 import Link from "next/link";
 import { AiRegistrationForm } from "@/components/applicants/ai-registration-form";
 
@@ -171,8 +171,8 @@ export function ApplicantsPageClient({
       {/* ヘッダー */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">申請人マスター</h1>
-          <p className="text-gray-500 text-sm mt-1">全 {applicants.length} 件</p>
+          <h1 className="text-2xl font-bold text-gray-900">顧客名簿（個人）<span className="text-base font-normal text-gray-400 ml-2">／ 申請人マスター</span></h1>
+          <p className="text-gray-500 text-sm mt-1">個人のお客様（申請人を含む）　全 {applicants.length} 件</p>
         </div>
         {/* 新規登録ボタン */}
         <button
@@ -189,7 +189,7 @@ export function ApplicantsPageClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="w-4 h-4" />
-            申請人一覧
+            顧客一覧（個人）
           </CardTitle>
         </CardHeader>
 
@@ -286,11 +286,7 @@ export function ApplicantsPageClient({
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {sorted.map((a) => {
-                    const visaDays = a.currentVisaExpiry ? (() => {
-                      const expiry = new Date(a.currentVisaExpiry);
-                      const today = new Date(); today.setHours(0,0,0,0);
-                      return Math.floor((expiry.getTime() - today.getTime()) / (1000*60*60*24));
-                    })() : null;
+                    const visaDays = getDaysUntil(a.currentVisaExpiry);
                     const orgName = a.organizationId ? orgMap.get(a.organizationId) : null;
 
                     return (

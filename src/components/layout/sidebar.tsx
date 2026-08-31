@@ -47,13 +47,13 @@ const navItems: NavItem[] = [
   },
   {
     href: "/applicants",
-    label: "申請人マスター",
+    label: "顧客名簿（個人）",
     icon: <Users className="w-4 h-4 flex-shrink-0" />,
     roles: ["expert", "admin", "hr_manager"],
   },
   {
     href: "/organizations",
-    label: "所属機関マスター",
+    label: "顧客名簿（法人）",
     icon: <Building2 className="w-4 h-4 flex-shrink-0" />,
     roles: ["expert", "admin", "hr_manager"],
   },

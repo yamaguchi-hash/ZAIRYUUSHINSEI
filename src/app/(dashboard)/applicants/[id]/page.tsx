@@ -11,6 +11,7 @@ import { formatDate, VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS, APPLICATION_STAT
 import { OcrPanel } from "@/components/applicants/ocr-panel";
 import { ResidenceCardHistoryPanel } from "@/components/applicants/residence-card-history-panel";
 import { UpdateHistoryPanel } from "@/components/applicants/update-history-panel";
+import { CustomerHistoryPanel } from "@/components/customers/customer-history-panel";
 import { DocumentPrintButtons } from "@/components/applications/document-print-buttons";
 import { ApplicantNotesPanel } from "@/components/applicants/applicant-notes-panel";
 import { Printer } from "lucide-react";
@@ -432,6 +433,11 @@ export default async function ApplicantDetailPage({
           </CardContent>
         </Card>
       )}
+
+      {/* ── 顧客履歴（全案件・打合せ・保管書類の一元表示）── */}
+      <div className="mt-6">
+        <CustomerHistoryPanel applicantId={id} />
+      </div>
 
       {/* ── 更新履歴（書類差し替え・AI項目変更）── */}
       <div className="mt-4">

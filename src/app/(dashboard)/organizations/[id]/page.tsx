@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Building2 } from "lucide-react";
 import { OrganizationDocumentsPanel } from "@/components/organizations/organization-documents-panel";
+import { CustomerHistoryPanel } from "@/components/customers/customer-history-panel";
 
 export default async function OrganizationDetailPage({
   params,
@@ -45,6 +46,11 @@ export default async function OrganizationDetailPage({
           fileName: d.fileName,
         }))}
       />
+
+      {/* 顧客履歴（全案件・打合せ・保管書類の一元表示） */}
+      <div className="mt-6">
+        <CustomerHistoryPanel organizationId={id} />
+      </div>
     </div>
   );
 }

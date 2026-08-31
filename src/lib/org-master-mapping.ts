@@ -139,8 +139,12 @@ export function mapOrganizationToFormData(
     ...(org.capital != null ? { orgCapital: String(org.capital) } : {}),
     // 直近の年間売上高
     ...(org.annualSales != null ? { orgAnnualSales: String(org.annualSales) } : {}),
-    // 常勤職員数
+    // 従業員数（常勤職員数）
     ...(org.employeeCount != null ? { orgEmployeeCount: String(org.employeeCount) } : {}),
+    // うち外国人従業員数（技人国等の所属機関欄）
+    ...(org.foreignEmployeeCount != null ? { orgForeignEmployeeCount: String(org.foreignEmployeeCount) } : {}),
+    // うち技能実習生数
+    ...(org.technicalInternCount != null ? { orgTechInternCount: String(org.technicalInternCount) } : {}),
     // 雇用保険適用事業所番号
     ...(org.employmentInsuranceNo ? { orgEmploymentInsuranceNo: org.employmentInsuranceNo } : {}),
     // 労働保険番号（14桁）

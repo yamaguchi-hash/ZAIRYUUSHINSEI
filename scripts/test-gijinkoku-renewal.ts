@@ -82,6 +82,9 @@ console.log("[カテゴリー1]");
 {
   const d = buildChecklist(base({ orgCategory: 1 }));
   check("在留期間更新許可申請書がある", has(d, "application_form"));
+  // 回帰テスト: exemptWhen未設定の共通書類が誤って「不要」にならないこと
+  check("在留期間更新許可申請書は required（exemptWhen未設定のため）", get(d, "application_form")?.status === "required");
+  check("パスポート及び在留カードは required（exemptWhen未設定のため）", get(d, "passport_and_residence_card")?.status === "required");
   check("写真がある・required", get(d, "photo")?.status === "required");
   check("パスポート及び在留カードがある", has(d, "passport_and_residence_card"));
   check("カテゴリー該当証明がある・required", get(d, "category_certificate")?.status === "required");

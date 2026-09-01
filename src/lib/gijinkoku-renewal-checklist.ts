@@ -142,7 +142,10 @@ export function evaluateChecklistFromMaster(rows: MasterDocRow[], input: Checkli
     .map((row) => {
       const c = parseConditions(row.conditions);
       const applicable = matchWhen(c.when, input);
-      const exempt = matchWhen(c.exemptWhen, input);
+      // exemptWhen 未設定（undefined）は「例外条件なし」を意味するため、
+      // matchWhen の「省略した次元は常に一致」規則をそのまま適用すると誤って exempt 扱いになる。
+      // exemptWhen が実際に設定されている場合のみ判定する。
+      const exempt = !!c.exemptWhen && matchWhen(c.exemptWhen, input);
       const variant = c.requirementVariants?.find((v) => matchWhen(v.when, input));
 
       return {

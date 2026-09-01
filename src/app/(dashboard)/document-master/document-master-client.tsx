@@ -26,6 +26,9 @@ import {
 } from "@/actions/document-master";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConditionsEditor } from "./document-conditions-editor";
+import { FamilyStayConditionsEditor } from "./family-stay-conditions-editor";
+import { GIJINKOKU_VISA_TYPE, GIJINKOKU_RENEWAL_APPLICATION_TYPE } from "@/lib/gijinkoku-renewal-checklist";
+import { FAMILY_STAY_VISA_TYPE, FAMILY_STAY_COE_APPLICATION_TYPE } from "@/lib/kazoku-tairyu-coe-checklist";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
@@ -42,7 +45,8 @@ const APP_TYPES: { value: string; label: string }[] = [
   { value: "all", label: "（全申請種別に共通）" },
 ];
 
-const PREPARED_BY_PRESETS = ["申請人", "受入企業", "弊所"];
+// 技人国・更新チェックリストの「派遣先」、家族滞在・COEチェックリストの「扶養者」「申請代理人」を含む
+const PREPARED_BY_PRESETS = ["申請人", "受入企業", "弊所", "扶養者", "申請代理人", "派遣先"];
 const ORIGINAL_OR_COPY_OPTIONS = ["", "原本", "写し", "原本＋写し", "提示のみ"];
 
 interface RowState extends DocMasterRow {
@@ -568,9 +572,7 @@ export function DocumentMasterClient() {
                                           className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white text-gray-600"
                                         >
                                           <option value="">—</option>
-                                          <option value="申請人">申請人</option>
-                                          <option value="受入企業">受入企業</option>
-                                          <option value="弊所">弊所</option>
+                                          {PREPARED_BY_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
                                           <option value="__other__">その他（自由記載）</option>
                                         </select>
                                         {it.preparedByOther && (
@@ -761,9 +763,7 @@ export function DocumentMasterClient() {
                             className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white text-gray-600 focus:outline-none focus:border-purple-300"
                           >
                             <option value="">—</option>
-                            <option value="申請人">申請人</option>
-                            <option value="受入企業">受入企業</option>
-                            <option value="弊所">弊所</option>
+                            {PREPARED_BY_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
                             <option value="__other__">その他（自由記載）</option>
                           </select>
                           {row.preparedByOther && (
@@ -805,11 +805,19 @@ export function DocumentMasterClient() {
                         className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-gray-600 focus:outline-none focus:border-blue-400"
                         placeholder="注意事項（チェックリストにℹ表示されます）"
                       />
-                      {/* 適用条件（技人国・更新等の自動チェックリストタブが使用） */}
-                      <ConditionsEditor
-                        value={row.conditions}
-                        onChange={(conditions) => patchRow(row.id, { conditions })}
-                      />
+                      {/* 適用条件（自動チェックリストタブが使用。対象の組み合わせのみエディタを表示） */}
+                      {visaType === GIJINKOKU_VISA_TYPE && appType === GIJINKOKU_RENEWAL_APPLICATION_TYPE && (
+                        <ConditionsEditor
+                          value={row.conditions}
+                          onChange={(conditions) => patchRow(row.id, { conditions })}
+                        />
+                      )}
+                      {visaType === FAMILY_STAY_VISA_TYPE && appType === FAMILY_STAY_COE_APPLICATION_TYPE && (
+                        <FamilyStayConditionsEditor
+                          value={row.conditions}
+                          onChange={(conditions) => patchRow(row.id, { conditions })}
+                        />
+                      )}
                     </div>
 
                     {/* 操作 */}
@@ -872,9 +880,7 @@ export function DocumentMasterClient() {
                 className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white text-gray-600"
               >
                 <option value="">—</option>
-                <option value="申請人">申請人</option>
-                <option value="受入企業">受入企業</option>
-                <option value="弊所">弊所</option>
+                {PREPARED_BY_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
                 <option value="__other__">その他（自由記載）</option>
               </select>
               {newPreparedByOther && (

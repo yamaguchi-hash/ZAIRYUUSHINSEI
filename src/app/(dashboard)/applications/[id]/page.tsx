@@ -48,7 +48,8 @@ import { GijinkokuRenewalChecklist } from "@/components/checklist/gijinkoku-rene
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { NoufushoPanel } from "@/components/applications/noufusho-panel";
 import { AzukariPanel } from "@/components/applications/azukari-panel";
-import { db, applicantDocuments, applicationAttachments } from "@/lib/db";
+import { db, applicantDocuments, applicationAttachments, applicantMaster } from "@/lib/db";
+import { KazokuTairyuCoeChecklist } from "@/components/checklist/kazoku-tairyu-coe-checklist";
 import { eq, desc } from "drizzle-orm";
 import { AttachmentUploadPanel } from "@/components/applications/attachment-upload-panel";
 import { buildEffectiveFormData } from "@/lib/effective-form-data";
@@ -111,6 +112,21 @@ export default async function ApplicationDetailPage({
   if (!data) notFound();
 
   const { application, applicant, organization, checklist } = data;
+
+  // 扶養者（家族滞在等のR型のみ使用）。氏名の自動反映にのみ使用する。
+  const supporter = application.supporterId
+    ? await db
+        .select({
+          familyNameJa: applicantMaster.familyNameJa,
+          givenNameJa: applicantMaster.givenNameJa,
+          familyNameEn: applicantMaster.familyNameEn,
+          givenNameEn: applicantMaster.givenNameEn,
+        })
+        .from(applicantMaster)
+        .where(eq(applicantMaster.id, application.supporterId))
+        .limit(1)
+        .then((r) => r[0] ?? null)
+    : null;
 
   // チェックリストの「マスターから選択」用。既存のmasterDocuments（書類要件マスターの
   // カタログ）とは別概念のため、availableMasterFilesという別名で区別する。
@@ -538,6 +554,29 @@ export default async function ApplicationDetailPage({
               (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
             }
             defaultOrganizationName={organization?.nameJa ?? ""}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 1.76 必要書類チェックリスト（家族滞在・COEのみ。案件情報を自動反映） */}
+      {application.visaType === "dependent" && application.applicationType === "certification" && (
+        <CollapsibleSection
+          title="必要書類チェックリスト（家族滞在・在留資格認定証明書交付申請）"
+          defaultOpen={false}
+          accentClass="bg-rose-500"
+        >
+          <KazokuTairyuCoeChecklist
+            defaultCaseName={application.caseNumber ?? ""}
+            defaultApplicantName={
+              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
+              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
+            }
+            defaultSupporterName={
+              supporter
+                ? ((`${supporter.familyNameJa ?? ""} ${supporter.givenNameJa ?? ""}`.trim()) ||
+                   (`${supporter.familyNameEn ?? ""} ${supporter.givenNameEn ?? ""}`.trim()))
+                : ""
+            }
           />
         </CollapsibleSection>
       )}

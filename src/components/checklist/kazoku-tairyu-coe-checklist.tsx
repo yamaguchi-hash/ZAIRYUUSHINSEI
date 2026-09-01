@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   evaluateChecklistFromMaster,
   groupByPreparer,
@@ -29,7 +30,8 @@ import {
   type FinancialProofKey,
 } from "@/lib/kazoku-tairyu-coe-checklist";
 import { getActiveDocumentRequirements } from "@/actions/document-master";
-import { Printer, ExternalLink, Info, AlertTriangle, ClipboardList, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { addDocumentsToChecklist } from "@/actions/applications";
+import { Printer, ExternalLink, Info, AlertTriangle, ClipboardList, Eye, EyeOff, Loader2, AlertCircle, ListPlus, CheckCircle2 } from "lucide-react";
 
 const PREPARER_ACCENT: Record<PreparedBy, string> = {
   applicant: "border-blue-200 bg-blue-50/50",
@@ -46,13 +48,19 @@ interface Props {
   defaultCaseName?: string;
   defaultApplicantName?: string;
   defaultSupporterName?: string;
+  /** 指定時のみ「必要書類チェックリストへ反映」ボタンを表示し、この案件のチェックリストへ追加する */
+  applicationId?: string;
 }
 
 export function KazokuTairyuCoeChecklist({
   defaultCaseName = "",
   defaultApplicantName = "",
   defaultSupporterName = "",
+  applicationId,
 }: Props) {
+  const router = useRouter();
+  const [applying, setApplying] = useState(false);
+  const [applyMessage, setApplyMessage] = useState("");
   const [relationship, setRelationship] = useState<Relationship>("spouse");
   const [supporterIncomeType, setSupporterIncomeType] = useState<ChecklistInput["supporterIncomeType"]>("income");
   const [identityDocs, setIdentityDocs] = useState<IdentityDocKey[]>([]);
@@ -107,6 +115,22 @@ export function KazokuTairyuCoeChecklist({
   const groups = useMemo(() => groupByPreparer(visible), [visible]);
   const requiredCount = evaluated.filter((d) => d.applicable && d.status === "required").length;
   const optionalCount = evaluated.filter((d) => d.applicable && d.status === "optional").length;
+
+  async function handleApplyToChecklist() {
+    if (!applicationId) return;
+    const ids = evaluated.filter((d) => d.applicable && d.status !== "exempt").map((d) => d.id);
+    if (ids.length === 0) return;
+    setApplying(true);
+    setApplyMessage("");
+    const result = await addDocumentsToChecklist(applicationId, ids);
+    setApplying(false);
+    if (!result.success) {
+      setApplyMessage(result.error ?? "反映に失敗しました");
+      return;
+    }
+    setApplyMessage(`必要書類チェックリストへ反映しました（${ids.length}件）`);
+    router.refresh();
+  }
 
   return (
     <div className="space-y-5">
@@ -296,6 +320,18 @@ export function KazokuTairyuCoeChecklist({
                 {showConditional ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 {showConditional ? "条件付き書類を隠す" : "条件付き書類を表示"}
               </button>
+              {applicationId && (
+                <button
+                  type="button"
+                  onClick={handleApplyToChecklist}
+                  disabled={applying || requiredCount === 0 || warnings.length > 0}
+                  title={warnings.length > 0 ? "未選択の必須項目を解消してから反映してください" : "表示中の必要書類を、この案件の「必要書類チェックリスト」へ追加します"}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg px-3 py-2 disabled:opacity-50"
+                >
+                  {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ListPlus className="w-4 h-4" />}
+                  必要書類チェックリストへ反映
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => window.print()}
@@ -305,6 +341,12 @@ export function KazokuTairyuCoeChecklist({
               </button>
             </div>
           </div>
+
+          {applyMessage && (
+            <p className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 print:hidden">
+              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{applyMessage}
+            </p>
+          )}
 
           {/* 準備者別の一覧表 */}
           {groups.length === 0 ? (

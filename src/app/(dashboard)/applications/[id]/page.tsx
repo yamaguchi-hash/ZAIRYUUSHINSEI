@@ -548,6 +548,7 @@ export default async function ApplicationDetailPage({
           accentClass="bg-blue-500"
         >
           <GijinkokuRenewalChecklist
+            applicationId={application.id}
             defaultCaseName={application.caseNumber ?? ""}
             defaultApplicantName={
               (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
@@ -566,6 +567,7 @@ export default async function ApplicationDetailPage({
           accentClass="bg-rose-500"
         >
           <KazokuTairyuCoeChecklist
+            applicationId={application.id}
             defaultCaseName={application.caseNumber ?? ""}
             defaultApplicantName={
               (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||

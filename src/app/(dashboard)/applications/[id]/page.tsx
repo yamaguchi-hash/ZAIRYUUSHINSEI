@@ -44,6 +44,7 @@ import { CaseNotesPanel } from "@/components/applications/case-notes-panel";
 import { ConsultationLogsPanel } from "@/components/applications/consultation-logs-panel";
 import { DispatchRecordsPanel } from "@/components/applications/dispatch-records-panel";
 import { LedgerInfoPanel } from "@/components/applications/ledger-info-panel";
+import { GijinkokuRenewalChecklist } from "@/components/checklist/gijinkoku-renewal-checklist";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { NoufushoPanel } from "@/components/applications/noufusho-panel";
 import { AzukariPanel } from "@/components/applications/azukari-panel";
@@ -522,6 +523,24 @@ export default async function ApplicationDetailPage({
       >
         <LedgerInfoPanel applicationId={application.id} />
       </CollapsibleSection>
+
+      {/* 1.75 必要書類チェックリスト（技人国・更新のみ。案件情報を自動反映） */}
+      {application.visaType === "engineer_humanities" && (
+        <CollapsibleSection
+          title="必要書類チェックリスト（技人国・在留期間更新）"
+          defaultOpen={false}
+          accentClass="bg-blue-500"
+        >
+          <GijinkokuRenewalChecklist
+            defaultCaseName={application.caseNumber ?? ""}
+            defaultApplicantName={
+              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
+              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
+            }
+            defaultOrganizationName={organization?.nameJa ?? ""}
+          />
+        </CollapsibleSection>
+      )}
 
       {/* 1.8 提出書類控え・預かり資料（ドラッグ&ドロップでBlob保管） */}
       <CollapsibleSection

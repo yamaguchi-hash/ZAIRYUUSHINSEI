@@ -18,6 +18,7 @@ import {
   ChevronRight,
   FileCheck,
   BookText,
+  ListChecks,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -62,6 +63,12 @@ const navItems: NavItem[] = [
     label: "必要書類マスター",
     icon: <FileCheck className="w-4 h-4 flex-shrink-0" />,
     roles: ["expert", "admin"],
+  },
+  {
+    href: "/document-checklist",
+    label: "必要書類チェックリスト",
+    icon: <ListChecks className="w-4 h-4 flex-shrink-0" />,
+    roles: ["expert", "admin", "hr_manager"],
   },
   {
     href: "/admin",

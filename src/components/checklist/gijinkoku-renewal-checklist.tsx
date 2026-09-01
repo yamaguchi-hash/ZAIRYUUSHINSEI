@@ -1,18 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
-  evaluateChecklist,
+  evaluateChecklistFromMaster,
   groupByPreparer,
   PREPARED_BY_LABELS,
   EFFECTIVE_DATE_NOTE,
   OFFICIAL_LINKS,
   CAUTION_NOTE,
+  GIJINKOKU_VISA_TYPE,
+  GIJINKOKU_RENEWAL_APPLICATION_TYPE,
   type ChecklistInput,
   type ChecklistDocument,
   type PreparedBy,
+  type MasterDocRow,
 } from "@/lib/gijinkoku-renewal-checklist";
-import { Printer, ExternalLink, Info, ClipboardList, Eye, EyeOff } from "lucide-react";
+import { getActiveDocumentRequirements } from "@/actions/document-master";
+import { Printer, ExternalLink, Info, ClipboardList, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 
 const PREPARER_ACCENT: Record<PreparedBy, string> = {
   applicant: "border-blue-200 bg-blue-50/50",
@@ -73,9 +77,27 @@ export function GijinkokuRenewalChecklist({
   const [showConditional, setShowConditional] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
+  const [rows, setRows] = useState<MasterDocRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    const result = await getActiveDocumentRequirements(GIJINKOKU_VISA_TYPE, GIJINKOKU_RENEWAL_APPLICATION_TYPE);
+    setLoading(false);
+    if (!result.success || !result.rows) {
+      setError(result.error ?? "必要書類マスターの読み込みに失敗しました");
+      return;
+    }
+    setRows(result.rows);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
   const set = <K extends keyof ChecklistInput>(k: K, v: ChecklistInput[K]) => setInput((p) => ({ ...p, [k]: v }));
 
-  const evaluated = useMemo(() => evaluateChecklist(input), [input]);
+  const evaluated = useMemo(() => evaluateChecklistFromMaster(rows, input), [rows, input]);
   const visible = showConditional ? evaluated : evaluated.filter((d) => d.applicable);
   const groups = useMemo(() => groupByPreparer(visible), [visible]);
   const requiredCount = evaluated.filter((d) => d.applicable && d.status === "required").length;
@@ -99,7 +121,14 @@ export function GijinkokuRenewalChecklist({
       <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 print:hidden">
         <Info className="w-4 h-4 flex-shrink-0" />
         本一覧は<strong className="mx-1">{EFFECTIVE_DATE_NOTE}</strong>としています。将来の法改正で変更される場合があります。
+        書類ルールは「必要書類マスター」の基本設定タブから編集できます。
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-2 print:hidden">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />{error}
+        </div>
+      )}
 
       {/* 入力・条件（印刷時は非表示） */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 print:hidden">
@@ -147,57 +176,71 @@ export function GijinkokuRenewalChecklist({
         </div>
       </div>
 
-      {/* ツールバー */}
-      <div className="flex items-center justify-between gap-3 flex-wrap print:hidden">
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <ClipboardList className="w-4 h-4 text-gray-400" />
-          必要書類 <span className="font-semibold text-gray-800">{requiredCount}</span> 件
+      {loading ? (
+        <div className="flex items-center justify-center py-16 text-gray-400 print:hidden">
+          <Loader2 className="w-6 h-6 animate-spin" />
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowConditional((v) => !v)}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg px-3 py-2"
-          >
-            {showConditional ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            {showConditional ? "条件付き書類を隠す" : "条件付き書類を表示"}
-          </button>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-3 py-2"
-          >
-            <Printer className="w-4 h-4" />印刷 / PDF保存
-          </button>
-        </div>
-      </div>
-
-      {/* 準備者別の一覧表 */}
-      <div className="space-y-4">
-        {groups.map((g) => (
-          <div key={g.preparedBy} className={`border rounded-xl overflow-hidden ${PREPARER_ACCENT[g.preparedBy]}`}>
-            <div className="px-4 py-2 border-b border-black/5 text-sm font-semibold text-gray-800">
-              {PREPARED_BY_LABELS[g.preparedBy]}
+      ) : (
+        <>
+          {/* ツールバー */}
+          <div className="flex items-center justify-between gap-3 flex-wrap print:hidden">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <ClipboardList className="w-4 h-4 text-gray-400" />
+              必要書類 <span className="font-semibold text-gray-800">{requiredCount}</span> 件
             </div>
-            <div className="overflow-x-auto bg-white/70">
-              <table className="w-full text-sm min-w-[640px]">
-                <thead>
-                  <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
-                    <th className="py-2 px-3 w-10"></th>
-                    <th className="py-2 px-3 font-medium">書類名</th>
-                    <th className="py-2 px-3 font-medium">提出要件・補足</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {g.docs.map((d) => (
-                    <Row key={d.id} d={d} checked={!!checked[d.id]} onToggle={() => setChecked((p) => ({ ...p, [d.id]: !p[d.id] }))} />
-                  ))}
-                </tbody>
-              </table>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowConditional((v) => !v)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg px-3 py-2"
+              >
+                {showConditional ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {showConditional ? "条件付き書類を隠す" : "条件付き書類を表示"}
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-3 py-2"
+              >
+                <Printer className="w-4 h-4" />印刷 / PDF保存
+              </button>
             </div>
           </div>
-        ))}
-      </div>
+
+          {/* 準備者別の一覧表 */}
+          {groups.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-10">
+              必要書類マスターに書類が登録されていません（基本設定タブから登録してください）。
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {groups.map((g) => (
+                <div key={g.preparedBy} className={`border rounded-xl overflow-hidden ${PREPARER_ACCENT[g.preparedBy]}`}>
+                  <div className="px-4 py-2 border-b border-black/5 text-sm font-semibold text-gray-800">
+                    {PREPARED_BY_LABELS[g.preparedBy]}
+                  </div>
+                  <div className="overflow-x-auto bg-white/70">
+                    <table className="w-full text-sm min-w-[640px]">
+                      <thead>
+                        <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                          <th className="py-2 px-3 w-10"></th>
+                          <th className="py-2 px-3 font-medium">書類名</th>
+                          <th className="py-2 px-3 font-medium">提出要件・補足</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {g.docs.map((d) => (
+                          <Row key={d.id} d={d} checked={!!checked[d.id]} onToggle={() => setChecked((p) => ({ ...p, [d.id]: !p[d.id] }))} />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {/* 注意書き */}
       <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-xs text-gray-600">

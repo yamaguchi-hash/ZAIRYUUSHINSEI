@@ -1,12 +1,18 @@
 /**
  * 技人国｜在留期間更新 必要書類チェックリストの判定ロジック テスト
  * 実行: npx tsx scripts/test-gijinkoku-renewal.ts
+ *
+ * 「必要書類マスター」の行（MasterDocRow）を模したモックデータに対して
+ * evaluateChecklistFromMaster を実行し、実際にDBへ投入する
+ * scripts/seed-gijinkoku-renewal-checklist.ts と同じ conditions 形状で検証する。
  * 依存追加なし（プレーンなアサーションで検証）。
  */
 import {
-  buildChecklist,
+  evaluateChecklistFromMaster,
   type ChecklistInput,
   type ChecklistDocument,
+  type MasterDocRow,
+  type GijinkokuRenewalConditions,
 } from "../src/lib/gijinkoku-renewal-checklist";
 
 let passed = 0;
@@ -20,6 +26,54 @@ const base = (over: Partial<ChecklistInput>): ChecklistInput => ({
   orgCategory: 1, dispatchWork: false, firstUpdateAfterTransfer: false,
   changeToLanguageWork: false, photoException: false, ...over,
 });
+
+function row(id: string, name: string, preparedBy: string, conditions: GijinkokuRenewalConditions, description = "説明"): MasterDocRow {
+  return { id, documentName: name, description, preparedBy, conditions, sortOrder: 0 };
+}
+
+// scripts/seed-gijinkoku-renewal-checklist.ts と同じ条件形状のモック行（21件）
+const ROWS: MasterDocRow[] = [
+  row("application_form", "在留期間更新許可申請書", "申請人", { category: "共通" }),
+  row("photo", "写真（縦4cm×横3cm）", "申請人", {
+    category: "共通",
+    exemptWhen: { photoException: true },
+    requirementVariants: [{ when: { photoException: true }, text: "不要（写真提出の例外に該当）" }],
+  }),
+  row("passport_and_residence_card", "パスポート及び在留カード", "申請人", { category: "共通" }),
+  row("category_certificate", "所属機関のカテゴリー該当性を証する文書", "受入企業", {
+    category: "共通",
+    exemptWhen: { orgCategoryIn: [4] },
+    requirementVariants: [
+      { when: { orgCategoryIn: [1] }, text: "上場企業の証明など" },
+      { when: { orgCategoryIn: [2] }, text: "法定調書合計表、又はオンライン利用の承認証明" },
+      { when: { orgCategoryIn: [3] }, text: "法定調書合計表" },
+      { when: { orgCategoryIn: [4] }, text: "原則不要（提出できない場合はその旨を説明）" },
+    ],
+  }),
+  row("dispatch_pledge_from", "誓約書（派遣元用）", "受入企業", { category: "派遣", when: { dispatchWork: true }, reason: "派遣契約に基づく就労のため" }),
+  row("dispatch_pledge_to", "誓約書（派遣先用）", "派遣先", { category: "派遣", when: { dispatchWork: true }, reason: "派遣契約に基づく就労のため" }),
+  row("dispatch_working_conditions", "労働条件通知書又は雇用契約書", "受入企業", { category: "派遣", when: { dispatchWork: true }, reason: "派遣契約に基づく就労のため" }),
+  row("dispatch_individual_contract", "労働者派遣個別契約書", "受入企業", { category: "派遣", when: { dispatchWork: true }, reason: "派遣契約に基づく就労のため" }),
+  row("dispatch_ledger_from", "派遣元管理台帳", "受入企業", { category: "派遣", when: { dispatchWork: true }, reason: "派遣契約に基づく就労のため" }),
+  row("dispatch_ledger_to", "派遣先管理台帳", "派遣先", { category: "派遣", when: { dispatchWork: true }, reason: "派遣契約に基づく就労のため" }),
+  row("dispatch_work_status_report", "就業状況報告書", "派遣先", { category: "派遣", when: { dispatchWork: true }, reason: "派遣契約に基づく就労のため" }),
+  row("cat34_representative_declaration", "所属機関の代表者に関する申告書", "受入企業", { category: "カテゴリー3・4", when: { orgCategoryIn: [3, 4] }, reason: "所属機関がカテゴリー3・4のため" }),
+  row("cat34_resident_tax_certificate", "住民税の課税（又は非課税）証明書", "申請人", { category: "カテゴリー3・4", when: { orgCategoryIn: [3, 4] }, reason: "所属機関がカテゴリー3・4のため" }, "1年間の総所得及び納税状況が確認できるもの"),
+  row("cat34_resident_tax_payment_certificate", "住民税の納税証明書", "申請人", { category: "カテゴリー3・4", when: { orgCategoryIn: [3, 4] }, reason: "所属機関がカテゴリー3・4のため" }),
+  row("transfer_activity_documents", "活動内容を明らかにする書類", "受入企業", { category: "転職後初回", when: { firstUpdateAfterTransfer: true }, reason: "カテゴリー3・4の会社へ転職後、初めての更新のため" }),
+  row("transfer_registry", "登記事項証明書", "受入企業", { category: "転職後初回", when: { firstUpdateAfterTransfer: true }, reason: "カテゴリー3・4の会社へ転職後、初めての更新のため" }),
+  row("transfer_company_profile", "会社案内等", "受入企業", { category: "転職後初回", when: { firstUpdateAfterTransfer: true }, reason: "カテゴリー3・4の会社へ転職後、初めての更新のため" }),
+  row("transfer_financial_statements", "直近年度の決算書類の写し", "受入企業", {
+    category: "転職後初回", when: { firstUpdateAfterTransfer: true }, reason: "カテゴリー3・4の会社へ転職後、初めての更新のため",
+    requirementVariants: [{ when: {}, text: "損益計算書・貸借対照表等。新規事業で決算が未了の場合は事業計画書" }],
+  }),
+  row("language_cefr_b2", "CEFR B2相当の言語能力を証する資料", "申請人", { category: "言語業務変更", when: { changeToLanguageWork: true }, reason: "主に言語能力を用いる対人業務への変更のため" }),
+  row("cat4_reason_no_tax_report", "法定調書合計表を提出できない理由を明らかにする書類", "受入企業", { category: "カテゴリー4・転職後初回", when: { orgCategoryIn: [4], firstUpdateAfterTransfer: true }, reason: "カテゴリー4かつ転職後初回のため" }),
+];
+
+function buildChecklist(input: ChecklistInput): ChecklistDocument[] {
+  return evaluateChecklistFromMaster(ROWS, input).filter((d) => d.applicable);
+}
 const has = (docs: ChecklistDocument[], id: string) => docs.some((d) => d.id === id);
 const get = (docs: ChecklistDocument[], id: string) => docs.find((d) => d.id === id);
 

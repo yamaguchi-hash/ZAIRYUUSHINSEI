@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   evaluateChecklistFromMaster,
   groupByPreparer,
@@ -16,9 +17,16 @@ import {
   type PreparedBy,
   type MasterDocRow,
 } from "@/lib/gijinkoku-renewal-checklist";
-import { getActiveDocumentRequirements } from "@/actions/document-master";
+import { getActiveDocumentRequirements, updateDocumentRequirement, createDocumentRequirement, setDocumentRequirementActive } from "@/actions/document-master";
 import { addDocumentsToChecklist } from "@/actions/applications";
-import { Printer, ExternalLink, Info, ClipboardList, Eye, EyeOff, Loader2, AlertCircle, ListPlus, CheckCircle2 } from "lucide-react";
+import { ConditionsEditor } from "@/app/(dashboard)/document-master/document-conditions-editor";
+import {
+  Printer, ExternalLink, Info, ClipboardList, Eye, EyeOff, Loader2, AlertCircle, ListPlus, CheckCircle2,
+  Pencil, Trash2, Plus, Save, X,
+} from "lucide-react";
+
+// この機能で使う担当プリセット（必要書類マスターの自由記載欄に保存する文字列）
+const PREPARED_BY_PRESETS = ["申請人", "受入企業", "派遣先"];
 
 const PREPARER_ACCENT: Record<PreparedBy, string> = {
   applicant: "border-blue-200 bg-blue-50/50",
@@ -70,8 +78,19 @@ export function GijinkokuRenewalChecklist({
   applicationId,
 }: Props) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const canEdit = ["expert", "admin"].includes((session?.user as any)?.role ?? "");
   const [applying, setApplying] = useState(false);
   const [applyMessage, setApplyMessage] = useState("");
+
+  // ── 書類の編集（基本設定の機能をこの画面に統合） ──────────────────────────
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [addingNew, setAddingNew] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPreparedBy, setNewPreparedBy] = useState(PREPARED_BY_PRESETS[0]);
+  const [newDescription, setNewDescription] = useState("");
+  const [savingRow, setSavingRow] = useState(false);
+  const [editError, setEditError] = useState("");
   const [input, setInput] = useState<ChecklistInput>({
     orgCategory: 1,
     dispatchWork: false,
@@ -109,6 +128,42 @@ export function GijinkokuRenewalChecklist({
   const visible = showConditional ? evaluated : evaluated.filter((d) => d.applicable);
   const groups = useMemo(() => groupByPreparer(visible), [visible]);
   const requiredCount = evaluated.filter((d) => d.applicable && d.status === "required").length;
+  const rowsById = useMemo(() => Object.fromEntries(rows.map((r) => [r.id, r])), [rows]);
+
+  async function handleSaveRow(id: string, patch: { documentName: string; description: string; preparedBy: string; conditions: Record<string, unknown> | null }) {
+    setSavingRow(true);
+    setEditError("");
+    const result = await updateDocumentRequirement(id, patch);
+    setSavingRow(false);
+    if (!result.success) { setEditError(result.error ?? "保存に失敗しました"); return; }
+    setEditingId(null);
+    void load();
+  }
+
+  async function handleDeactivate(id: string, name: string) {
+    if (!window.confirm(`「${name}」を必要書類一覧から外しますか？\n（無効化されます。復元は必要書類マスターの基本設定タブから行えます）`)) return;
+    const result = await setDocumentRequirementActive(id, false);
+    if (!result.success) { setEditError(result.error ?? "更新に失敗しました"); return; }
+    void load();
+  }
+
+  async function handleAddNew() {
+    if (!newName.trim()) { setEditError("書類名を入力してください"); return; }
+    setSavingRow(true);
+    setEditError("");
+    const result = await createDocumentRequirement({
+      visaType: GIJINKOKU_VISA_TYPE,
+      applicationType: GIJINKOKU_RENEWAL_APPLICATION_TYPE,
+      documentName: newName,
+      description: newDescription,
+      preparedBy: newPreparedBy,
+      isAlwaysRequired: false,
+    });
+    setSavingRow(false);
+    if (!result.success) { setEditError(result.error ?? "追加に失敗しました"); return; }
+    setNewName(""); setNewDescription(""); setNewPreparedBy(PREPARED_BY_PRESETS[0]); setAddingNew(false);
+    void load();
+  }
 
   async function handleApplyToChecklist() {
     if (!applicationId) return;
@@ -145,7 +200,7 @@ export function GijinkokuRenewalChecklist({
       <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 print:hidden">
         <Info className="w-4 h-4 flex-shrink-0" />
         本一覧は<strong className="mx-1">{EFFECTIVE_DATE_NOTE}</strong>としています。将来の法改正で変更される場合があります。
-        書類ルールは「必要書類マスター」の基本設定タブから編集できます。
+        {canEdit ? "各行の編集アイコンから書類・条件を直接編集できます。" : "書類ルールの編集には権限が必要です。"}
       </div>
 
       {error && (
@@ -221,6 +276,15 @@ export function GijinkokuRenewalChecklist({
                 {showConditional ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 {showConditional ? "条件付き書類を隠す" : "条件付き書類を表示"}
               </button>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => { setAddingNew((v) => !v); setEditingId(null); setEditError(""); }}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg px-3 py-2"
+                >
+                  <Plus className="w-3.5 h-3.5" />書類を追加
+                </button>
+              )}
               {applicationId && (
                 <button
                   type="button"
@@ -249,10 +313,62 @@ export function GijinkokuRenewalChecklist({
             </p>
           )}
 
+          {editError && (
+            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 print:hidden">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{editError}
+            </div>
+          )}
+
+          {addingNew && canEdit && (
+            <div className="border border-indigo-200 bg-indigo-50/50 rounded-xl p-4 space-y-2 print:hidden">
+              <p className="text-xs font-semibold text-indigo-700">新しい書類を追加</p>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="書類名"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-indigo-400"
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-gray-400">担当:</span>
+                <select
+                  value={newPreparedBy}
+                  onChange={(e) => setNewPreparedBy(e.target.value)}
+                  className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white text-gray-600"
+                >
+                  {PREPARED_BY_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <input
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                placeholder="提出要件・補足（任意）"
+                className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-gray-600 bg-white focus:outline-none focus:border-indigo-400"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddNew}
+                  disabled={savingRow || !newName.trim()}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg px-3 py-1.5 disabled:opacity-50"
+                >
+                  {savingRow ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}追加する
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddingNew(false)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg px-3 py-1.5"
+                >
+                  <X className="w-3.5 h-3.5" />キャンセル
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400">追加後、必要に応じて一覧の行から「適用条件を設定」できます。</p>
+            </div>
+          )}
+
           {/* 準備者別の一覧表 */}
           {groups.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-10">
-              必要書類マスターに書類が登録されていません（基本設定タブから登録してください）。
+              {canEdit ? "書類が登録されていません。上の「書類を追加」から登録してください。" : "書類が登録されていません。"}
             </p>
           ) : (
             <div className="space-y-4">
@@ -268,11 +384,25 @@ export function GijinkokuRenewalChecklist({
                           <th className="py-2 px-3 w-10"></th>
                           <th className="py-2 px-3 font-medium">書類名</th>
                           <th className="py-2 px-3 font-medium">提出要件・補足</th>
+                          {canEdit && <th className="py-2 px-3 w-20 print:hidden"></th>}
                         </tr>
                       </thead>
                       <tbody>
                         {g.docs.map((d) => (
-                          <Row key={d.id} d={d} checked={!!checked[d.id]} onToggle={() => setChecked((p) => ({ ...p, [d.id]: !p[d.id] }))} />
+                          <Row
+                            key={d.id}
+                            d={d}
+                            checked={!!checked[d.id]}
+                            onToggle={() => setChecked((p) => ({ ...p, [d.id]: !p[d.id] }))}
+                            canEdit={canEdit}
+                            isEditing={editingId === d.id}
+                            onStartEdit={() => { setEditingId(d.id); setAddingNew(false); setEditError(""); }}
+                            onCancelEdit={() => setEditingId(null)}
+                            onDeactivate={() => handleDeactivate(d.id, d.name)}
+                            masterRow={rowsById[d.id]}
+                            onSave={(patch) => handleSaveRow(d.id, patch)}
+                            saving={savingRow}
+                          />
                         ))}
                       </tbody>
                     </table>
@@ -306,9 +436,28 @@ export function GijinkokuRenewalChecklist({
   );
 }
 
-function Row({ d, checked, onToggle }: { d: ChecklistDocument; checked: boolean; onToggle: () => void }) {
+function Row({
+  d, checked, onToggle, canEdit, isEditing, onStartEdit, onCancelEdit, onDeactivate, masterRow, onSave, saving,
+}: {
+  d: ChecklistDocument; checked: boolean; onToggle: () => void;
+  canEdit: boolean; isEditing: boolean; onStartEdit: () => void; onCancelEdit: () => void; onDeactivate: () => void;
+  masterRow: MasterDocRow | undefined;
+  onSave: (patch: { documentName: string; description: string; preparedBy: string; conditions: Record<string, unknown> | null }) => void;
+  saving: boolean;
+}) {
   const inapplicable = !d.applicable;
   const exempt = d.status === "exempt";
+
+  if (isEditing && masterRow) {
+    return (
+      <tr className="border-b border-gray-50 bg-indigo-50/30">
+        <td colSpan={canEdit ? 4 : 3} className="p-3">
+          <RowEditForm masterRow={masterRow} onSave={onSave} onCancel={onCancelEdit} saving={saving} />
+        </td>
+      </tr>
+    );
+  }
+
   return (
     <tr className={`border-b border-gray-50 align-top ${inapplicable ? "opacity-45" : ""}`}>
       <td className="py-2.5 px-3">
@@ -332,6 +481,88 @@ function Row({ d, checked, onToggle }: { d: ChecklistDocument; checked: boolean;
         )}
       </td>
       <td className="py-2.5 px-3 text-xs text-gray-600 leading-relaxed">{d.requirement}</td>
+      {canEdit && (
+        <td className="py-2.5 px-3 print:hidden">
+          <div className="flex items-center gap-1 justify-end">
+            <button type="button" onClick={onStartEdit} className="p-1 text-gray-300 hover:text-indigo-600" title="編集">
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" onClick={onDeactivate} className="p-1 text-gray-300 hover:text-red-500" title="一覧から外す（無効化）">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </td>
+      )}
     </tr>
+  );
+}
+
+function RowEditForm({
+  masterRow, onSave, onCancel, saving,
+}: {
+  masterRow: MasterDocRow;
+  onSave: (patch: { documentName: string; description: string; preparedBy: string; conditions: Record<string, unknown> | null }) => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  const [name, setName] = useState(masterRow.documentName);
+  const [description, setDescription] = useState(masterRow.description ?? "");
+  const [preparedBy, setPreparedBy] = useState(masterRow.preparedBy ?? PREPARED_BY_PRESETS[0]);
+  const [conditions, setConditions] = useState<Record<string, unknown> | null>(
+    (masterRow.conditions as Record<string, unknown> | null) ?? null
+  );
+
+  return (
+    <div className="space-y-2">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="w-full text-sm font-medium border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-indigo-400"
+        placeholder="書類名"
+      />
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-gray-400">担当:</span>
+        <select
+          value={PREPARED_BY_PRESETS.includes(preparedBy) ? preparedBy : "__other__"}
+          onChange={(e) => setPreparedBy(e.target.value === "__other__" ? "" : e.target.value)}
+          className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white text-gray-600"
+        >
+          {PREPARED_BY_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
+          <option value="__other__">その他（自由記載）</option>
+        </select>
+        {!PREPARED_BY_PRESETS.includes(preparedBy) && (
+          <input
+            value={preparedBy}
+            onChange={(e) => setPreparedBy(e.target.value)}
+            placeholder="担当を自由記載"
+            className="text-xs border border-purple-200 rounded px-2 py-1 w-32 bg-purple-50"
+          />
+        )}
+      </div>
+      <input
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-gray-600 bg-white focus:outline-none focus:border-indigo-400"
+        placeholder="提出要件・補足"
+      />
+      <ConditionsEditor value={conditions} onChange={setConditions} />
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={() => onSave({ documentName: name, description, preparedBy, conditions })}
+          disabled={saving || !name.trim()}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg px-3 py-1.5 disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}保存
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg px-3 py-1.5"
+        >
+          <X className="w-3.5 h-3.5" />キャンセル
+        </button>
+      </div>
+    </div>
   );
 }

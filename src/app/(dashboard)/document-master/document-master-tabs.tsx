@@ -46,7 +46,7 @@ export function DocumentMasterTabs() {
       {tab === "gijinkoku_renewal" && (
         <div>
           <p className="text-sm text-gray-500 mb-4">
-            技術・人文知識・国際業務｜在留期間更新許可申請。申請条件を選ぶと、本人・所属機関・派遣先が準備すべき書類を一覧表示します。
+            技術・人文知識・国際業務｜在留期間更新許可申請。申請条件を選ぶと、本人・所属機関・派遣先が準備すべき書類を一覧表示します。書類の追加・編集もこの画面から直接行えます。
           </p>
           <GijinkokuRenewalChecklist />
         </div>
@@ -55,7 +55,7 @@ export function DocumentMasterTabs() {
       {tab === "kazoku_tairyu_coe" && (
         <div>
           <p className="text-sm text-gray-500 mb-4">
-            家族滞在｜在留資格認定証明書交付申請。案件情報と条件を選ぶと、申請人・扶養者・申請代理人が準備すべき書類を一覧表示します。
+            家族滞在｜在留資格認定証明書交付申請。案件情報と条件を選ぶと、申請人・扶養者・申請代理人が準備すべき書類を一覧表示します。書類の追加・編集もこの画面から直接行えます。
           </p>
           <KazokuTairyuCoeChecklist />
         </div>

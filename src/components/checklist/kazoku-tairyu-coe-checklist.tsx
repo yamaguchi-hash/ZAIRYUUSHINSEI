@@ -188,8 +188,25 @@ export function KazokuTairyuCoeChecklist({
     router.refresh();
   }
 
+  // 印刷時に必要書類一覧のみを抽出（担当・状態ヘッダー付きの単一表。
+  // showConditional のオン/オフに応じて画面と同じ範囲を印刷する）
+  const printDocs = visible;
+  const printRequiredCount = printDocs.filter((d) => d.status !== "exempt").length;
+  const printCheckedCount = printDocs.filter((d) => checked[d.id]).length;
+
   return (
-    <div className="space-y-5">
+    <div id="kazoku-tairyu-print-root" className="space-y-5">
+      {/* 印刷専用スタイル: 印刷時はこの要素だけを表示し（ダッシュボードのサイドバー等を隠す）、
+          出入国在留管理庁向け提出書類チェックリスト（(print)/print/[id]と同じ体裁）で出力する。 */}
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 10mm 12mm; }
+          body * { visibility: hidden; }
+          #kazoku-tairyu-print-root, #kazoku-tairyu-print-root * { visibility: visible; }
+          #kazoku-tairyu-print-root { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+      `}</style>
+
       {/* 対象範囲の注意（画面上に明確に表示） */}
       <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2.5 text-xs text-red-800 print:hidden">
         <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -198,16 +215,43 @@ export function KazokuTairyuCoeChecklist({
 
       {/* 印刷ヘッダー（画面では非表示・印刷時のみ表示） */}
       <div className="hidden print:block mb-4">
-        <h1 className="text-lg font-bold">家族滞在｜在留資格認定証明書交付申請　必要書類一覧</h1>
-        <div className="text-xs mt-1 grid grid-cols-2 gap-x-8 gap-y-0.5">
-          <span>案件名：{caseName || "—"}</span>
-          <span>作成日：{todayJa()}</span>
-          <span>申請人名：{applicantName || "—"}</span>
-          <span>続柄：{RELATIONSHIP_LABELS[relationship]}</span>
-          <span>扶養者名：{supporterName || "—"}</span>
-          <span>基準：{EFFECTIVE_DATE_NOTE}</span>
+        <div className="flex items-end justify-between border-b-2 border-gray-800 pb-3 mb-3">
+          <div>
+            <h1 className="text-base font-bold">家族滞在　必要書類一覧</h1>
+            <p className="text-[11px] text-gray-500 mt-1">行政書士 JLS　（yamaguchi@jls-gyosei.jp）</p>
+          </div>
+          <div className="text-right text-[11px] text-gray-600">
+            <div>作成日：{todayJa()}</div>
+            <div className="font-mono text-[10px] mt-0.5">{caseName || "—"}</div>
+          </div>
         </div>
-        <hr className="my-2 border-gray-400" />
+
+        <table className="w-full border-collapse text-[11px] mb-3">
+          <tbody>
+            <tr>
+              <td className="border border-gray-300 bg-gray-100 font-semibold px-2 py-1 w-20">申請人</td>
+              <td className="border border-gray-300 px-2 py-1">{applicantName || "—"} 様</td>
+              <td className="border border-gray-300 bg-gray-100 font-semibold px-2 py-1 w-20">続柄</td>
+              <td className="border border-gray-300 px-2 py-1">{RELATIONSHIP_LABELS[relationship]}</td>
+            </tr>
+            <tr>
+              <td className="border border-gray-300 bg-gray-100 font-semibold px-2 py-1">扶養者</td>
+              <td className="border border-gray-300 px-2 py-1">{supporterName || "—"} 様</td>
+              <td className="border border-gray-300 bg-gray-100 font-semibold px-2 py-1">手続</td>
+              <td className="border border-gray-300 px-2 py-1">家族滞在　在留資格認定証明書交付申請</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div className="bg-red-50 border border-red-200 border-l-4 border-l-red-500 px-3 py-2 text-[10.5px] leading-relaxed mb-2">
+          {SCOPE_WARNING}
+        </div>
+
+        <div className="bg-gray-50 border border-gray-200 border-l-4 border-l-blue-500 px-3 py-2 text-[11px] leading-relaxed mb-3">
+          <p className="font-bold mb-0.5">【ご提出のお願い】</p>
+          <p>以下の書類をご準備いただき、担当行政書士へご提出ください。</p>
+          <p className="text-gray-500 text-[10px] mt-0.5">{EFFECTIVE_DATE_NOTE}（{LAST_REVIEWED_NOTE}）</p>
+        </div>
       </div>
 
       {/* 基準日・対象手続バナー */}
@@ -465,13 +509,13 @@ export function KazokuTairyuCoeChecklist({
             </div>
           )}
 
-          {/* 準備者別の一覧表 */}
+          {/* 準備者別の一覧表（画面表示専用。印刷時は下の単一表を使う） */}
           {groups.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-10">
+            <p className="text-sm text-gray-400 text-center py-10 print:hidden">
               {canEdit ? "書類が登録されていません。上の「書類を追加」から登録してください。" : "書類が登録されていません。"}
             </p>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 print:hidden">
               {groups.map((g) => (
                 <div key={g.preparedBy} className={`border rounded-xl overflow-hidden ${PREPARER_ACCENT[g.preparedBy]}`}>
                   <div className="px-4 py-2 border-b border-black/5 text-sm font-semibold text-gray-800">
@@ -515,7 +559,65 @@ export function KazokuTairyuCoeChecklist({
         </>
       )}
 
-      {/* 注意書き */}
+      {/* 提出書類一覧表（印刷専用。既存の必要書類チェックリスト印刷と同じ体裁の単一表） */}
+      <div className="hidden print:block">
+        <table className="w-full border-collapse text-[11px]">
+          <thead>
+            <tr>
+              <th className="bg-gray-800 text-white text-center px-2 py-1.5 w-8">No.</th>
+              <th className="bg-gray-800 text-white text-center px-2 py-1.5 w-8">□</th>
+              <th className="bg-gray-800 text-white text-left px-2 py-1.5">書類名</th>
+              <th className="bg-gray-800 text-white text-center px-2 py-1.5 w-20">担当</th>
+              <th className="bg-gray-800 text-white text-center px-2 py-1.5 w-16">状態</th>
+              <th className="bg-gray-800 text-white text-left px-2 py-1.5">備考</th>
+            </tr>
+          </thead>
+          <tbody>
+            {printDocs.length === 0 ? (
+              <tr><td colSpan={6} className="text-center text-gray-400 py-6 border border-gray-300">必要書類がありません</td></tr>
+            ) : printDocs.map((d, i) => {
+              const isChecked = !!checked[d.id];
+              const exempt = d.status === "exempt";
+              const optional = d.status === "optional";
+              return (
+                <tr key={d.id} className={i % 2 === 1 ? "bg-gray-50" : ""}>
+                  <td className="border border-gray-300 text-center px-2 py-1.5 text-gray-400">{exempt ? "—" : i + 1}</td>
+                  <td className="border border-gray-300 text-center px-2 py-1.5 text-sm">{isChecked ? "✓" : "□"}</td>
+                  <td className="border border-gray-300 px-2 py-1.5 font-semibold">
+                    {d.name}
+                    {optional && <span className="ml-1.5 text-[9px] font-normal border border-blue-400 text-blue-600 rounded px-1">任意・推奨</span>}
+                    {exempt && <span className="ml-1.5 text-[9px] font-normal border border-gray-400 rounded px-1 text-gray-500">不要</span>}
+                    {!d.applicable && <span className="ml-1.5 text-[9px] font-normal border border-gray-400 rounded px-1 text-gray-500">この条件では不要</span>}
+                  </td>
+                  <td className="border border-gray-300 text-center px-2 py-1.5">{PREPARED_BY_LABELS[d.preparedBy]}</td>
+                  <td className="border border-gray-300 text-center px-2 py-1.5">{isChecked ? "準備済み" : "未提出"}</td>
+                  <td className="border border-gray-300 px-2 py-1.5 text-gray-600">
+                    {d.requirement}
+                    {d.conditional && d.reason && <div className="text-indigo-600 text-[10px] mt-0.5">＊{d.reason}</div>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div className="mt-2.5 text-[10px] text-gray-500 flex gap-5">
+          <span>□ 未提出</span>
+          <span>✓ 準備済み</span>
+        </div>
+        <div className="mt-2 text-right text-[11px] text-gray-500">
+          必要書類合計：{printRequiredCount} 件　／　準備済み：{printCheckedCount} 件
+        </div>
+
+        <div className="mt-5 pt-3 border-t border-gray-200 text-[11px]">
+          <p className="font-bold mb-1">【ご連絡先】</p>
+          <p>行政書士 JLS</p>
+          <p>Email: yamaguchi@jls-gyosei.jp</p>
+          <p className="text-gray-500 text-[10px] mt-1.5">書類に関してご不明な点は、お気軽にご相談ください。</p>
+        </div>
+      </div>
+
+      {/* 注意書き（画面・印刷とも表示） */}
       <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-xs text-gray-600 space-y-0.5">
         {CAUTION_NOTES.map((n) => <p key={n}>※ {n}</p>)}
       </div>

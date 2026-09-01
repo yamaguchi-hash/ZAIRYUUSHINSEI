@@ -12,6 +12,8 @@ import {
   CAUTION_NOTE,
   GIJINKOKU_VISA_TYPE,
   GIJINKOKU_RENEWAL_APPLICATION_TYPE,
+  TARGET_VISA_LABEL,
+  TARGET_PROCEDURE_LABEL,
   type ChecklistInput,
   type ChecklistDocument,
   type PreparedBy,
@@ -24,6 +26,8 @@ import {
   Printer, ExternalLink, Info, ClipboardList, Eye, EyeOff, Loader2, AlertCircle, ListPlus, CheckCircle2,
   Pencil, Trash2, Plus, Save, X,
 } from "lucide-react";
+import { buildChecklistPdfFileName } from "@/lib/checklist-pdf-file-name";
+import { selectApplicableChecklistDocumentsForPrint } from "@/lib/checklist-print-items";
 
 // この機能で使う担当プリセット（必要書類マスターの自由記載欄に保存する文字列）
 const PREPARED_BY_PRESETS = ["申請人", "受入企業", "派遣先"];
@@ -127,7 +131,12 @@ export function GijinkokuRenewalChecklist({
   const evaluated = useMemo(() => evaluateChecklistFromMaster(rows, input), [rows, input]);
   const visible = showConditional ? evaluated : evaluated.filter((d) => d.applicable);
   const groups = useMemo(() => groupByPreparer(visible), [visible]);
-  const requiredCount = evaluated.filter((d) => d.applicable && d.status === "required").length;
+  // チェックを入れた書類のみが「案件への反映」対象（該当しない書類・不要書類は誤チェックでも除外）
+  const selectedDocs = useMemo(
+    () => evaluated.filter((d) => checked[d.id] && d.applicable && d.status !== "exempt"),
+    [evaluated, checked]
+  );
+  const requiredCount = selectedDocs.length;
   const rowsById = useMemo(() => Object.fromEntries(rows.map((r) => [r.id, r])), [rows]);
 
   async function handleSaveRow(id: string, patch: { documentName: string; description: string; preparedBy: string; conditions: Record<string, unknown> | null }) {
@@ -167,7 +176,7 @@ export function GijinkokuRenewalChecklist({
 
   async function handleApplyToChecklist() {
     if (!applicationId) return;
-    const ids = evaluated.filter((d) => d.applicable && d.status !== "exempt").map((d) => d.id);
+    const ids = selectedDocs.map((d) => d.id);
     if (ids.length === 0) return;
     setApplying(true);
     setApplyMessage("");
@@ -181,11 +190,14 @@ export function GijinkokuRenewalChecklist({
     router.refresh();
   }
 
-  // 印刷時に必要書類一覧のみを抽出（担当・状態ヘッダー付きの単一表。
-  // showConditional のオン/オフに応じて画面と同じ範囲を印刷する）
-  const printDocs = visible;
-  const printRequiredCount = printDocs.filter((d) => d.status !== "exempt").length;
-  const printCheckedCount = printDocs.filter((d) => checked[d.id]).length;
+  // 印刷・案件への反映は「チェックを入れた書類」のみを対象とする
+  // （チェックしていない書類は一覧表にも提出書類にも含めない）
+  const printDocs = selectApplicableChecklistDocumentsForPrint(evaluated);
+
+  function handlePrint() {
+    document.title = buildChecklistPdfFileName(TARGET_VISA_LABEL, TARGET_PROCEDURE_LABEL);
+    window.print();
+  }
 
   return (
     <div id="gijinkoku-print-root" className="space-y-5">
@@ -193,7 +205,7 @@ export function GijinkokuRenewalChecklist({
           出入国在留管理庁向け提出書類チェックリスト（(print)/print/[id]と同じ体裁）で出力する。 */}
       <style>{`
         @media print {
-          @page { size: A4 landscape; margin: 10mm 12mm; }
+          @page { size: A4 portrait; margin: 10mm 12mm; }
           body * { visibility: hidden; }
           #gijinkoku-print-root, #gijinkoku-print-root * { visibility: visible; }
           #gijinkoku-print-root { position: absolute; left: 0; top: 0; width: 100%; }
@@ -304,11 +316,17 @@ export function GijinkokuRenewalChecklist({
         </div>
       ) : (
         <>
+          {/* チェックの役割についての案内（一覧表・印刷は該当する書類すべてが対象） */}
+          <p className="text-xs text-gray-500 print:hidden">
+            一覧表・印刷には、該当する必要書類がすべて表示されます。チェックは
+            <strong className="text-gray-700">案件の「必要書類チェックリスト」へ反映する書類を選ぶため</strong>に使います。
+          </p>
+
           {/* ツールバー */}
           <div className="flex items-center justify-between gap-3 flex-wrap print:hidden">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <ClipboardList className="w-4 h-4 text-gray-400" />
-              必要書類 <span className="font-semibold text-gray-800">{requiredCount}</span> 件
+              反映対象（チェック済み） <span className="font-semibold text-gray-800">{requiredCount}</span> 件
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -333,7 +351,7 @@ export function GijinkokuRenewalChecklist({
                   type="button"
                   onClick={handleApplyToChecklist}
                   disabled={applying || requiredCount === 0}
-                  title="表示中の必要書類を、この案件の「必要書類チェックリスト」へ追加します"
+                  title="チェックした必要書類を、この案件の「必要書類チェックリスト」へ追加します"
                   className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg px-3 py-2 disabled:opacity-50"
                 >
                   {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ListPlus className="w-4 h-4" />}
@@ -342,7 +360,7 @@ export function GijinkokuRenewalChecklist({
               )}
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={handlePrint}
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-3 py-2"
               >
                 <Printer className="w-4 h-4" />印刷 / PDF保存
@@ -466,43 +484,29 @@ export function GijinkokuRenewalChecklist({
               <th className="bg-gray-800 text-white text-center px-2 py-1.5 w-8">□</th>
               <th className="bg-gray-800 text-white text-left px-2 py-1.5">書類名</th>
               <th className="bg-gray-800 text-white text-center px-2 py-1.5 w-20">担当</th>
-              <th className="bg-gray-800 text-white text-center px-2 py-1.5 w-16">状態</th>
               <th className="bg-gray-800 text-white text-left px-2 py-1.5">備考</th>
             </tr>
           </thead>
           <tbody>
             {printDocs.length === 0 ? (
-              <tr><td colSpan={6} className="text-center text-gray-400 py-6 border border-gray-300">必要書類がありません</td></tr>
-            ) : printDocs.map((d, i) => {
-              const isChecked = !!checked[d.id];
-              const exempt = d.status === "exempt";
-              return (
-                <tr key={d.id} className={i % 2 === 1 ? "bg-gray-50" : ""}>
-                  <td className="border border-gray-300 text-center px-2 py-1.5 text-gray-400">{exempt ? "—" : i + 1}</td>
-                  <td className="border border-gray-300 text-center px-2 py-1.5 text-sm">{isChecked ? "✓" : "□"}</td>
-                  <td className="border border-gray-300 px-2 py-1.5 font-semibold">
-                    {d.name}
-                    {exempt && <span className="ml-1.5 text-[9px] font-normal border border-gray-400 rounded px-1 text-gray-500">不要</span>}
-                    {!d.applicable && <span className="ml-1.5 text-[9px] font-normal border border-gray-400 rounded px-1 text-gray-500">この条件では不要</span>}
-                  </td>
-                  <td className="border border-gray-300 text-center px-2 py-1.5">{PREPARED_BY_LABELS[d.preparedBy]}</td>
-                  <td className="border border-gray-300 text-center px-2 py-1.5">{isChecked ? "準備済み" : "未提出"}</td>
-                  <td className="border border-gray-300 px-2 py-1.5 text-gray-600">
-                    {d.requirement}
-                    {d.conditional && d.reason && <div className="text-indigo-600 text-[10px] mt-0.5">＊{d.reason}</div>}
-                  </td>
-                </tr>
-              );
-            })}
+              <tr><td colSpan={5} className="text-center text-gray-400 py-6 border border-gray-300">必要書類がありません</td></tr>
+            ) : printDocs.map((d, i) => (
+              <tr key={d.id} className={i % 2 === 1 ? "bg-gray-50" : ""}>
+                <td className="border border-gray-300 text-center px-2 py-1.5 text-gray-400">{i + 1}</td>
+                <td className="border border-gray-300 text-center px-2 py-1.5 text-sm">□</td>
+                <td className="border border-gray-300 px-2 py-1.5 font-semibold">{d.name}</td>
+                <td className="border border-gray-300 text-center px-2 py-1.5">{PREPARED_BY_LABELS[d.preparedBy]}</td>
+                <td className="border border-gray-300 px-2 py-1.5 text-gray-600">
+                  {d.requirement}
+                  {d.conditional && d.reason && <div className="text-indigo-600 text-[10px] mt-0.5">＊{d.reason}</div>}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
 
-        <div className="mt-2.5 text-[10px] text-gray-500 flex gap-5">
-          <span>□ 未提出</span>
-          <span>✓ 準備済み</span>
-        </div>
         <div className="mt-2 text-right text-[11px] text-gray-500">
-          必要書類合計：{printRequiredCount} 件　／　準備済み：{printCheckedCount} 件
+          必要書類合計：{printDocs.length} 件
         </div>
 
         <div className="mt-5 pt-3 border-t border-gray-200 text-[11px]">
@@ -564,7 +568,8 @@ function Row({
           type="checkbox"
           checked={checked}
           onChange={onToggle}
-          aria-label={`${d.name} を準備済みにする`}
+          aria-label={`${d.name} を案件へ反映する対象にする`}
+          title="案件の「必要書類チェックリスト」へ反映する書類として選ぶ"
           className="w-4 h-4 accent-blue-600 mt-0.5"
         />
       </td>

@@ -15,6 +15,8 @@
 
 export const GIJINKOKU_VISA_TYPE = "engineer_humanities";
 export const GIJINKOKU_RENEWAL_APPLICATION_TYPE = "renewal";
+export const TARGET_VISA_LABEL = "技術・人文知識・国際業務";
+export const TARGET_PROCEDURE_LABEL = "在留期間更新許可申請";
 
 /** 準備者区分 */
 export type PreparedBy = "applicant" | "organization" | "dispatch_destination";

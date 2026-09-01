@@ -33,7 +33,8 @@ function row(id: string, name: string, preparedBy: string, conditions: Gijinkoku
 
 // scripts/seed-gijinkoku-renewal-checklist.ts と同じ条件形状のモック行（21件）
 const ROWS: MasterDocRow[] = [
-  row("application_form", "在留期間更新許可申請書", "申請人", { category: "共通" }),
+  // 在留期間更新許可申請書そのものは所属機関側で作成・提出する申請書式であり、
+  // 申請人・扶養者が準備する必要書類（添付書類）ではないため一覧に含めない
   row("photo", "写真（縦4cm×横3cm）", "申請人", {
     category: "共通",
     exemptWhen: { photoException: true },
@@ -81,12 +82,10 @@ const get = (docs: ChecklistDocument[], id: string) => docs.find((d) => d.id ===
 console.log("[カテゴリー1]");
 {
   const d = buildChecklist(base({ orgCategory: 1 }));
-  check("在留期間更新許可申請書がある", has(d, "application_form"));
+  check("パスポート及び在留カードがある", has(d, "passport_and_residence_card"));
   // 回帰テスト: exemptWhen未設定の共通書類が誤って「不要」にならないこと
-  check("在留期間更新許可申請書は required（exemptWhen未設定のため）", get(d, "application_form")?.status === "required");
   check("パスポート及び在留カードは required（exemptWhen未設定のため）", get(d, "passport_and_residence_card")?.status === "required");
   check("写真がある・required", get(d, "photo")?.status === "required");
-  check("パスポート及び在留カードがある", has(d, "passport_and_residence_card"));
   check("カテゴリー該当証明がある・required", get(d, "category_certificate")?.status === "required");
   check("カテゴリー1の証明文言（上場等）", (get(d, "category_certificate")?.requirement ?? "").includes("上場"));
   check("派遣書類は出ない", !has(d, "dispatch_ledger_from"));

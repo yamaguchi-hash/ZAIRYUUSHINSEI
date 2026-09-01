@@ -36,9 +36,10 @@ function row(id: string, name: string, preparedBy: string, conditions: FamilySta
   return { id, documentName: name, description, preparedBy, conditions, sortOrder: 0 };
 }
 
-// scripts/seed-kazoku-tairyu-coe.ts と同じ条件形状のモック行（16件）
+// scripts/seed-kazoku-tairyu-coe.ts と同じ条件形状のモック行（15件）
+// 在留資格認定証明書交付申請書そのものは申請代理人側で作成・提出する申請書式であり、
+// 申請人・扶養者が準備する必要書類（添付書類）ではないため一覧に含めない
 const ROWS: MasterDocRow[] = [
-  row("application_form", "在留資格認定証明書交付申請書（1通）", "申請代理人", { category: "共通" }),
   row("photo", "写真（縦4cm×横3cm）", "申請人", { category: "共通" }),
   row("return_envelope", "返信用封筒", "申請代理人", { category: "共通" }),
   row("supporter_residence_card_or_passport", "扶養者の在留カード又は旅券の写し", "扶養者", { category: "共通" }),
@@ -75,12 +76,10 @@ const get = (docs: ChecklistDocument[], id: string) => docs.find((d) => d.id ===
 console.log("[会社勤務・配偶者]");
 {
   const d = buildChecklist(base({ relationship: "spouse", supporterIncomeType: "income", identityDocs: ["marriage_certificate"] }));
-  check("共通書類（申請書）がある", has(d, "application_form"));
   check("共通書類（写真）がある", has(d, "photo"));
   check("共通書類（返信用封筒）がある", has(d, "return_envelope"));
   check("扶養者の在留カード等がある", has(d, "supporter_residence_card_or_passport"));
   // 回帰テスト: exemptWhen未設定の共通書類が誤って「不要」にならないこと
-  check("申請書は required（exemptWhen未設定のため）", get(d, "application_form")?.status === "required");
   check("扶養者の在留カード等は required（exemptWhen未設定のため）", get(d, "supporter_residence_card_or_passport")?.status === "required");
   check("結婚証明書の写しがある（選択どおり）", has(d, "identity_marriage_certificate"));
   check("戸籍謄本は出ない（未選択）", !has(d, "identity_family_register"));

@@ -29,6 +29,8 @@ import { ConditionsEditor } from "./document-conditions-editor";
 import { FamilyStayConditionsEditor } from "./family-stay-conditions-editor";
 import { GIJINKOKU_VISA_TYPE, GIJINKOKU_RENEWAL_APPLICATION_TYPE } from "@/lib/gijinkoku-renewal-checklist";
 import { FAMILY_STAY_VISA_TYPE, FAMILY_STAY_COE_APPLICATION_TYPE } from "@/lib/kazoku-tairyu-coe-checklist";
+import { GijinkokuRenewalChecklist } from "@/components/checklist/gijinkoku-renewal-checklist";
+import { KazokuTairyuCoeChecklist } from "@/components/checklist/kazoku-tairyu-coe-checklist";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
@@ -64,6 +66,12 @@ export function DocumentMasterClient() {
 
   const [visaType, setVisaType] = useState<string>(visaTypes[0]?.value ?? "");
   const [appType, setAppType] = useState<string>("change");
+
+  // 技人国・更新 / 家族滞在・COE は、条件付き自動チェックリストが使える組み合わせ。
+  // この場合は下の「一覧」「新規追加」の代わりにチェックリスト画面（編集機能つき）を表示する。
+  const isGijinkokuRenewal = visaType === GIJINKOKU_VISA_TYPE && appType === GIJINKOKU_RENEWAL_APPLICATION_TYPE;
+  const isFamilyStayCoe = visaType === FAMILY_STAY_VISA_TYPE && appType === FAMILY_STAY_COE_APPLICATION_TYPE;
+  const hasChecklist = isGijinkokuRenewal || isFamilyStayCoe;
   const [rows, setRows] = useState<RowState[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -662,6 +670,13 @@ export function DocumentMasterClient() {
         </CardContent>
       </Card>
 
+      {/* この組み合わせに条件付き自動チェックリストがある場合は、一覧・新規追加の代わりに
+          チェックリスト画面（編集機能つき）を表示する（申請条件・案件情報の入力欄も含む）。 */}
+      {isGijinkokuRenewal && <GijinkokuRenewalChecklist />}
+      {isFamilyStayCoe && <KazokuTairyuCoeChecklist />}
+
+      {!hasChecklist && (
+      <>
       {/* 一覧 */}
       <Card>
         <CardContent className="p-0">
@@ -925,6 +940,8 @@ export function DocumentMasterClient() {
           </button>
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }

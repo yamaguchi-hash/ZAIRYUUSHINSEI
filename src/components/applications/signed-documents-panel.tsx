@@ -27,7 +27,7 @@ const DOC_TYPE_CONFIG = {
     bgColor: "bg-blue-100",
   },
   organization: {
-    label: "所属機関用",
+    label: "所属機関用/扶養者用",
     icon: Building2,
     color: "bg-green-50 border-green-200",
     textColor: "text-green-700",
@@ -278,7 +278,7 @@ export function SignedDocumentsPanel({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 disabled:bg-gray-100"
             >
               <option value="applicant">👤 申請人用</option>
-              <option value="organization">🏢 所属機関用</option>
+              <option value="organization">🏢 所属機関用/扶養者用</option>
               <option value="gaikatsu">💼 資格外活動許可申請書</option>
             </select>
 

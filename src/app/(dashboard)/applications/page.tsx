@@ -1,14 +1,9 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { applications, applicantMaster, organizationMaster } from "@/lib/db/schema";
-import { eq, and, ne, desc } from "drizzle-orm";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  FileText,
-  Plus,
-  Search,
-  Filter,
-} from "lucide-react";
+import { eq, and, ne, desc, asc } from "drizzle-orm";
+import { Card, CardContent } from "@/components/ui/card";
+import { FileText, Plus } from "lucide-react";
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_TYPE_LABELS,
@@ -17,15 +12,46 @@ import {
   formatDate,
 } from "@/lib/utils";
 import Link from "next/link";
+import { SortableHeader } from "@/components/applications/sortable-header";
+
+type SortColumn = "applicant_name" | "status" | "created_at" | "visa_expiry";
+type SortOrder = "asc" | "desc";
+
+function buildOrderBy(sort: SortColumn, order: SortOrder) {
+  const dir = order === "asc" ? asc : desc;
+  switch (sort) {
+    case "applicant_name":
+      return [dir(applicantMaster.familyNameEn), dir(applicantMaster.givenNameEn)];
+    case "status":
+      return [dir(applications.status), desc(applications.updatedAt)];
+    case "created_at":
+      return [dir(applications.createdAt)];
+    case "visa_expiry":
+      return [dir(applicantMaster.currentVisaExpiry), desc(applications.createdAt)];
+    default:
+      return [desc(applications.updatedAt)];
+  }
+}
+
+function getSortHref(col: SortColumn, currentSort: SortColumn, currentOrder: SortOrder): string {
+  const newOrder: SortOrder = currentSort === col && currentOrder === "asc" ? "desc" : "asc";
+  return `/applications?sort=${col}&order=${newOrder}`;
+}
 
 export default async function ApplicationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; sort?: string; order?: string }>;
 }) {
   const session = await auth();
   const tenantId = (session?.user as any)?.tenantId;
   const params = await searchParams;
+
+  const VALID_SORTS: SortColumn[] = ["applicant_name", "status", "created_at", "visa_expiry"];
+  const sort: SortColumn = VALID_SORTS.includes(params.sort as SortColumn)
+    ? (params.sort as SortColumn)
+    : "created_at";
+  const order: SortOrder = params.order === "asc" ? "asc" : "desc";
 
   const apps = await db
     .select({
@@ -41,12 +67,13 @@ export default async function ApplicationsPage({
       applicantGivenName: applicantMaster.givenNameEn,
       applicantNationality: applicantMaster.nationality,
       organizationName: organizationMaster.nameJa,
+      currentVisaExpiry: applicantMaster.currentVisaExpiry,
     })
     .from(applications)
     .leftJoin(applicantMaster, eq(applications.applicantId, applicantMaster.id))
     .leftJoin(organizationMaster, eq(applications.organizationId, organizationMaster.id))
     .where(and(eq(applications.tenantId, tenantId ?? ""), ne(applications.status, "cancelled")))
-    .orderBy(desc(applications.updatedAt));
+    .orderBy(...buildOrderBy(sort, order));
 
   return (
     <div className="p-8">
@@ -87,12 +114,41 @@ export default async function ApplicationsPage({
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">案件番号</th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">申請人</th>
+                    <th className="text-left px-6 py-3">
+                      <SortableHeader
+                        label="申請人"
+                        href={getSortHref("applicant_name", sort, order)}
+                        isActive={sort === "applicant_name"}
+                        order={order}
+                      />
+                    </th>
                     <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">所属機関</th>
                     <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">在留資格</th>
                     <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">申請種別</th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">ステータス</th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">更新日</th>
+                    <th className="text-left px-6 py-3">
+                      <SortableHeader
+                        label="ステータス"
+                        href={getSortHref("status", sort, order)}
+                        isActive={sort === "status"}
+                        order={order}
+                      />
+                    </th>
+                    <th className="text-left px-6 py-3">
+                      <SortableHeader
+                        label="申請日"
+                        href={getSortHref("created_at", sort, order)}
+                        isActive={sort === "created_at"}
+                        order={order}
+                      />
+                    </th>
+                    <th className="text-left px-6 py-3">
+                      <SortableHeader
+                        label="在留期限"
+                        href={getSortHref("visa_expiry", sort, order)}
+                        isActive={sort === "visa_expiry"}
+                        order={order}
+                      />
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -131,7 +187,10 @@ export default async function ApplicationsPage({
                         </span>
                       </td>
                       <td className="px-6 py-4 text-gray-500 text-xs">
-                        {formatDate(app.updatedAt)}
+                        {formatDate(app.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 text-gray-500 text-xs">
+                        {app.currentVisaExpiry ? formatDate(app.currentVisaExpiry) : "—"}
                       </td>
                     </tr>
                   ))}

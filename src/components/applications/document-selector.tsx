@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition, useMemo, useRef } from "react";
-import { addDocumentsToChecklist, removeDocumentFromChecklist, addCustomDocumentToChecklist, addRequiredDocumentsToChecklist } from "@/actions/applications";
+import { addDocumentsToChecklist, addCustomDocumentToChecklist, addRequiredDocumentsToChecklist } from "@/actions/applications";
 import {
-  PlusCircle, Trash2, ChevronDown, ChevronRight, CheckSquare,
+  PlusCircle, ChevronDown, ChevronRight, CheckSquare,
   Square, Loader2, Search, ListChecks, X, FilePlus, Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,6 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
-  const [isRemoving, startRemove] = useTransition();
   const [isAddingCustom, startAddCustom] = useTransition();
   const [isAddingRequired, startAddRequired] = useTransition();
   const [message, setMessage] = useState("");
@@ -99,12 +98,6 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
       } else {
         setMessage(`エラー: ${result.error}`);
       }
-    });
-  }
-
-  function handleRemove(itemId: string) {
-    startRemove(async () => {
-      await removeDocumentFromChecklist(itemId);
     });
   }
 
@@ -264,32 +257,6 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
         </div>
       )}
 
-      {/* 現在のチェックリスト（削除ボタン付き） */}
-      {checklist.length > 0 && (
-        <div className="mt-3 space-y-1">
-          <p className="text-xs text-gray-500 font-medium px-1">登録済み書類（{checklist.length}件）</p>
-          {checklist.map((item) => (
-            <div key={item.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg text-sm group">
-              <span className="flex-1 truncate text-gray-800">{item.documentName}</span>
-              <span className={cn("text-xs px-2 py-0.5 rounded-full flex-shrink-0",
-                item.status === "approved" ? "bg-green-100 text-green-700" :
-                item.status === "submitted" ? "bg-blue-100 text-blue-700" :
-                "bg-gray-100 text-gray-500"
-              )}>
-                {item.status === "approved" ? "承認" : item.status === "submitted" ? "提出済" : "未提出"}
-              </span>
-              <button
-                onClick={() => handleRemove(item.id)}
-                disabled={isRemoving}
-                className="text-gray-300 hover:text-red-500 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-30"
-                title="チェックリストから削除"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

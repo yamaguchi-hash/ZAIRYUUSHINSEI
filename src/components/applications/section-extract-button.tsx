@@ -10,9 +10,10 @@ interface Props {
   sectionKey: SectionKey;
   onExtracted: (data: Record<string, any>) => void;
   className?: string;
+  label?: string; // ボタンラベルのカスタマイズ（デフォルト: "書類から読み取る"）
 }
 
-export function SectionExtractButton({ applicationId, sectionKey, onExtracted, className }: Props) {
+export function SectionExtractButton({ applicationId, sectionKey, onExtracted, className, label }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [isError, setIsError] = useState(false);
@@ -51,7 +52,7 @@ export function SectionExtractButton({ applicationId, sectionKey, onExtracted, c
         {isLoading
           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
           : <ScanText className="w-3.5 h-3.5" />}
-        {isLoading ? "読み取り中..." : "書類から読み取る"}
+        {isLoading ? "読み取り中..." : (label ?? "書類から読み取る")}
       </button>
       {msg && (
         <p className={cn("text-xs max-w-[220px] text-right leading-tight",

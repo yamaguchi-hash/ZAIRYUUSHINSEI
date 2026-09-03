@@ -2,11 +2,12 @@
 
 import { useRef, useState } from "react";
 import { saveApplicantDocument, deleteApplicantDocument } from "@/actions/ocr";
-import { Upload, X, CheckCircle, Loader2, FileText } from "lucide-react";
+import { X, CheckCircle, Loader2, FileText, Eye, ExternalLink, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DocumentViewTrigger } from "./document-viewer";
+import { DocumentLink, isImageFile } from "./document-viewer";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 
-type DocType = "passport_front" | "passport_data_page" | "residence_card_front" | "residence_card_back";
+type DocType = "passport_data_page" | "residence_card_front" | "residence_card_back";
 
 interface DocumentUploadZoneProps {
   applicantId: string;
@@ -26,10 +27,39 @@ export function DocumentUploadZone({
   onUploaded,
 }: DocumentUploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragDepth = useRef(0);
   const [error, setError] = useState("");
+
+  // 行全体をドロップ対象にするためのハンドラ。子要素（リンク・ボタン）上に
+  // ドロップされてもイベントが確実に拾えるよう、ドラッグ中はオーバーレイを重ねる。
+  const onRowDragEnter = (e: React.DragEvent) => {
+    if (!existingDoc) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setIsDragging(true);
+  };
+  const onRowDragOver = (e: React.DragEvent) => {
+    if (!existingDoc) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+  const onRowDragLeave = (e: React.DragEvent) => {
+    if (!existingDoc) return;
+    e.preventDefault();
+    dragDepth.current -= 1;
+    if (dragDepth.current <= 0) { dragDepth.current = 0; setIsDragging(false); }
+  };
+  const onRowDrop = (e: React.DragEvent) => {
+    if (!existingDoc) return;
+    e.preventDefault();
+    dragDepth.current = 0;
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFile(file);
+  };
 
   async function handleFile(file: File) {
     setError("");
@@ -73,101 +103,96 @@ export function DocumentUploadZone({
     }
   }
 
-  const isPdf = existingDoc?.fileName?.toLowerCase().endsWith(".pdf");
-
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-800">{label}</p>
-          <p className="text-xs text-gray-400">{description}</p>
-        </div>
-        {existingDoc?.ocrProcessedAt && (
-          <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-            <CheckCircle className="w-3 h-3" /> OCR済み
-          </span>
-        )}
-      </div>
-
+    <div>
       {existingDoc ? (
-        /* Preview with viewer */
-        <div className="relative border border-gray-200 rounded-xl overflow-hidden bg-gray-50 group">
-          <DocumentViewTrigger
-            url={existingDoc.fileUrl}
-            fileName={existingDoc.fileName}
-            documentType={documentType}
-          >
-            <div className="aspect-[3/2] flex items-center justify-center">
-              {isPdf ? (
-                <div className="flex flex-col items-center gap-2 text-gray-400">
-                  <FileText className="w-10 h-10" />
-                  <p className="text-xs">{existingDoc.fileName}</p>
-                </div>
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={existingDoc.fileUrl}
-                  alt={label}
-                  className="object-contain w-full h-full p-2"
-                />
-              )}
-            </div>
-          </DocumentViewTrigger>
-
-          {/* Hover overlay */}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
-            <button
-              onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
-              className="bg-white text-gray-800 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-gray-100"
-            >
-              差し替え
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-              disabled={isDeleting}
-              className="bg-red-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-red-600 flex items-center gap-1"
-            >
-              {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
-              削除
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* Drop zone */
+        /* ─── アップロード済み: コンパクト行（ドラッグ&ドロップで差し替え可能） ─── */
         <div
           className={cn(
-            "border-2 border-dashed rounded-xl aspect-[3/2] flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors",
-            isDragging ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50/50",
-            isUploading && "pointer-events-none opacity-60"
+            "relative flex items-center gap-2 border rounded-lg px-3 py-2 transition-colors",
+            isUploading
+              ? "border-blue-300 bg-blue-50"
+              : isDragging
+              ? "border-blue-400 bg-blue-50 ring-2 ring-blue-200"
+              : "border-gray-200 bg-white"
           )}
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragging(false);
-            const file = e.dataTransfer.files[0];
-            if (file) handleFile(file);
-          }}
+          onDragEnter={onRowDragEnter}
+          onDragOver={onRowDragOver}
+          onDragLeave={onRowDragLeave}
+          onDrop={onRowDrop}
+          title="ここにファイルをドラッグ＆ドロップして差し替えできます"
         >
           {isUploading ? (
-            <>
-              <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-              <p className="text-xs text-blue-600">アップロード中...</p>
-            </>
+            <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin flex-shrink-0" />
           ) : (
-            <>
-              <Upload className="w-8 h-8 text-gray-300" />
-              <div className="text-center px-2">
-                <p className="text-xs text-gray-500">クリックまたはドラッグ＆ドロップ</p>
-                <p className="text-xs text-gray-400">JPEG / PNG / WebP / PDF（10MB以下）</p>
-              </div>
-            </>
+            <FileText className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] text-gray-400 leading-none mb-0.5">{label}</p>
+            <DocumentLink
+              url={existingDoc.fileUrl}
+              fileName={existingDoc.fileName}
+              documentType={documentType}
+              className="text-xs text-gray-700 hover:text-blue-600 flex items-center gap-1 text-left"
+            >
+              <span className="truncate">{existingDoc.fileName}</span>
+              {isImageFile(existingDoc.fileName) ? (
+                <Eye className="w-3 h-3 text-gray-300 flex-shrink-0" />
+              ) : (
+                <ExternalLink className="w-3 h-3 text-gray-300 flex-shrink-0" />
+              )}
+            </DocumentLink>
+          </div>
+          {existingDoc.ocrProcessedAt && (
+            <span className="flex items-center gap-0.5 text-[10px] text-green-600 flex-shrink-0 font-medium">
+              <CheckCircle className="w-3 h-3" /> OCR済
+            </span>
+          )}
+          <button
+            onClick={() => inputRef.current?.click()}
+            className="text-xs font-medium text-blue-500 hover:text-blue-700 flex-shrink-0 px-1"
+          >
+            差し替え
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="p-0.5 text-gray-300 hover:text-red-500 disabled:opacity-50 flex-shrink-0"
+            title="削除"
+          >
+            {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+          </button>
+
+          {/* ドラッグ中のみ前面に出すドロップ捕捉オーバーレイ。子要素（リンク・ボタン）
+              の上でドロップされても確実に差し替えできるようにする。 */}
+          {isDragging && (
+            <div
+              className="absolute inset-0 z-20 flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-blue-400 bg-blue-50/95 text-xs font-medium text-blue-600"
+              onDragEnter={onRowDragEnter}
+              onDragOver={onRowDragOver}
+              onDragLeave={onRowDragLeave}
+              onDrop={onRowDrop}
+            >
+              <Upload className="w-4 h-4" />
+              ここにドロップで差し替え
+            </div>
           )}
         </div>
+      ) : (
+        /* ─── 未アップロード: コンパクトなインライン型ドロップゾーン ─── */
+        <FileDropzone
+          label={label}
+          description={`${description}　·　クリックまたはドラッグ＆ドロップ`}
+          isUploading={isUploading}
+          onFile={handleFile}
+        >
+          <span className="text-[10px] text-gray-300 flex-shrink-0 hidden sm:inline">
+            JPEG · PNG · PDF
+          </span>
+        </FileDropzone>
       )}
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-red-500 mt-1 px-1">{error}</p>}
 
       <input
         ref={inputRef}

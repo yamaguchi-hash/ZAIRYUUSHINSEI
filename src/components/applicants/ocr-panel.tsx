@@ -3,21 +3,23 @@
 import { useState, useTransition, useCallback } from "react";
 import { ocrAndFillApplicant, getApplicantDocuments } from "@/actions/ocr";
 import { DocumentUploadZone } from "./document-upload-zone";
-import { DocumentViewTrigger } from "./document-viewer";
+import { DocumentLink, isImageFile } from "./document-viewer";
 import {
   Sparkles, Loader2, CheckCircle, AlertCircle,
-  ChevronDown, ChevronUp, FileText, Eye,
+  ChevronDown, ChevronUp, FileText, Eye, ExternalLink, Clock, Plus, X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
 
-type DocType = "passport_front" | "passport_data_page" | "residence_card_front" | "residence_card_back";
+type DocType = "passport_data_page" | "residence_card_front" | "residence_card_back";
 
-const DOC_CONFIGS: { type: DocType; label: string; description: string }[] = [
-  { type: "passport_front",     label: "パスポート（表紙）",         description: "表紙面" },
-  { type: "passport_data_page", label: "パスポート（顔写真ページ）",  description: "氏名・番号・有効期限ページ" },
-  { type: "residence_card_front", label: "在留カード（表面）",        description: "氏名・在留資格・有効期限" },
-  { type: "residence_card_back",  label: "在留カード（裏面）",        description: "勤務先等" },
+const PASSPORT_CONFIGS: { type: DocType; label: string; description: string }[] = [
+  { type: "passport_data_page", label: "パスポート（顔写真ページ）", description: "氏名・番号・有効期限ページ" },
+];
+
+const RESIDENCE_CARD_CONFIGS: { type: DocType; label: string; description: string }[] = [
+  { type: "residence_card_front", label: "在留カード（表面）", description: "氏名・在留資格・有効期限" },
+  { type: "residence_card_back",  label: "在留カード（裏面）", description: "勤務先・住所変更記録" },
 ];
 
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -25,7 +27,11 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   passport_data_page: "パスポート（顔写真ページ）",
   residence_card_front: "在留カード（表面）",
   residence_card_back: "在留カード（裏面）",
+  residence_card_renewal: "最新の在留カード",
 };
+
+// 在留カード更新時にアップロードされた書類（履歴として複数件たまる）
+const RENEWAL_DOC_TYPE = "residence_card_renewal";
 
 interface DocItem {
   id: string;
@@ -47,6 +53,10 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
   const [ocrResult, setOcrResult] = useState<{ fields: string[]; extracted: Record<string, any> } | null>(null);
   const [ocrError, setOcrError] = useState("");
   const [uploadExpanded, setUploadExpanded] = useState(true);
+  // 裏面枠の表示制御（既存ドキュメントがある場合は初期表示）
+  const [showBackSide, setShowBackSide] = useState(
+    () => initialDocs.some(d => d.documentType === "residence_card_back")
+  );
 
   const refreshDocs = useCallback(() => {
     getApplicantDocuments(applicantId).then((d) =>
@@ -79,13 +89,25 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
     });
   }
 
-  const uploadedCount = docs.length;
-  const isPdf = (fileName: string) => fileName?.toLowerCase().endsWith(".pdf");
+  const uploadedCount = docs.filter((d) => d.documentType !== RENEWAL_DOC_TYPE && d.documentType !== "passport_front").length;
+
+  // 在留カード更新の履歴（複数アップロードされた場合、最新の1件のみメインに表示し、
+  // それ以外は下部の折りたたみ履歴に回す）
+  const renewalDocs = docs
+    .filter((d) => d.documentType === RENEWAL_DOC_TYPE)
+    .sort((a, b) => new Date(b.uploadedAt ?? 0).getTime() - new Date(a.uploadedAt ?? 0).getTime());
+  const latestRenewal = renewalDocs[0] ?? null;
+  const renewalHistory = renewalDocs.slice(1);
+
+  const galleryDocs = [
+    ...docs.filter((d) => d.documentType !== RENEWAL_DOC_TYPE && d.documentType !== "passport_front"),
+    ...(latestRenewal ? [latestRenewal] : []),
+  ];
 
   return (
     <div className="space-y-4">
       {/* ── Uploaded documents gallery ── */}
-      {docs.length > 0 && (
+      {galleryDocs.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
@@ -93,58 +115,40 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
               保存済み書類（クリックで閲覧）
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              {docs.map((doc) => (
-                <DocumentViewTrigger
-                  key={doc.id}
-                  url={doc.fileUrl}
-                  fileName={doc.fileName}
-                  documentType={doc.documentType}
-                >
-                  <div className="border border-gray-200 rounded-xl overflow-hidden hover:border-blue-400 hover:shadow-md transition-all group bg-gray-50">
-                    {/* Thumbnail */}
-                    <div className="aspect-[3/2] flex items-center justify-center bg-gray-100 relative">
-                      {isPdf(doc.fileName) ? (
-                        <div className="flex flex-col items-center gap-1 text-gray-400">
-                          <FileText className="w-8 h-8" />
-                          <span className="text-xs">PDF</span>
-                        </div>
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={doc.fileUrl}
-                          alt={doc.fileName}
-                          className="object-contain w-full h-full p-2"
-                        />
-                      )}
-                      {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <div className="bg-white rounded-full p-2 shadow">
-                          <Eye className="w-4 h-4 text-blue-600" />
-                        </div>
-                      </div>
-                    </div>
-                    {/* Label */}
-                    <div className="px-2 py-1.5">
-                      <p className="text-xs font-medium text-gray-700 truncate">
-                        {DOC_TYPE_LABELS[doc.documentType] ?? doc.documentType}
-                      </p>
-                      <div className="flex items-center justify-between mt-0.5">
-                        <p className="text-xs text-gray-400 truncate">{doc.fileName}</p>
-                        {doc.ocrProcessedAt ? (
-                          <span className="flex-shrink-0 text-xs text-green-600 flex items-center gap-0.5">
-                            <CheckCircle className="w-3 h-3" />OCR済
-                          </span>
-                        ) : (
-                          <span className="flex-shrink-0 text-xs text-gray-400">未処理</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </DocumentViewTrigger>
-              ))}
-            </div>
+          <CardContent className="space-y-1.5">
+            {galleryDocs.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2"
+              >
+                <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-700 truncate">
+                    {DOC_TYPE_LABELS[doc.documentType] ?? doc.documentType}
+                  </p>
+                  <DocumentLink
+                    url={doc.fileUrl}
+                    fileName={doc.fileName}
+                    documentType={doc.documentType}
+                    className="text-xs text-gray-500 hover:text-blue-600 truncate flex items-center gap-1 text-left"
+                  >
+                    <span className="truncate">{doc.fileName}</span>
+                    {isImageFile(doc.fileName) ? (
+                      <Eye className="w-3 h-3 text-gray-300 flex-shrink-0" />
+                    ) : (
+                      <ExternalLink className="w-3 h-3 text-gray-300 flex-shrink-0" />
+                    )}
+                  </DocumentLink>
+                </div>
+                {doc.ocrProcessedAt ? (
+                  <span className="flex-shrink-0 text-xs text-green-600 flex items-center gap-0.5">
+                    <CheckCircle className="w-3 h-3" />OCR済
+                  </span>
+                ) : (
+                  <span className="flex-shrink-0 text-xs text-gray-400">未処理</span>
+                )}
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
@@ -171,9 +175,12 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
 
         {uploadExpanded && (
           <CardContent className="space-y-5">
-            {/* 2×2 upload grid */}
-            <div className="grid grid-cols-2 gap-4">
-              {DOC_CONFIGS.map((cfg) => (
+            {/* パスポートセクション */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
+                <span>📄</span> パスポート
+              </p>
+              {PASSPORT_CONFIGS.map((cfg) => (
                 <DocumentUploadZone
                   key={cfg.type}
                   applicantId={applicantId}
@@ -184,6 +191,66 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
                   onUploaded={refreshDocs}
                 />
               ))}
+            </div>
+
+            {/* 在留カードセクション */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
+                <span>🪪</span> 在留カード
+              </p>
+
+              {/* 表面（常に表示） */}
+              <DocumentUploadZone
+                applicantId={applicantId}
+                documentType="residence_card_front"
+                label={RESIDENCE_CARD_CONFIGS[0].label}
+                description={RESIDENCE_CARD_CONFIGS[0].description}
+                existingDoc={getDoc("residence_card_front")}
+                onUploaded={refreshDocs}
+              />
+
+              {/* 裏面：ドキュメントが存在するか showBackSide が true の場合に表示 */}
+              {(showBackSide || !!getDoc("residence_card_back")) ? (
+                <div className="border-t border-dashed border-gray-200 pt-2 space-y-1.5">
+                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                    <span>↳</span>
+                    <span>裏面（勤務先・住所変更記録）</span>
+                    {!getDoc("residence_card_back") && (
+                      <button
+                        type="button"
+                        onClick={() => setShowBackSide(false)}
+                        className="ml-auto text-gray-300 hover:text-gray-500 transition-colors"
+                        title="裏面枠を閉じる"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <DocumentUploadZone
+                    applicantId={applicantId}
+                    documentType="residence_card_back"
+                    label={RESIDENCE_CARD_CONFIGS[1].label}
+                    description={RESIDENCE_CARD_CONFIGS[1].description}
+                    existingDoc={getDoc("residence_card_back")}
+                    onUploaded={refreshDocs}
+                  />
+                  {getDoc("residence_card_front") && getDoc("residence_card_back") && (
+                    <p className="text-xs text-blue-500 flex items-center gap-1 bg-blue-50 rounded-lg px-2.5 py-1.5">
+                      <Sparkles className="w-3 h-3 flex-shrink-0" />
+                      表面・裏面の両方がそろいました — AIが2枚を同時解析します
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowBackSide(true)}
+                  className="w-full flex items-center justify-center gap-1.5 border border-dashed border-gray-300 rounded-xl py-2 text-xs text-gray-400 hover:text-blue-500 hover:border-blue-300 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  裏面を追加する
+                </button>
+              )}
             </div>
 
             {/* OCR button & results */}
@@ -267,6 +334,43 @@ export function OcrPanel({ applicantId, initialDocs }: OcrPanelProps) {
           </CardContent>
         )}
       </Card>
+
+      {/* ── 在留カードの履歴（目立たない折りたたみエリア） ── */}
+      {renewalHistory.length > 0 && (
+        <details className="group bg-gray-50 border border-gray-200 rounded-xl">
+          <summary className="cursor-pointer list-none px-4 py-2.5 flex items-center justify-between text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors">
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              過去の在留カード（履歴）{renewalHistory.length}件
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="px-4 pb-3 pt-1 space-y-1.5 border-t border-gray-100">
+            {renewalHistory.map((doc) => (
+              <DocumentLink
+                key={doc.id}
+                url={doc.fileUrl}
+                fileName={doc.fileName}
+                documentType={doc.documentType}
+                className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-2.5 py-1.5 hover:border-blue-300 cursor-pointer transition-colors w-full text-left"
+              >
+                <FileText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                <span className="text-xs text-gray-600 truncate flex-1">{doc.fileName}</span>
+                {doc.uploadedAt && (
+                  <span className="text-xs text-gray-400 flex-shrink-0">
+                    {formatDate(doc.uploadedAt.toString())}
+                  </span>
+                )}
+                {isImageFile(doc.fileName) ? (
+                  <Eye className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                ) : (
+                  <ExternalLink className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                )}
+              </DocumentLink>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

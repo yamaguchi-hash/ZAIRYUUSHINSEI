@@ -83,6 +83,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [remarkInput, setRemarkInput] = useState("");
   const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
+  const [isAddingRemark, setIsAddingRemark] = useState(false);
   const [formData, setFormData] = useState({
     entryDate: "",
     entryTime: "",
@@ -295,6 +296,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
             setRemarks(remarks.map((r) => (r.id === editingRemarkId ? updated : r)));
             setEditingRemarkId(null);
             setRemarkInput("");
+            setIsAddingRemark(false);
             setError("");
           } else {
             setError("備考の更新に失敗しました。もう一度お試しください");
@@ -304,6 +306,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
           if (added) {
             setRemarks([added, ...remarks]);
             setRemarkInput("");
+            setIsAddingRemark(false);
             setError("");
           } else {
             setError("備考の保存に失敗しました。もう一度お試しください");
@@ -791,7 +794,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
             </div>
 
             {/* 備考入力 */}
-            {editingRemarkId || remarkInput ? (
+            {editingRemarkId || isAddingRemark ? (
               <div className="bg-white border border-blue-100 rounded-lg p-3 space-y-2">
                 <textarea
                   value={remarkInput}
@@ -814,6 +817,7 @@ export function CaseNotesPanel({ applicationId }: Props) {
                     onClick={() => {
                       setRemarkInput("");
                       setEditingRemarkId(null);
+                      setIsAddingRemark(false);
                     }}
                     className="flex-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
                   >
@@ -824,7 +828,10 @@ export function CaseNotesPanel({ applicationId }: Props) {
               </div>
             ) : (
               <button
-                onClick={() => setRemarkInput("")}
+                onClick={() => {
+                  setRemarkInput("");
+                  setIsAddingRemark(true);
+                }}
                 className="w-full px-3 py-2 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded"
               >
                 <Plus className="w-3.5 h-3.5 inline mr-1" />

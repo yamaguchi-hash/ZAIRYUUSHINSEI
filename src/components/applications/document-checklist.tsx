@@ -1,45 +1,62 @@
 "use client";
 
-import { useState, useTransition, useRef, useEffect } from "react";
+/**
+ * 必要書類チェックリスト（ステータス管理＋個別アップロード）
+ * ──────────────────────────────────────────
+ * 書類の要否・提出状況・備考の管理に加え、項目ごとのドロップインアップロード枠
+ * （ChecklistDropzone）を提供する。アップロードされた書類は
+ *  ① fillAllFieldsFromDocs によるAI自動入力のソース
+ *  ② 提出用データ一括ダウンロード（Zip）の対象
+ * として連動する。
+ */
+import { useState, useTransition, useRef, useEffect, useCallback, memo } from "react";
 import {
   toggleExpertCheckmark,
   updateDocumentStatus,
   updateChecklistNotes,
-  runConsistencyCheck,
-  saveChecklistDocumentAndOcr,
-  shareApplicantDocumentsToChecklist,
   generateApplicationFormDraft,
-  duplicateChecklistItem,
   removeDocumentFromChecklist,
-  clearChecklistFile,
   addCustomDocumentToChecklist,
 } from "@/actions/applications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   CheckSquare, Square, CheckCircle, XCircle, AlertCircle,
-  Clock, RefreshCw, Loader2, FileText, Upload, Sparkles,
-  ChevronDown, ChevronRight, Share2, Pencil, Check, X,
-  FileEdit, ArrowRight, Plus, FilePlus,
+  Clock, Loader2, FileText,
+  Pencil, Check, X, FileEdit, ArrowRight, Plus, FilePlus,
+  Upload, Download, Trash2, CheckCircle2,
+  User, Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DocumentLink } from "@/components/applicants/document-viewer";
+import { MasterDocumentPicker, type AvailableMasterFiles } from "./master-document-picker";
+
+interface AdditionalFile {
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  sourcedFromMaster?: boolean;
+  sourcedFromMasterType?: "applicant" | "organization" | "supporter";
+}
 
 interface ChecklistItem {
   id: string;
   documentName: string;
   isRequiredByExpert: boolean;
   status: string;
-  fileUrl: string | null;
-  fileName: string | null;
   expertNotes: string | null;
   ocrExtractedData?: Record<string, any> | null;
-  /** マスターの留意事項（description フィールド） */
   masterDescription?: string | null;
-  /** 書類マスターID（グループ化に使用） */
   documentRequirementId?: string | null;
-  /** マスターの並び順（入管提出順） */
   masterSortOrder?: number;
-  /** 作成日時（ISO文字列） */
   createdAt?: string | null;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
+  mimeType?: string | null;
+  additionalFiles?: AdditionalFile[] | null;
+  fileSourcedFromMaster?: boolean;
+  fileSourcedFromMasterType?: string | null;
 }
 
 interface DocumentChecklistProps {
@@ -47,10 +64,9 @@ interface DocumentChecklistProps {
   applicationId: string;
   userRole?: string;
   applicationStatus: string;
+  availableMasterFiles: AvailableMasterFiles;
 }
 
-// STATUS_ICONS はモジュールレベルに置かずコンポーネント内で生成する関数にする
-// （React 19 での hydration mismatch を防ぐため）
 function getStatusIcon(status: string): React.ReactNode {
   switch (status) {
     case "not_submitted":     return <Clock className="w-4 h-4 text-gray-400" />;
@@ -61,329 +77,457 @@ function getStatusIcon(status: string): React.ReactNode {
   }
 }
 const STATUS_LABELS: Record<string, string> = {
-  not_submitted: "未提出",
-  submitted:     "提出済",
+  not_submitted: "未収集",
+  submitted:     "収集済",
   approved:      "承認",
-  resubmit_required: "再提出要求",
+  resubmit_required: "再収集",
 };
 
-// 申請書類（アップロード不要）の判定
-function isApplicationForm(name: string) {
-  return /申請書/.test(name);
-}
-
-// OCR抽出データのサマリー表示用フィールド
-const OCR_DISPLAY_FIELDS: { key: string; label: string }[] = [
-  { key: "company_name",    label: "会社名" },
-  { key: "position",        label: "役職" },
-  { key: "annual_salary",   label: "年収" },
-  { key: "monthly_salary",  label: "月収" },
-  { key: "school_name",     label: "学校名" },
-  { key: "degree",          label: "学位" },
-  { key: "graduation_date", label: "卒業日" },
-  { key: "qualification",   label: "資格" },
-  { key: "full_name_ja",    label: "氏名" },
-  { key: "issue_date",      label: "発行日" },
-  { key: "notes",           label: "備考" },
+// ─── 書類カテゴリ判定（申請人 or 所属機関） ────────────────────────────────────
+const ORG_KEYWORDS = [
+  "登記", "決算書", "損益計算書", "貸借対照表", "財務諸表",
+  "雇用契約書", "雇用条件書", "労働条件通知書",
+  "支援計画", "支援責任者", "支援担当者", "支援機関",
+  "登録支援機関", "登録通知書",
+  "就業規則", "給与台帳", "出勤簿",
+  "雇用保険", "社会保険", "健康保険", "厚生年金",
+  "法人税", "法人番号", "消費税",
+  "採用", "受入", "外国人労働者",
 ];
 
-// ── 書類アップロード（per item・複数ファイル対応）────────────────────────────
-function ChecklistItemUpload({
-  item,
+function getDocumentSide(name: string): "applicant" | "organization" {
+  const n = name.normalize("NFKC");
+  return ORG_KEYWORDS.some((k) => n.includes(k)) ? "organization" : "applicant";
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 個別ドロップイン（チェックリスト項目ごとの軽量アップロード枠）
+// ═════════════════════════════════════════════════════════════════════════════
+interface ChecklistFile {
+  fileUrl: string | null;
+  fileName: string | null;
+  fileSize: number | null;
+  mimeType: string | null;
+  fileSourcedFromMaster?: boolean;
+  fileSourcedFromMasterType?: string | null;
+}
+
+interface UploadedFileResult extends ChecklistFile {
+  status: string;
+}
+
+interface AiFillResult {
+  success: boolean;
+  error?: string;
+  docsRead?: number;
+}
+
+interface MismatchInfo {
+  aiDocumentName: string;
+  droppedInto: string;
+  matchedName: string;
+  moved: boolean;
+}
+
+interface UploadMeta {
+  needsManualClassification?: boolean;
+  mismatch?: MismatchInfo | null;
+}
+
+const ChecklistDropzone = memo(function ChecklistDropzone({
+  itemId,
   applicationId,
+  documentName,
+  file,
+  availableMasterFiles,
   onUploaded,
-  onCleared,
-  onSlotAdded,
+  onDeleted,
+  onAiResult,
+  onMasterApplied,
 }: {
-  item: ChecklistItem;
+  itemId: string;
   applicationId: string;
-  onUploaded: (id: string, updates: Partial<ChecklistItem>) => void;
-  onCleared: (id: string) => void;
-  /** 複数ファイル時、2枚目以降のスロットが自動作成されたときに呼ばれる */
-  onSlotAdded: (newEntry: ChecklistItem) => void;
+  documentName: string;
+  file: ChecklistFile;
+  availableMasterFiles: AvailableMasterFiles;
+  onUploaded: (targetItemId: string, file: UploadedFileResult, meta?: UploadMeta) => void;
+  onDeleted: (itemId: string) => void;
+  onAiResult: (result: AiFillResult) => void;
+  onMasterApplied: (itemId: string, item: {
+    fileUrl: string | null; fileName: string | null; fileSize: number | null; mimeType: string | null;
+    status: string; fileSourcedFromMaster: boolean; fileSourcedFromMasterType: string | null;
+  }) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
-  const [isClearing, setIsClearing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
-  const [ocrStatus, setOcrStatus] = useState<"idle" | "processing" | "done">("idle");
-  const [showOcr, setShowOcr] = useState(false);
 
-  const ocr = item.ocrExtractedData as Record<string, any> | null;
-  const ocrFields = ocr
-    ? OCR_DISPLAY_FIELDS.filter((f) => ocr[f.key] && ocr[f.key] !== "null")
-    : [];
-
-  /** 1ファイルを指定スロットIDにアップロードして DB 保存。URL と OCR 結果を返す。 */
-  async function uploadToSlot(slotId: string, file: File) {
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: fd });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "アップロード失敗");
-
-    const result = await saveChecklistDocumentAndOcr(
-      slotId,
-      data.url,
-      file.name,
-      file.size,
-      data.mimeType,
-      item.documentName
-    );
-    if (!result.success) throw new Error(result.error ?? "保存失敗");
-
-    return {
-      fileUrl: data.url as string,
-      fileName: file.name,
-      mimeType: data.mimeType as string,
-      extracted: result.extracted ?? null,
-    };
-  }
-
-  /**
-   * 複数ファイル対応アップロード
-   * - 1枚目: 現スロット (item.id) へ
-   * - 2枚目以降: duplicateChecklistItem でスロットを自動生成してアップロード
-   */
-  async function handleFiles(files: File[]) {
-    if (files.length === 0) return;
+  async function handleFiles(fileList: File[]) {
+    if (fileList.length === 0) return;
     setError("");
     setIsUploading(true);
-    setOcrStatus("idle");
-    const total = files.length;
-    if (total > 1) setUploadProgress({ current: 1, total });
-
     try {
-      // ── 1枚目: 現スロット ──
-      const first = await uploadToSlot(item.id, files[0]);
-      onUploaded(item.id, {
-        fileUrl: first.fileUrl,
-        fileName: first.fileName,
-        status: "submitted",
-        ocrExtractedData: first.extracted,
+      const fd = new FormData();
+      fd.append("file", fileList[0]);
+      const res = await fetch(`/api/applications/${applicationId}/checklist/${itemId}/document`, {
+        method: "POST",
+        body: fd,
       });
-      setOcrStatus("done");
-
-      // ── 2枚目以降: 自動スロット作成 ──
-      for (let i = 1; i < total; i++) {
-        if (total > 1) setUploadProgress({ current: i + 1, total });
-        try {
-          const dupeResult = await duplicateChecklistItem(item.id, applicationId);
-          if (!dupeResult.success || !dupeResult.newItem) continue;
-
-          const extra = await uploadToSlot(dupeResult.newItem.id, files[i]);
-
-          // 新スロットを親の localChecklist に追加
-          onSlotAdded({
-            id: dupeResult.newItem.id,
-            documentName: dupeResult.newItem.documentName,
-            documentRequirementId: dupeResult.newItem.documentRequirementId,
-            isRequiredByExpert: dupeResult.newItem.isRequiredByExpert,
-            status: "submitted",
-            fileUrl: extra.fileUrl,
-            fileName: extra.fileName,
-            expertNotes: null,
-            ocrExtractedData: extra.extracted,
-            masterDescription: item.masterDescription,
-            masterSortOrder: item.masterSortOrder,
-            createdAt: new Date().toISOString(),
-          });
-        } catch {
-          // 一部失敗しても残りを続行
-        }
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(
+          `サーバーエラーが発生しました（HTTP ${res.status}）。` +
+          "書類が多い場合は処理に時間がかかることがあります。しばらく待ってから再試行してください。"
+        );
       }
+      if (!res.ok) throw new Error(data?.error ?? "アップロードに失敗しました");
+      onUploaded(
+        data.targetItemId ?? itemId,
+        data.item,
+        { needsManualClassification: data.needsManualClassification, mismatch: data.mismatch }
+      );
+      if (data.aiResult) onAiResult(data.aiResult);
     } catch (err: any) {
       setError(err.message ?? "アップロードに失敗しました");
-      setOcrStatus("idle");
     } finally {
       setIsUploading(false);
-      setUploadProgress(null);
     }
   }
 
-  // アップロード取り消し処理
-  async function handleClear() {
-    if (!confirm(`「${item.fileName}」のアップロードを取り消しますか？`)) return;
-    setIsClearing(true);
+  async function handleDelete() {
+    if (!confirm(`「${file.fileName}」を削除しますか？`)) return;
+    setIsDeleting(true);
     setError("");
     try {
-      const result = await clearChecklistFile(item.id);
-      if (!result.success) {
-        setError(result.error ?? "取り消しに失敗しました");
-      } else {
-        onCleared(item.id);
-      }
+      const res = await fetch(`/api/applications/${applicationId}/checklist/${itemId}/document`, {
+        method: "DELETE",
+      });
+      let data: any;
+      try { data = await res.json(); } catch { throw new Error(`サーバーエラー（HTTP ${res.status}）`); }
+      if (!res.ok) throw new Error(data?.error ?? "削除に失敗しました");
+      onDeleted(itemId);
     } catch (err: any) {
-      setError(err.message ?? "エラーが発生しました");
+      setError(err.message ?? "削除に失敗しました");
     } finally {
-      setIsClearing(false);
+      setIsDeleting(false);
     }
   }
 
-  // ファイルあり → ファイル名＋OCR結果表示
-  const hasFile = item.fileUrl && item.fileName;
-  if (hasFile) {
-    return (
-      <div className="mt-2 ml-8">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5 text-xs text-blue-800 max-w-xs">
-            <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-            <span className="truncate">{item.fileName}</span>
-          </div>
-          {/* AI読込結果バッジ */}
-          {ocr && ocrFields.length > 0 && (
-            <button
-              onClick={() => setShowOcr((v) => !v)}
-              className="flex items-center gap-1 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-2 py-1 hover:bg-purple-100"
+  const hasFile = !!file.fileName;
+
+  return (
+    <div className="inline-block">
+      {hasFile ? (
+        <div className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg pl-1.5 pr-1 py-1 max-w-full">
+          <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+          {file.fileUrl && file.fileUrl !== "(uploaded)" ? (
+            <DocumentLink
+              url={file.fileUrl}
+              fileName={file.fileName!}
+              documentType={documentName}
+              className="text-xs text-green-700 hover:text-green-900 hover:underline truncate max-w-[180px]"
             >
-              <Sparkles className="w-3 h-3" />
-              AI読込済み
-              {showOcr ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            </button>
+              {file.fileName}
+            </DocumentLink>
+          ) : (
+            <span className="text-xs text-green-700 truncate max-w-[180px]" title={file.fileName ?? ""}>
+              {file.fileName}
+            </span>
           )}
-          {/* 差し替えボタン */}
+          {file.fileSourcedFromMaster && (
+            <span
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 flex-shrink-0 whitespace-nowrap"
+              title={
+                file.fileSourcedFromMasterType === "organization"
+                  ? "所属機関マスターに登録済みの書類が反映されました"
+                  : file.fileSourcedFromMasterType === "supporter"
+                  ? "扶養者の書類が反映されました"
+                  : file.fileSourcedFromMasterType === "applicant"
+                  ? "申請人マスターに登録済みの書類が反映されました"
+                  : "マスターに登録済みの書類が反映されました"
+              }
+            >
+              {file.fileSourcedFromMasterType === "organization"
+                ? "アップロード済み（所属機関マスターから反映）"
+                : file.fileSourcedFromMasterType === "supporter"
+                ? "アップロード済み（扶養者マスターから反映）"
+                : file.fileSourcedFromMasterType === "applicant"
+                ? "アップロード済み（申請人マスターから反映）"
+                : "マスターから反映"}
+            </span>
+          )}
           <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="p-0.5 text-green-400 hover:text-red-500 disabled:opacity-50 flex-shrink-0"
+            title="削除"
+          >
+            {isDeleting
+              ? <Loader2 className="w-3 h-3 animate-spin" />
+              : <Trash2 className="w-3 h-3" />}
+          </button>
+        </div>
+      ) : (
+        <div className="inline-flex items-start gap-1.5 flex-wrap">
+          <div
             onClick={() => inputRef.current?.click()}
-            disabled={isClearing}
-            className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50"
-          >
-            差し替え
-          </button>
-          {/* 取り消しボタン */}
-          <button
-            onClick={handleClear}
-            disabled={isClearing}
-            className="text-xs text-red-400 hover:text-red-600 underline disabled:opacity-50"
-            title="アップロードを取り消す"
-          >
-            {isClearing ? "取り消し中..." : "取り消し"}
-          </button>
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,image/jpeg,image/png,application/pdf"
-            className="hidden"
-            onChange={(e) => {
-              const files = Array.from(e.target.files ?? []);
-              if (files.length) { handleFiles(files); e.target.value = ""; }
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              const fl = Array.from(e.dataTransfer.files);
+              if (fl.length) handleFiles(fl);
             }}
+            className={cn(
+              "inline-flex items-center gap-1.5 border border-dashed rounded-lg px-2 py-1 cursor-pointer transition-colors text-xs",
+              isDragging
+                ? "border-blue-400 bg-blue-50 text-blue-600"
+                : "border-gray-200 bg-gray-50 text-gray-400 hover:border-blue-300 hover:bg-blue-50/40",
+              isUploading && "pointer-events-none opacity-60"
+            )}
+          >
+            {isUploading ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" /><span className="text-blue-600">アップロード中...</span></>
+            ) : isDragging ? (
+              <><Upload className="w-3.5 h-3.5" /><span>ここにドロップ</span></>
+            ) : (
+              <><Upload className="w-3.5 h-3.5" /><span>ドラッグ&amp;ドロップ または クリックで添付</span></>
+            )}
+          </div>
+          <MasterDocumentPicker
+            applicationId={applicationId}
+            itemId={itemId}
+            slot="primary"
+            availableMasterFiles={availableMasterFiles}
+            onPrimaryApplied={onMasterApplied}
           />
         </div>
+      )}
+      {error && <p className="text-xs text-red-500 mt-0.5 whitespace-pre-wrap max-w-[220px]">{error}</p>}
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,image/jpeg,image/png,application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const fl = Array.from(e.target.files ?? []);
+          if (fl.length) { handleFiles(fl); e.target.value = ""; }
+        }}
+      />
+    </div>
+  );
+});
 
-        {/* OCR抽出データ詳細 */}
-        {showOcr && ocr && ocrFields.length > 0 && (
-          <div className="mt-2 bg-purple-50 border border-purple-100 rounded-lg p-3 text-xs space-y-1">
-            <p className="font-semibold text-purple-800 flex items-center gap-1 mb-2">
-              <Sparkles className="w-3 h-3" /> AI自動読込データ
-            </p>
-            {ocrFields.map((f) => (
-              <div key={f.key} className="flex gap-2">
-                <span className="text-purple-500 w-16 flex-shrink-0">{f.label}:</span>
-                <span className="text-gray-800 break-all">
-                  {f.key === "annual_salary" || f.key === "monthly_salary"
-                    ? `${Number(ocr[f.key]).toLocaleString()}円`
-                    : String(ocr[f.key])}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-      </div>
-    );
+// ═════════════════════════════════════════════════════════════════════════════
+// 追加ファイルセクション（2枚目以降のアップロード・表示・削除）
+// ═════════════════════════════════════════════════════════════════════════════
+const ExtraFilesSection = memo(function ExtraFilesSection({
+  itemId,
+  applicationId,
+  documentName,
+  extraFiles,
+  availableMasterFiles,
+  onFileAdded,
+  onFileDeleted,
+  onAiResult,
+}: {
+  itemId: string;
+  applicationId: string;
+  documentName: string;
+  extraFiles: AdditionalFile[];
+  availableMasterFiles: AvailableMasterFiles;
+  onFileAdded: (itemId: string, file: AdditionalFile) => void;
+  onFileDeleted: (itemId: string, index: number) => void;
+  onAiResult: (result: AiFillResult) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
+
+  async function handleFiles(fileList: File[]) {
+    if (fileList.length === 0) return;
+    setError("");
+    setIsUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", fileList[0]);
+      const res = await fetch(`/api/applications/${applicationId}/checklist/${itemId}/extra-file`, {
+        method: "POST",
+        body: fd,
+      });
+      let data: any;
+      try { data = await res.json(); } catch {
+        throw new Error(`サーバーエラーが発生しました（HTTP ${res.status}）。書類が多い場合は時間がかかることがあります。`);
+      }
+      if (!res.ok) throw new Error(data?.error ?? "アップロードに失敗しました");
+      onFileAdded(itemId, data.addedFile);
+      if (data.aiResult) onAiResult(data.aiResult);
+    } catch (err: any) {
+      setError(err.message ?? "アップロードに失敗しました");
+    } finally {
+      setIsUploading(false);
+    }
   }
 
-  // ファイルなし → ドロップゾーン（複数ファイル対応）
+  async function handleDelete(index: number) {
+    if (!confirm("追加ファイルを削除しますか？")) return;
+    setDeletingIdx(index);
+    setError("");
+    try {
+      const res = await fetch(`/api/applications/${applicationId}/checklist/${itemId}/extra-file`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ index }),
+      });
+      let data: any;
+      try { data = await res.json(); } catch { throw new Error(`サーバーエラー（HTTP ${res.status}）`); }
+      if (!res.ok) throw new Error(data?.error ?? "削除に失敗しました");
+      onFileDeleted(itemId, index);
+    } catch (err: any) {
+      setError(err.message ?? "削除に失敗しました");
+    } finally {
+      setDeletingIdx(null);
+    }
+  }
+
   return (
-    <div className="mt-2 ml-8">
+    <div className="mt-1 flex flex-wrap gap-1 items-start">
+      {/* 追加ファイル一覧 */}
+      {extraFiles.map((f, idx) => (
+        <div key={idx} className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg pl-1.5 pr-1 py-1">
+          <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+          {f.fileUrl && f.fileUrl !== "(uploaded)" ? (
+            <DocumentLink
+              url={f.fileUrl}
+              fileName={f.fileName}
+              documentType={documentName}
+              className="text-xs text-green-700 hover:text-green-900 hover:underline truncate max-w-[160px]"
+            >
+              {f.fileName}
+            </DocumentLink>
+          ) : (
+            <span className="text-xs text-green-700 truncate max-w-[160px]" title={f.fileName}>{f.fileName}</span>
+          )}
+          {f.sourcedFromMaster && (
+            <span
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 flex-shrink-0 whitespace-nowrap"
+              title={
+                f.sourcedFromMasterType === "organization"
+                  ? "所属機関マスターに登録済みの書類が反映されました"
+                  : f.sourcedFromMasterType === "supporter"
+                  ? "扶養者の書類が反映されました"
+                  : "申請人マスターに登録済みの書類が反映されました"
+              }
+            >
+              {f.sourcedFromMasterType === "organization"
+                ? "所属機関マスターから反映"
+                : f.sourcedFromMasterType === "supporter"
+                ? "扶養者マスターから反映"
+                : "申請人マスターから反映"}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => handleDelete(idx)}
+            disabled={deletingIdx === idx}
+            className="p-0.5 text-green-400 hover:text-red-500 disabled:opacity-50 flex-shrink-0"
+            title="削除"
+          >
+            {deletingIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+          </button>
+        </div>
+      ))}
+
+      {/* 追加アップロードゾーン */}
       <div
-        className={cn(
-          "border border-dashed rounded-lg px-3 py-2 flex items-center gap-2 cursor-pointer transition-colors text-xs",
-          isDragging ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50/40",
-          (isUploading || ocrStatus === "processing") && "pointer-events-none opacity-60"
-        )}
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={(e) => {
           e.preventDefault();
           setIsDragging(false);
-          const files = Array.from(e.dataTransfer.files);
-          if (files.length) handleFiles(files);
+          const fl = Array.from(e.dataTransfer.files);
+          if (fl.length) handleFiles(fl);
         }}
+        className={cn(
+          "inline-flex items-center gap-1 border border-dashed rounded-lg px-2 py-0.5 cursor-pointer transition-colors text-xs",
+          isDragging
+            ? "border-blue-400 bg-blue-50 text-blue-600"
+            : "border-gray-200 bg-gray-50 text-gray-400 hover:border-blue-300 hover:bg-blue-50/40",
+          isUploading && "pointer-events-none opacity-60"
+        )}
       >
-        {isUploading && uploadProgress ? (
-          <>
-            <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin flex-shrink-0" />
-            <span className="text-blue-600">
-              {uploadProgress.current}/{uploadProgress.total} ファイルをアップロード中...
-            </span>
-          </>
-        ) : isUploading ? (
-          <><Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" /><span className="text-blue-600">アップロード中...</span></>
-        ) : ocrStatus === "processing" ? (
-          <><Sparkles className="w-3.5 h-3.5 text-purple-500 animate-pulse" /><span className="text-purple-600">AIが読み込み中...</span></>
+        {isUploading ? (
+          <><Loader2 className="w-3 h-3 animate-spin text-blue-500" /><span className="text-blue-500">追加中...</span></>
         ) : isDragging ? (
-          <><Upload className="w-3.5 h-3.5 text-blue-500" /><span className="text-blue-600">ここにドロップ</span></>
+          <><Upload className="w-3 h-3" /><span>ここにドロップ</span></>
         ) : (
-          <>
-            <Upload className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-            <span className="text-gray-400">クリックまたはドロップで添付・AI自動読込</span>
-            <span className="text-gray-300 text-xs">（複数可）</span>
-          </>
+          <><Plus className="w-3 h-3" /><span>2枚目を追加</span></>
         )}
       </div>
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+
+      <MasterDocumentPicker
+        applicationId={applicationId}
+        itemId={itemId}
+        slot="extra"
+        availableMasterFiles={availableMasterFiles}
+        onExtraApplied={onFileAdded}
+      />
+
+      {error && <p className="w-full text-xs text-red-500 mt-0.5 whitespace-pre-wrap max-w-[240px]">{error}</p>}
       <input
         ref={inputRef}
         type="file"
-        multiple
         accept=".jpg,.jpeg,.png,.webp,.heic,.pdf,image/jpeg,image/png,application/pdf"
         className="hidden"
         onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          if (files.length) { handleFiles(files); e.target.value = ""; }
+          const fl = Array.from(e.target.files ?? []);
+          if (fl.length) { handleFiles(fl); e.target.value = ""; }
         }}
       />
     </div>
   );
-}
+});
 
-// ── メインチェックリスト ──────────────────────────────────────────────────────
 export function DocumentChecklist({
   checklist,
   applicationId,
   userRole,
-  applicationStatus,
+  availableMasterFiles,
 }: DocumentChecklistProps) {
   const [isPending, startTransition] = useTransition();
   const [localChecklist, setLocalChecklist] = useState(checklist);
 
-  // props が更新されたら state を同期（必須書類自動追加後など）
   useEffect(() => {
     setLocalChecklist(checklist);
   }, [checklist]);
-  const [isCheckRunning, setIsCheckRunning] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
-  const [shareMessage, setShareMessage] = useState("");
-  // 備考編集中のアイテムIDと入力値
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
   const [editingNotesValue, setEditingNotesValue] = useState("");
-  // 下書き生成
   const [isDraftGenerating, setIsDraftGenerating] = useState(false);
   const [draftMessage, setDraftMessage] = useState("");
-  // 追加書類入力
   const [customDocName, setCustomDocName] = useState("");
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [customDocError, setCustomDocError] = useState("");
   const customDocInputRef = useRef<HTMLInputElement>(null);
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [zipError, setZipError] = useState("");
+  const [aiFillMessage, setAiFillMessage] = useState("");
+  const [mismatchWarning, setMismatchWarning] = useState("");
+  const [needsManualClassification, setNeedsManualClassification] = useState<Set<string>>(new Set());
+  const [isReassigning, setIsReassigning] = useState<Set<string>>(new Set());
 
   const isExpert = userRole === "expert" || userRole === "admin";
   const requiredItems = localChecklist.filter((i) => i.isRequiredByExpert);
-  const submittedRequired = requiredItems.filter((i) => i.status !== "not_submitted");
+  const collectedRequired = requiredItems.filter((i) => i.status !== "not_submitted");
+  const uploadedCount = localChecklist.filter((i) => i.fileName).length;
 
   function handleToggleExpert(item: ChecklistItem) {
     const newValue = !item.isRequiredByExpert;
@@ -398,68 +542,6 @@ export function DocumentChecklist({
       prev.map((i) => (i.id === itemId ? { ...i, status } : i))
     );
     startTransition(async () => { await updateDocumentStatus(itemId, status); });
-  }
-
-  function handleUploaded(id: string, updates: Partial<ChecklistItem>) {
-    setLocalChecklist((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, ...updates } : i))
-    );
-  }
-
-  function handleCleared(id: string) {
-    // アップロード取り消し後：fileUrl・fileName・status をリセット
-    setLocalChecklist((prev) =>
-      prev.map((i) =>
-        i.id === id
-          ? { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, ocrExtractedData: null, status: "not_submitted" }
-          : i
-      )
-    );
-  }
-
-  /** 複数ファイル一括ドロップ時に 2枚目以降の自動スロットを localChecklist に追加 */
-  function handleSlotAdded(newEntry: ChecklistItem) {
-    setLocalChecklist((prev) => {
-      // 同じグループの末尾アイテムの直後に挿入
-      const groupKey = newEntry.documentRequirementId ?? `name:${newEntry.documentName}`;
-      let insertAfterIdx = -1;
-      for (let i = prev.length - 1; i >= 0; i--) {
-        const key = prev[i].documentRequirementId ?? `name:${prev[i].documentName}`;
-        if (key === groupKey) { insertAfterIdx = i; break; }
-      }
-      if (insertAfterIdx >= 0) {
-        const next = [...prev];
-        next.splice(insertAfterIdx + 1, 0, newEntry);
-        return next;
-      }
-      return [...prev, newEntry];
-    });
-  }
-
-  async function handleConsistencyCheck() {
-    setIsCheckRunning(true);
-    try { await runConsistencyCheck(applicationId); } finally { setIsCheckRunning(false); }
-  }
-
-  async function handleShare() {
-    setIsSharing(true);
-    setShareMessage("");
-    try {
-      const result = await shareApplicantDocumentsToChecklist(applicationId);
-      if (result.success) {
-        setShareMessage(
-          result.count && result.count > 0
-            ? `✓ ${result.count}件のパスポート・在留カード情報を反映しました`
-            : "対象書類が見つかりませんでした（チェックリストにパスポート・在留カード項目を追加してください）"
-        );
-        // ページをリロードして最新データを表示
-        window.location.reload();
-      } else {
-        setShareMessage(`エラー: ${result.error}`);
-      }
-    } finally {
-      setIsSharing(false);
-    }
   }
 
   function startEditNotes(item: ChecklistItem) {
@@ -481,10 +563,136 @@ export function DocumentChecklist({
     setEditingNotesValue("");
   }
 
-  // 全必須書類が提出済みかどうか
-  const allRequiredSubmitted =
+  const allRequiredCollected =
     requiredItems.length > 0 &&
     requiredItems.every((i) => i.status !== "not_submitted");
+
+  const handleFileUploaded = useCallback((targetItemId: string, file: UploadedFileResult, meta?: UploadMeta) => {
+    setLocalChecklist((prev) =>
+      prev.map((i) => (i.id === targetItemId
+        ? { ...i, fileUrl: file.fileUrl, fileName: file.fileName, fileSize: file.fileSize, mimeType: file.mimeType, status: file.status, fileSourcedFromMaster: false, fileSourcedFromMasterType: null }
+        : i))
+    );
+    setNeedsManualClassification((prev) => {
+      const next = new Set(prev);
+      if (meta?.needsManualClassification) next.add(targetItemId); else next.delete(targetItemId);
+      return next;
+    });
+    if (meta?.mismatch) {
+      const m = meta.mismatch;
+      setMismatchWarning(
+        m.moved
+          ? `書類の内容を解析した結果「${m.aiDocumentName}」と判定されたため、「${m.matchedName}」の項目に自動登録しました（ドロップ先：${m.droppedInto}）。`
+          : `ドロップされた枠と書類の中身が異なる可能性があります（AI判定：${m.aiDocumentName}）。「${m.matchedName}」の項目もご確認ください。`
+      );
+    } else {
+      setMismatchWarning("");
+    }
+  }, []);
+
+  const handleMasterApplied = useCallback((targetItemId: string, item: {
+    fileUrl: string | null; fileName: string | null; fileSize: number | null; mimeType: string | null;
+    status: string; fileSourcedFromMaster: boolean; fileSourcedFromMasterType: string | null;
+  }) => {
+    setLocalChecklist((prev) =>
+      prev.map((i) => (i.id === targetItemId
+        ? { ...i, fileUrl: item.fileUrl, fileName: item.fileName, fileSize: item.fileSize, mimeType: item.mimeType, status: item.status, fileSourcedFromMaster: item.fileSourcedFromMaster, fileSourcedFromMasterType: item.fileSourcedFromMasterType }
+        : i))
+    );
+  }, []);
+
+  const handleFileDeleted = useCallback((itemId: string) => {
+    setLocalChecklist((prev) =>
+      prev.map((i) => (i.id === itemId
+        ? { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, status: "not_submitted", fileSourcedFromMaster: false, fileSourcedFromMasterType: null }
+        : i))
+    );
+    setNeedsManualClassification((prev) => {
+      const next = new Set(prev);
+      next.delete(itemId);
+      return next;
+    });
+  }, []);
+
+  const handleReassign = useCallback(async (fromId: string, toId: string) => {
+    setIsReassigning((prev) => new Set(prev).add(fromId));
+    try {
+      const res = await fetch(`/api/applications/${applicationId}/checklist/${fromId}/document`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetItemId: toId }),
+      });
+      let data: any;
+      try { data = await res.json(); } catch { throw new Error(`サーバーエラー（HTTP ${res.status}）`); }
+      if (!res.ok) throw new Error(data?.error ?? "再分類に失敗しました");
+      setLocalChecklist((prev) => prev.map((i) => {
+        if (i.id === fromId) return { ...i, fileUrl: null, fileName: null, fileSize: null, mimeType: null, fileSourcedFromMaster: false, fileSourcedFromMasterType: null, status: "not_submitted" };
+        if (i.id === toId) return { ...i, fileUrl: data.item.fileUrl, fileName: data.item.fileName, fileSize: data.item.fileSize, mimeType: data.item.mimeType, fileSourcedFromMaster: data.item.fileSourcedFromMaster, fileSourcedFromMasterType: data.item.fileSourcedFromMasterType, status: data.item.status };
+        return i;
+      }));
+      setNeedsManualClassification((prev) => {
+        const next = new Set(prev);
+        next.delete(fromId);
+        return next;
+      });
+    } catch (err: any) {
+      setMismatchWarning(`再分類に失敗しました: ${err.message ?? "不明なエラー"}`);
+    } finally {
+      setIsReassigning((prev) => { const next = new Set(prev); next.delete(fromId); return next; });
+    }
+  }, [applicationId]);
+
+  const handleExtraFileAdded = useCallback((itemId: string, file: AdditionalFile) => {
+    setLocalChecklist(prev =>
+      prev.map(i => i.id === itemId
+        ? { ...i, additionalFiles: [...(i.additionalFiles ?? []), file] }
+        : i)
+    );
+  }, []);
+
+  const handleExtraFileDeleted = useCallback((itemId: string, index: number) => {
+    setLocalChecklist(prev =>
+      prev.map(i => i.id === itemId
+        ? { ...i, additionalFiles: (i.additionalFiles ?? []).filter((_, idx) => idx !== index) }
+        : i)
+    );
+  }, []);
+
+  const handleAiResult = useCallback((result: AiFillResult) => {
+    if (result.success) {
+      setAiFillMessage(`✓ AIが書類を読み取り、申請書のフィールドを自動入力しました（${result.docsRead ?? 0}件の書類を解析）。「申請書作成」タブで内容をご確認ください。`);
+    } else {
+      setAiFillMessage(`AI自動入力を実行できませんでした: ${result.error ?? "不明なエラー"}`);
+    }
+  }, []);
+
+  async function handleZipDownload() {
+    setIsDownloadingZip(true);
+    setZipError("");
+    try {
+      const res = await fetch(`/api/applications/${applicationId}/submission-package`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Zipの生成に失敗しました");
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") ?? "";
+      const m = cd.match(/filename\*=UTF-8''([^;]+)/);
+      const fileName = m ? decodeURIComponent(m[1]) : "submission-package.zip";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setZipError(err.message ?? "ダウンロードに失敗しました");
+    } finally {
+      setIsDownloadingZip(false);
+    }
+  }
 
   async function handleAddCustomDoc() {
     const name = customDocName.trim();
@@ -499,14 +707,18 @@ export function DocumentChecklist({
           documentName: name,
           documentRequirementId: null,
           isRequiredByExpert: true,
-          status: "not_submitted",
-          fileUrl: null,
-          fileName: null,
+          status: result.item?.status ?? "not_submitted",
           expertNotes: null,
           ocrExtractedData: null,
           masterDescription: null,
           masterSortOrder: 9999,
           createdAt: new Date().toISOString(),
+          fileUrl: result.item?.fileUrl ?? null,
+          fileName: result.item?.fileName ?? null,
+          fileSize: result.item?.fileSize ?? null,
+          mimeType: result.item?.mimeType ?? null,
+          fileSourcedFromMaster: result.item?.fileSourcedFromMaster ?? false,
+          fileSourcedFromMasterType: result.item?.fileSourcedFromMasterType ?? null,
         };
         setLocalChecklist(prev => [...prev, newEntry]);
         setCustomDocName("");
@@ -535,55 +747,76 @@ export function DocumentChecklist({
     }
   }
 
+  // 連番（写真は番号なし）
+  let docNum = 0;
+  const numMap: Record<string, number | null> = {};
+  for (const it of localChecklist) {
+    if (it.isRequiredByExpert) {
+      numMap[it.id] = it.documentName.includes("写真") ? null : ++docNum;
+    }
+  }
+
+  // カテゴリバッジ表示フラグ（申請人 / 所属機関の両方が存在する場合のみバッジを表示）
+  const showCategoryBadge =
+    localChecklist.some(i => getDocumentSide(i.documentName) === "applicant") &&
+    localChecklist.some(i => getDocumentSide(i.documentName) === "organization");
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
               <FileText className="w-4 h-4" />
               必要書類チェックリスト
             </CardTitle>
+            <p className="text-xs text-blue-600 mt-1 leading-relaxed">
+              ※これらの書類は、申請書のAI自動入力および入管提出に使用する書類です。該当する書類タイプの枠にアップロードしてください。
+            </p>
             {requiredItems.length > 0 && (
               <p className="text-xs text-gray-500 mt-1">
-                必要書類: {submittedRequired.length} / {requiredItems.length} 件提出済
+                必要書類: {collectedRequired.length} / {requiredItems.length} 件収集済
+                {uploadedCount > 0 && (
+                  <span className="ml-2 text-green-600 font-medium">（ファイル添付 {uploadedCount}件）</span>
+                )}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {/* 申請人マスターから共有ボタン */}
-            <button
-              onClick={handleShare}
-              disabled={isSharing}
-              className="inline-flex items-center gap-1.5 border border-blue-200 bg-blue-50 text-blue-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-blue-100 transition-colors disabled:opacity-50"
-              title="申請人マスターのパスポート・在留カード情報をチェックリストに反映"
-            >
-              {isSharing
-                ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <Share2 className="w-3 h-3" />}
-              申請人マスターから共有
-            </button>
-            {isExpert && (
-              <button
-                onClick={handleConsistencyCheck}
-                disabled={isCheckRunning}
-                className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
-                {isCheckRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                整合性チェック
-              </button>
-            )}
-          </div>
+          <button
+            onClick={handleZipDownload}
+            disabled={isDownloadingZip}
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-shrink-0"
+            title="申請書データと添付書類を1つのZipファイルにまとめてダウンロード"
+          >
+            {isDownloadingZip
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <Download className="w-4 h-4" />}
+            提出用データ（一括）ダウンロード
+          </button>
         </div>
-        {/* 共有結果メッセージ */}
-        {shareMessage && (
+        {zipError && <p className="text-xs text-red-500 whitespace-pre-wrap mt-2">{zipError}</p>}
+        {mismatchWarning && (
+          <div className="mt-2 flex items-start gap-1.5 text-xs px-3 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+            <span className="flex-shrink-0 mt-0.5">⚠</span>
+            <span>{mismatchWarning}</span>
+            <button
+              type="button"
+              onClick={() => setMismatchWarning("")}
+              className="ml-auto flex-shrink-0 text-amber-400 hover:text-amber-600"
+              title="閉じる"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        {aiFillMessage && (
           <p className={cn(
-            "text-xs mt-2 px-3 py-2 rounded-lg",
-            shareMessage.startsWith("エラー") || shareMessage.startsWith("対象")
-              ? "bg-yellow-50 text-yellow-700 border border-yellow-200"
-              : "bg-blue-50 text-blue-700 border border-blue-200"
+            "mt-2 text-xs px-3 py-2 rounded-lg",
+            aiFillMessage.startsWith("✓")
+              ? "bg-green-50 text-green-700 border border-green-200"
+              : "bg-amber-50 text-amber-700 border border-amber-200"
           )}>
-            {shareMessage}
+            {aiFillMessage}
           </p>
         )}
       </CardHeader>
@@ -594,274 +827,222 @@ export function DocumentChecklist({
             <p className="text-sm">書類リストがありません</p>
             <p className="text-xs mt-1">下の「入管必要書類から選択」から追加してください</p>
           </div>
-        ) : (() => {
-            // ── グループ情報を事前計算（同じ documentRequirementId のアイテムをグループ化）
-            // アイテムは masterSortOrder 順でソート済みなので同グループは隣接している
-            type GroupInfo = { isFirst: boolean; isLast: boolean; index: number; groupKey: string };
-            const groupInfoMap = new Map<string, GroupInfo>();
-            {
-              const keyToIds = new Map<string, string[]>();
-              for (const it of localChecklist) {
-                const key = it.documentRequirementId ?? `name:${it.documentName}`;
-                if (!keyToIds.has(key)) keyToIds.set(key, []);
-                keyToIds.get(key)!.push(it.id);
-              }
-              for (const [key, ids] of keyToIds.entries()) {
-                ids.forEach((id, idx) => {
-                  groupInfoMap.set(id, {
-                    isFirst: idx === 0,
-                    isLast: idx === ids.length - 1,
-                    index: idx,
-                    groupKey: key,
-                  });
-                });
-              }
-            }
-
-            // 連番（グループ単位・写真は番号なし）
-            let docNum = 0;
-            const numMap: Record<string, number | null> = {};
-            for (const it of localChecklist) {
-              if (it.isRequiredByExpert) {
-                const info = groupInfoMap.get(it.id);
-                // グループの先頭アイテムにだけ番号を付ける
-                if (info?.isFirst) {
-                  numMap[it.id] = it.documentName.includes("写真") ? null : ++docNum;
-                }
-              }
-            }
-
-            return (
+        ) : (
           <div className="divide-y divide-gray-50">
             {localChecklist.map((item) => {
-              const groupInfo = groupInfoMap.get(item.id);
-              const isAddedSlot = groupInfo ? !groupInfo.isFirst : false;  // 追加枠（グループ2番目以降）
-              const isLastInGroup = groupInfo?.isLast ?? true;  // グループの最後のアイテム
-
+              const side = getDocumentSide(item.documentName);
               return (
               <div
                 key={item.id}
                 className={cn(
-                  "hover:bg-gray-50/50 transition-colors",
-                  isAddedSlot ? "px-6 py-2 pl-12 bg-blue-50/30" : "px-6 py-4",
+                  "px-6 py-3 hover:bg-gray-50/50 transition-colors",
                   !item.isRequiredByExpert && "opacity-60"
                 )}
               >
-                {/* ── 上段: 追加枠は「N枚目＋削除」のみ、通常枠は番号・チェック・書類名・ステータス ── */}
-                {isAddedSlot ? (
-                  /* 追加枠ヘッダー */
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-xs text-gray-500 font-medium">
-                      {(groupInfo?.index ?? 1) + 1}枚目
-                    </span>
-                    {/* 削除ボタン（ファイル未アップロード時のみ） */}
-                    {!item.fileUrl && isExpert && (
-                      <button
-                        onClick={async () => {
-                          await removeDocumentFromChecklist(item.id);
-                          setLocalChecklist(prev => prev.filter(i => i.id !== item.id));
-                        }}
-                        className="text-xs text-red-400 hover:text-red-600 underline"
-                        title="この枠を削除"
-                      >
-                        この枠を削除
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  /* 通常枠ヘッダー: 番号 + チェックボックス + 書類名 + ステータス */
-                  <div className="flex items-center gap-3">
-                    {/* 連番バッジ */}
-                    {item.isRequiredByExpert ? (
-                      <div className="flex-shrink-0 w-7 text-center">
-                        {numMap[item.id] != null ? (
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
-                            {numMap[item.id]}
+                <div className="flex items-center gap-3">
+                  {/* 連番バッジ */}
+                  {item.isRequiredByExpert ? (
+                    <div className="flex-shrink-0 w-7 text-center">
+                      {numMap[item.id] != null ? (
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
+                          {numMap[item.id]}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex-shrink-0 w-7" />
+                  )}
+
+                  {isExpert ? (
+                    <button
+                      onClick={() => handleToggleExpert(item)}
+                      disabled={isPending}
+                      className="flex-shrink-0 text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                      title="必要書類として確定"
+                    >
+                      {item.isRequiredByExpert
+                        ? <CheckSquare className="w-5 h-5" />
+                        : <Square className="w-5 h-5 text-gray-300" />}
+                    </button>
+                  ) : (
+                    <div className="flex-shrink-0 w-5">
+                      {item.isRequiredByExpert && <CheckSquare className="w-5 h-5 text-blue-600" />}
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <div className={cn(
+                      "flex items-center gap-1.5 flex-wrap",
+                      item.isRequiredByExpert ? "text-gray-900" : "text-gray-400"
+                    )}>
+                      {/* カテゴリバッジ（インライン） */}
+                      {showCategoryBadge && (
+                        side === "applicant" ? (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 flex-shrink-0 border border-blue-100">
+                            <User className="w-2.5 h-2.5" />申請人
                           </span>
                         ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex-shrink-0 w-7" />
-                    )}
-
-                    {isExpert ? (
-                      <button
-                        onClick={() => handleToggleExpert(item)}
-                        disabled={isPending}
-                        className="flex-shrink-0 text-blue-600 hover:text-blue-700 disabled:opacity-50"
-                        title="必要書類として確定"
-                      >
-                        {item.isRequiredByExpert
-                          ? <CheckSquare className="w-5 h-5" />
-                          : <Square className="w-5 h-5 text-gray-300" />}
-                      </button>
-                    ) : (
-                      <div className="flex-shrink-0 w-5">
-                        {item.isRequiredByExpert && <CheckSquare className="w-5 h-5 text-blue-600" />}
-                      </div>
-                    )}
-
-                    <div className="flex-1 min-w-0">
-                      <p className={cn(
-                        "text-sm font-medium leading-tight",
-                        item.isRequiredByExpert ? "text-gray-900" : "text-gray-400"
-                      )}>
-                        {item.documentName}
-                        {item.isRequiredByExpert && (
-                          <span className="ml-2 text-xs text-red-500 font-normal">必須</span>
-                        )}
-                      </p>
-                      {/* 留意事項 */}
-                      {item.masterDescription && (
-                        <p className="text-xs text-blue-600 mt-0.5 leading-relaxed">
-                          ℹ {item.masterDescription}
-                        </p>
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-600 flex-shrink-0 border border-teal-100">
+                            <Building2 className="w-2.5 h-2.5" />所属機関
+                          </span>
+                        )
                       )}
-                      {/* 備考欄（全ユーザー編集可能） */}
-                      {editingNotesId === item.id ? (
-                        <div className="flex items-center gap-1 mt-1">
-                          <input
-                            type="text"
-                            value={editingNotesValue}
-                            onChange={(e) => setEditingNotesValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") saveNotes(item.id);
-                              if (e.key === "Escape") cancelEditNotes();
+                      <span className="text-sm font-medium leading-tight">{item.documentName}</span>
+                      {item.isRequiredByExpert && (
+                        <span className="text-xs text-red-500 font-normal flex-shrink-0">必須</span>
+                      )}
+                    </div>
+                    {item.masterDescription && (
+                      <p className="text-xs text-blue-600 mt-0.5 leading-relaxed">
+                        ℹ {item.masterDescription}
+                      </p>
+                    )}
+                    {/* 備考欄 */}
+                    {editingNotesId === item.id ? (
+                      <div className="flex items-center gap-1 mt-1">
+                        <input
+                          type="text"
+                          value={editingNotesValue}
+                          onChange={(e) => setEditingNotesValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveNotes(item.id);
+                            if (e.key === "Escape") cancelEditNotes();
+                          }}
+                          placeholder="備考を入力（PDFにも反映されます）"
+                          autoFocus
+                          className="flex-1 text-xs border border-orange-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50"
+                        />
+                        <button onClick={() => saveNotes(item.id)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="保存">
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={cancelEditNotes} className="p-1 text-gray-400 hover:bg-gray-50 rounded" title="キャンセル">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 mt-0.5 group/notes cursor-pointer" onClick={() => startEditNotes(item)}>
+                        {item.expertNotes ? (
+                          <p className="text-xs text-orange-600">📝 {item.expertNotes}</p>
+                        ) : (
+                          <p className="text-xs text-gray-300 group-hover/notes:text-gray-400">+ 備考を追加</p>
+                        )}
+                        <button
+                          className="p-0.5 text-gray-300 hover:text-orange-400 rounded opacity-0 group-hover/notes:opacity-100 transition-opacity"
+                          title="備考を編集"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 全項目にドロップイン枠を表示 */}
+                    <div className="mt-1.5">
+                      <ChecklistDropzone
+                        itemId={item.id}
+                        applicationId={applicationId}
+                        documentName={item.documentName}
+                        file={{
+                          fileUrl: item.fileUrl ?? null,
+                          fileName: item.fileName ?? null,
+                          fileSize: item.fileSize ?? null,
+                          mimeType: item.mimeType ?? null,
+                          fileSourcedFromMaster: item.fileSourcedFromMaster ?? false,
+                          fileSourcedFromMasterType: item.fileSourcedFromMasterType ?? null,
+                        }}
+                        availableMasterFiles={availableMasterFiles}
+                        onUploaded={handleFileUploaded}
+                        onDeleted={handleFileDeleted}
+                        onAiResult={handleAiResult}
+                        onMasterApplied={handleMasterApplied}
+                      />
+                      {/* 1枚目が存在する場合のみ2枚目以降のUI */}
+                      {item.fileName && (
+                        <ExtraFilesSection
+                          itemId={item.id}
+                          applicationId={applicationId}
+                          documentName={item.documentName}
+                          extraFiles={item.additionalFiles ?? []}
+                          availableMasterFiles={availableMasterFiles}
+                          onFileAdded={handleExtraFileAdded}
+                          onFileDeleted={handleExtraFileDeleted}
+                          onAiResult={handleAiResult}
+                        />
+                      )}
+                      {/* 未判別書類の手動再分類 */}
+                      {needsManualClassification.has(item.id) && item.fileName && (
+                        <div className="mt-1.5 flex items-start gap-1.5 flex-wrap">
+                          <span className="text-xs text-amber-600 flex-shrink-0 mt-0.5 leading-tight">
+                            ⚠ 書類種別を自動判別できませんでした。正しい項目へ移動:
+                          </span>
+                          <select
+                            className="text-xs border border-amber-300 rounded px-1.5 py-0.5 bg-amber-50 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+                            defaultValue=""
+                            disabled={isReassigning.has(item.id)}
+                            onChange={async (e) => {
+                              const toId = e.target.value;
+                              if (!toId) return;
+                              e.target.value = "";
+                              await handleReassign(item.id, toId);
                             }}
-                            placeholder="備考を入力（PDFにも反映されます）"
-                            autoFocus
-                            className="flex-1 text-xs border border-orange-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50"
-                          />
-                          <button onClick={() => saveNotes(item.id)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="保存">
-                            <Check className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={cancelEditNotes} className="p-1 text-gray-400 hover:bg-gray-50 rounded" title="キャンセル">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 mt-0.5 group/notes cursor-pointer" onClick={() => startEditNotes(item)}>
-                          {item.expertNotes ? (
-                            <p className="text-xs text-orange-600">📝 {item.expertNotes}</p>
-                          ) : (
-                            <p className="text-xs text-gray-300 group-hover/notes:text-gray-400">+ 備考を追加</p>
-                          )}
-                          <button
-                            className="p-0.5 text-gray-300 hover:text-orange-400 rounded opacity-0 group-hover/notes:opacity-100 transition-opacity"
-                            title="備考を編集"
                           >
-                            <Pencil className="w-3 h-3" />
-                          </button>
+                            <option value="">書類名を選択...</option>
+                            {localChecklist
+                              .filter((c) => c.id !== item.id && !c.fileName)
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>{c.documentName}</option>
+                              ))}
+                          </select>
+                          {isReassigning.has(item.id) && (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500 mt-0.5 flex-shrink-0" />
+                          )}
                         </div>
                       )}
                     </div>
+                  </div>
 
-                    {/* ステータス */}
+                  {/* ステータス選択（手動管理） */}
+                  {item.isRequiredByExpert && (
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {getStatusIcon(item.status)}
-                      <span className="text-xs text-gray-500 hidden sm:block">{STATUS_LABELS[item.status]}</span>
+                      <select
+                        value={item.status}
+                        onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                        disabled={isPending}
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-600 outline-none focus:border-blue-400 cursor-pointer disabled:opacity-50"
+                      >
+                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
                     </div>
+                  )}
 
-                    {/* 承認・却下ボタン */}
-                    {isExpert && item.status === "submitted" && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => handleStatusChange(item.id, "approved")}
-                          disabled={isPending}
-                          className="p-1 rounded text-green-600 hover:bg-green-50 disabled:opacity-50"
-                          title="承認"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(item.id, "resubmit_required")}
-                          disabled={isPending}
-                          className="p-1 rounded text-red-600 hover:bg-red-50 disabled:opacity-50"
-                          title="再提出要求"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* 削除ボタン */}
-                    <button
-                      onClick={async () => {
-                        if (!confirm(`「${item.documentName}」をチェックリストから削除しますか？`)) return;
-                        await removeDocumentFromChecklist(item.id);
-                        setLocalChecklist(prev => prev.filter(i => i.id !== item.id));
-                      }}
-                      className="flex-shrink-0 p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      title="チェックリストから削除"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-
-                {/* ── 下段: アップロードゾーン＋追加ボタン（追加枠・通常枠とも表示）── */}
-                {item.isRequiredByExpert && !isApplicationForm(item.documentName) && (
-                  <div>
-                    <ChecklistItemUpload item={item} applicationId={applicationId} onUploaded={handleUploaded} onCleared={handleCleared} onSlotAdded={handleSlotAdded} />
-                    {/* 追加ボタン: グループの最後アイテムにだけ表示 */}
-                    {isLastInGroup && (() => {
-                      const info = groupInfoMap.get(item.id);
-                      const nextSlotNum = (info?.index ?? 0) + 2;
-                      return (
-                        <button
-                          onClick={async () => {
-                            const result = await duplicateChecklistItem(item.id, applicationId);
-                            if (result.success && result.newItem) {
-                              setLocalChecklist(prev => {
-                                const idx = prev.findIndex(i => i.id === item.id);
-                                const newEntry = {
-                                  id: result.newItem!.id,
-                                  documentName: result.newItem!.documentName,
-                                  documentRequirementId: result.newItem!.documentRequirementId,
-                                  isRequiredByExpert: result.newItem!.isRequiredByExpert,
-                                  status: "not_submitted" as const,
-                                  fileUrl: null,
-                                  fileName: null,
-                                  expertNotes: null,
-                                  ocrExtractedData: null,
-                                  masterDescription: item.masterDescription,
-                                  masterSortOrder: item.masterSortOrder,
-                                  createdAt: new Date().toISOString(),
-                                };
-                                if (idx >= 0) {
-                                  const next = [...prev];
-                                  next.splice(idx + 1, 0, newEntry);
-                                  return next;
-                                }
-                                return [...prev, newEntry];
-                              });
-                            }
-                          }}
-                          className="ml-8 mt-2 inline-flex items-center gap-1.5 text-xs text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg px-3 py-1.5 transition-colors"
-                          title={`同じ書類の${nextSlotNum}枚目のアップロード先を追加`}
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          追加
-                        </button>
-                      );
-                    })()}
-                  </div>
-                )}
+                  {/* 削除ボタン */}
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`「${item.documentName}」をチェックリストから削除しますか？`)) return;
+                      await removeDocumentFromChecklist(item.id);
+                      setLocalChecklist(prev => prev.filter(i => i.id !== item.id));
+                    }}
+                    className="flex-shrink-0 p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    title="チェックリストから削除"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               );
             })}
           </div>
-        );
-          })()
-        }
+        )}
 
-        {/* ── 追加書類入力欄（常に表示）── */}
+        {/* ── 追加書類入力欄 ── */}
         <div className="border-t border-gray-100 bg-gray-50 px-6 py-3">
           <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1">
             <FilePlus className="w-3.5 h-3.5" />
-            追加書類をアップロードする欄を作成
+            追加書類をチェックリストに追加
           </p>
           <div className="flex gap-2">
             <input
@@ -881,7 +1062,7 @@ export function DocumentChecklist({
               {isAddingCustom
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <Plus className="w-4 h-4" />}
-              枠を作成
+              追加
             </button>
           </div>
           {customDocError && (
@@ -889,8 +1070,8 @@ export function DocumentChecklist({
           )}
         </div>
 
-        {/* ── 全書類提出済み → 下書き作成バナー ── */}
-        {allRequiredSubmitted && (
+        {/* ── 全書類収集済み → 下書き作成バナー ── */}
+        {allRequiredCollected && (
           <div className="border-t border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -899,7 +1080,7 @@ export function DocumentChecklist({
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-green-800">
-                    必要書類がすべて提出されました
+                    必要書類がすべて収集されました
                   </p>
                   <p className="text-xs text-green-600 mt-0.5">
                     次のステップ：AIが収集した書類情報をもとに申請書類の下書きを作成します

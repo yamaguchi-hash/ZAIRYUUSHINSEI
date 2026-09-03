@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Pencil, X, Mail, Phone, Shield, User, TrendingUp, Trash2, AlertTriangle } from "lucide-react";
+import { Building2, Pencil, X, Mail, Phone, Shield, User, TrendingUp, Trash2, AlertTriangle, FileText } from "lucide-react";
 import { AddOrganizationForm } from "./add-organization-form";
 import { deleteOrganization } from "@/actions/organizations";
 
@@ -16,14 +17,18 @@ type Org = {
   city: string | null;
   addressLine: string | null;
   phone: string | null;
+  fax: string | null;
   email: string | null;
   category: string | null;
   capital: number | null;
   annualSales: number | null;
   employeeCount: number | null;
+  foreignEmployeeCount: number | null;
+  technicalInternCount: number | null;
   industry: string | null;
-  workersAccidentInsuranceNo: string | null;
   employmentInsuranceNo: string | null;
+  laborInsuranceNo: string | null;
+  socialInsuranceSymbol: string | null;
   representativeTitle: string | null;
   representativeName: string | null;
 };
@@ -123,14 +128,18 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
             city: editingOrg.city ?? undefined,
             addressLine: editingOrg.addressLine ?? undefined,
             phone: editingOrg.phone ?? undefined,
+            fax: editingOrg.fax ?? undefined,
             email: editingOrg.email ?? undefined,
             category: editingOrg.category ?? undefined,
             capital: editingOrg.capital,
             annualSales: editingOrg.annualSales,
             employeeCount: editingOrg.employeeCount,
+            foreignEmployeeCount: editingOrg.foreignEmployeeCount,
+            technicalInternCount: editingOrg.technicalInternCount,
             industry: editingOrg.industry ?? undefined,
-            workersAccidentInsuranceNo: editingOrg.workersAccidentInsuranceNo ?? undefined,
             employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? undefined,
+            laborInsuranceNo: editingOrg.laborInsuranceNo ?? undefined,
+            socialInsuranceSymbol: editingOrg.socialInsuranceSymbol ?? undefined,
             representativeTitle: editingOrg.representativeTitle ?? undefined,
             representativeName: editingOrg.representativeName ?? undefined,
           }}
@@ -180,6 +189,14 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                           {org.nameEn && <p className="text-xs text-gray-400">{org.nameEn}</p>}
                         </div>
                         <div className="opacity-0 group-hover:opacity-100 flex items-center gap-2 flex-shrink-0 transition-opacity">
+                          <Link
+                            href={`/organizations/${org.id}`}
+                            className="inline-flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800"
+                          >
+                            <FileText className="w-3 h-3" />
+                            書類管理
+                          </Link>
+                          <span className="text-gray-300">|</span>
                           <button
                             onClick={() => setEditingId(org.id)}
                             className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
@@ -206,7 +223,7 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                       </div>
 
                       {/* 財務・規模情報 */}
-                      {(org.capital != null || org.annualSales != null || org.employeeCount != null) && (
+                      {(org.capital != null || org.annualSales != null || org.employeeCount != null || org.foreignEmployeeCount != null || org.technicalInternCount != null) && (
                         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
                           <TrendingUp className="w-2.5 h-2.5 mt-0.5 flex-shrink-0 text-amber-500" />
                           {org.capital != null && (
@@ -216,7 +233,13 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                             <span>年間売上: <span className="font-medium">{org.annualSales.toLocaleString()}円</span></span>
                           )}
                           {org.employeeCount != null && (
-                            <span>常勤: <span className="font-medium">{org.employeeCount}名</span></span>
+                            <span>従業員: <span className="font-medium">{org.employeeCount}名</span></span>
+                          )}
+                          {org.foreignEmployeeCount != null && (
+                            <span>うち外国人: <span className="font-medium">{org.foreignEmployeeCount}名</span></span>
+                          )}
+                          {org.technicalInternCount != null && (
+                            <span>うち技能実習生: <span className="font-medium">{org.technicalInternCount}名</span></span>
                           )}
                         </div>
                       )}
@@ -252,14 +275,17 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
                       )}
 
                       {/* 保険番号 */}
-                      {(org.workersAccidentInsuranceNo || org.employmentInsuranceNo) && (
+                      {(org.employmentInsuranceNo || org.laborInsuranceNo || org.socialInsuranceSymbol) && (
                         <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-gray-400">
                           <Shield className="w-2.5 h-2.5 mt-0.5 flex-shrink-0" />
-                          {org.workersAccidentInsuranceNo && (
-                            <span>労災: <span className="font-mono">{org.workersAccidentInsuranceNo}</span></span>
-                          )}
                           {org.employmentInsuranceNo && (
                             <span>雇用: <span className="font-mono">{org.employmentInsuranceNo}</span></span>
+                          )}
+                          {org.laborInsuranceNo && (
+                            <span>労保: <span className="font-mono">{org.laborInsuranceNo}</span></span>
+                          )}
+                          {org.socialInsuranceSymbol && (
+                            <span>社保: <span className="font-mono">{org.socialInsuranceSymbol}</span></span>
                           )}
                         </div>
                       )}

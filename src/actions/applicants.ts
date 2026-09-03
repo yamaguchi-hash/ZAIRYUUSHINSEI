@@ -62,6 +62,9 @@ export async function createApplicant(data: {
   passportNumber?: string;
   passportExpiry?: string;
   residenceCardNumber?: string;
+  currentVisaType?: string;
+  currentVisaExpiry?: string;
+  organizationId?: string | null;
   phone?: string;
   emailAddress?: string;
   postalCode?: string;
@@ -84,8 +87,10 @@ export async function createApplicant(data: {
       tenantId,
       ...data,
       japanAddress,
+      organizationId: data.organizationId || null,
       dateOfBirth: data.dateOfBirth || null,
       passportExpiry: data.passportExpiry || null,
+      currentVisaExpiry: data.currentVisaExpiry || null,
     })
     .returning();
 
@@ -114,6 +119,9 @@ export async function updateApplicant(
     passportNumber: string;
     passportExpiry: string;
     residenceCardNumber: string;
+    currentVisaType: string;
+    currentVisaExpiry: string;
+    organizationId: string | null;
     phone: string;
     mobilePhone: string;
     emailAddress: string;
@@ -136,7 +144,15 @@ export async function updateApplicant(
 
   await db
     .update(applicantMaster)
-    .set({ ...data, ...(japanAddress ? { japanAddress } : {}), updatedAt: new Date() })
+    .set({
+      ...data,
+      ...(japanAddress ? { japanAddress } : {}),
+      ...(data.organizationId !== undefined && { organizationId: data.organizationId || null }),
+      ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth || null }),
+      ...(data.passportExpiry !== undefined && { passportExpiry: data.passportExpiry || null }),
+      ...(data.currentVisaExpiry !== undefined && { currentVisaExpiry: data.currentVisaExpiry || null }),
+      updatedAt: new Date(),
+    })
     .where(and(eq(applicantMaster.id, id), eq(applicantMaster.tenantId, tenantId)));
 
   await db.insert(auditLog).values({

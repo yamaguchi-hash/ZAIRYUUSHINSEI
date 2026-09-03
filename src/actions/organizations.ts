@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { organizationMaster, auditLog } from "@/lib/db/schema";
 import { eq, and, ilike } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { pickOrgCommonFields } from "@/lib/org-master-mapping";
 
 export async function getOrganizationById(id: string) {
   const session = await auth();
@@ -50,14 +51,18 @@ export async function createOrganization(data: {
   city?: string;
   addressLine?: string;
   phone?: string;
+  fax?: string;
   capital?: number;
   annualSales?: number;
   employeeCount?: number;
+  foreignEmployeeCount?: number;
+  technicalInternCount?: number;
   fiscalYearEnd?: string;
   category?: string;
   industry?: string;
-  workersAccidentInsuranceNo?: string;
   employmentInsuranceNo?: string;
+  laborInsuranceNo?: string;
+  socialInsuranceSymbol?: string;
   representativeTitle?: string;
   representativeName?: string;
   email?: string;
@@ -66,9 +71,13 @@ export async function createOrganization(data: {
   if (!session?.user) throw new Error("認証が必要です");
   const tenantId = requireTenantId((session.user as any).tenantId);
 
+  // 全申請書共通項目（企業の基本属性）以外のキーはここで破棄する
+  const common = pickOrgCommonFields(data);
+  if (!common.nameJa) throw new Error("法人名（日）は必須です");
+
   const [org] = await db
     .insert(organizationMaster)
-    .values({ tenantId, ...data })
+    .values({ tenantId, ...common, nameJa: common.nameJa })
     .returning();
 
   await db.insert(auditLog).values({
@@ -93,14 +102,18 @@ export async function updateOrganization(
     city: string;
     addressLine: string;
     phone: string;
+    fax: string;
     capital: number;
     annualSales: number;
     employeeCount: number;
+    foreignEmployeeCount: number;
+    technicalInternCount: number;
     fiscalYearEnd: string;
     category: string;
     industry: string;
-    workersAccidentInsuranceNo: string;
     employmentInsuranceNo: string;
+    laborInsuranceNo: string;
+    socialInsuranceSymbol: string;
     representativeTitle: string;
     representativeName: string;
     email: string;
@@ -110,9 +123,12 @@ export async function updateOrganization(
   if (!session?.user) throw new Error("認証が必要です");
   const tenantId = requireTenantId((session.user as any).tenantId);
 
+  // 全申請書共通項目（企業の基本属性）以外のキーはここで破棄する
+  const common = pickOrgCommonFields(data);
+
   await db
     .update(organizationMaster)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...common, updatedAt: new Date() })
     .where(and(eq(organizationMaster.id, id), eq(organizationMaster.tenantId, tenantId)));
 
   await db.insert(auditLog).values({
@@ -121,7 +137,7 @@ export async function updateOrganization(
     action: "update",
     entityType: "organization",
     entityId: id,
-    newValue: JSON.stringify(data),
+    newValue: JSON.stringify(common),
   });
 
   revalidatePath("/organizations");

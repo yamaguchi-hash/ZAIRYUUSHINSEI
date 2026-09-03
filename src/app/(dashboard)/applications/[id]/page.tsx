@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { getApplicationById } from "@/actions/applications";
+import { getApplicationById, syncMasterDocumentsToChecklist, syncOrgMasterDocumentsToChecklist, getAvailableMasterDocumentsForApplication, type MasterFileOption } from "@/actions/applications";
 import { notFound, redirect } from "next/navigation";
 import {
   Card, CardContent, CardHeader, CardTitle,
@@ -18,7 +18,6 @@ import {
   XCircle,
   Clock,
   FileText,
-  AlertTriangle,
   User,
   Building2,
   Shield,
@@ -27,10 +26,12 @@ import Link from "next/link";
 import { WorkflowStepper } from "@/components/applications/workflow-stepper";
 import { DocumentChecklist } from "@/components/applications/document-checklist";
 import { DocumentSelector } from "@/components/applications/document-selector";
-import { ConsistencyCheckPanel } from "@/components/applications/consistency-check-panel";
+import { ChecklistTemplatePanel } from "@/components/applications/checklist-template-panel";
+import { DocumentPrintButtons } from "@/components/applications/document-print-buttons";
 import { ApproveButton } from "@/components/applications/approve-button";
 import { QuestionnairePanel } from "@/components/applications/questionnaire-panel";
 import { getDocumentRequirements } from "@/actions/applications";
+import { listDocumentTemplates } from "@/actions/document-master";
 import { DeleteApplicationButton } from "./delete-application-button";
 import { FileDown, FolderArchive, Zap } from "lucide-react";
 import { MergePdfButton } from "@/components/applications/merge-pdf-button";
@@ -40,13 +41,24 @@ import { SubmissionInfoPanel } from "@/components/applications/submission-info-p
 import { PermitResultPanel } from "@/components/applications/permit-result-panel";
 import { SignedDocumentsPanel } from "@/components/applications/signed-documents-panel";
 import { CaseNotesPanel } from "@/components/applications/case-notes-panel";
+import { ConsultationLogsPanel } from "@/components/applications/consultation-logs-panel";
+import { DispatchRecordsPanel } from "@/components/applications/dispatch-records-panel";
+import { LedgerInfoPanel } from "@/components/applications/ledger-info-panel";
+import { GijinkokuRenewalChecklist } from "@/components/checklist/gijinkoku-renewal-checklist";
+import { GijinkokuChangeOfStatusChecklist } from "@/components/checklist/gijinkoku-change-of-status-checklist";
+import { KazokuChangeOfStatusChecklist } from "@/components/checklist/kazoku-change-of-status-checklist";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { NoufushoPanel } from "@/components/applications/noufusho-panel";
 import { AzukariPanel } from "@/components/applications/azukari-panel";
-import { db, applicantDocuments } from "@/lib/db";
-import { eq } from "drizzle-orm";
+import { db, applicantDocuments, applicationAttachments, applicantMaster } from "@/lib/db";
+import { KazokuTairyuCoeChecklist } from "@/components/checklist/kazoku-tairyu-coe-checklist";
+import { eq, desc } from "drizzle-orm";
+import { AttachmentUploadPanel } from "@/components/applications/attachment-upload-panel";
+import { buildEffectiveFormData } from "@/lib/effective-form-data";
+import { computeInterviewQuestions } from "@/lib/interview-diff";
+import { toFormType } from "@/lib/questionnaire-questions";
 
-// 8ステップのワークフロー
+// 9ステップのワークフロー
 const WORKFLOW_STEPS = [
   { key: "draft",                label: "①基本設定" },
   { key: "documents_requested",  label: "②書類リスト" },
@@ -55,7 +67,8 @@ const WORKFLOW_STEPS = [
   { key: "questionnaire_sent",   label: "⑤質問書聴取" },
   { key: "under_review",         label: "⑥申請書反映" },
   { key: "submitted",            label: "⑦署名・提出" },
-  { key: "completed",            label: "⑧許可・完了" },
+  { key: "applying",             label: "⑧申請中" },
+  { key: "completed",            label: "⑨許可・完了" },
 ];
 
 export default async function ApplicationDetailPage({
@@ -75,6 +88,20 @@ export default async function ApplicationDetailPage({
   const userRole = (session?.user as any)?.role;
   const { id } = await params;
 
+  try {
+    await syncMasterDocumentsToChecklist(id);
+  } catch (e) {
+    console.error("[ApplicationDetailPage] syncMasterDocumentsToChecklist failed:", e);
+    // マスター連携に失敗してもページ表示は継続する
+  }
+
+  try {
+    await syncOrgMasterDocumentsToChecklist(id);
+  } catch (e) {
+    console.error("[ApplicationDetailPage] syncOrgMasterDocumentsToChecklist failed:", e);
+    // マスター連携に失敗してもページ表示は継続する
+  }
+
   let data;
   try {
     data = await getApplicationById(id);
@@ -86,8 +113,44 @@ export default async function ApplicationDetailPage({
   // data が取れなかった場合は notFound() が throw するので、ここには到達しない
   if (!data) notFound();
 
-  const { application, applicant, organization, checklist, questionnaire } = data;
-  const checkResult = application.consistencyCheckResult as any;
+  const { application, applicant, organization, checklist } = data;
+
+  // 扶養者（家族滞在等のR型のみ使用）。氏名の自動反映にのみ使用する。
+  const supporter = application.supporterId
+    ? await db
+        .select({
+          familyNameJa: applicantMaster.familyNameJa,
+          givenNameJa: applicantMaster.givenNameJa,
+          familyNameEn: applicantMaster.familyNameEn,
+          givenNameEn: applicantMaster.givenNameEn,
+        })
+        .from(applicantMaster)
+        .where(eq(applicantMaster.id, application.supporterId))
+        .limit(1)
+        .then((r) => r[0] ?? null)
+    : null;
+
+  // チェックリストの「マスターから選択」用。既存のmasterDocuments（書類要件マスターの
+  // カタログ）とは別概念のため、availableMasterFilesという別名で区別する。
+  let availableMasterFiles: { applicant: MasterFileOption[]; organization: MasterFileOption[]; supporter: MasterFileOption[] } = { applicant: [], organization: [], supporter: [] };
+  try {
+    availableMasterFiles = await getAvailableMasterDocumentsForApplication(application.id);
+  } catch (e) {
+    console.error("[ApplicationDetailPage] getAvailableMasterDocumentsForApplication failed:", e);
+    // マスター書類一覧の取得に失敗してもページ表示は継続する（チェックリストのマスター選択UIが空になるのみ）
+  }
+
+  const effectiveForm = buildEffectiveFormData(application, applicant, organization);
+  const interviewFormType = toFormType(effectiveForm.applicationFormType ?? application.applicationType);
+  const interviewCategory = effectiveForm.visaFormCategory ?? "N";
+  const interviewExcludedIds = new Set((application.interviewExcludedFields ?? []) as string[]);
+  const interviewQuestions = computeInterviewQuestions(
+    effectiveForm,
+    interviewFormType,
+    interviewCategory,
+    checklist,
+    interviewExcludedIds
+  );
 
   // 書類マスター取得（ビザ種別・申請種別でフィルタ）
   // masterDocuments: Date オブジェクトを持つフィールドを除外して RSC シリアライズを安全にする
@@ -101,6 +164,9 @@ export default async function ApplicationDetailPage({
     sortOrder: number;
     visaType: string;
     applicationType: string;
+    /** 必要書類マスターで設定した担当・原本/写し（セレクタでの参考表示用） */
+    preparedBy: string | null;
+    originalOrCopy: string | null;
   };
   let masterDocuments: SafeMasterDoc[] = [];
   try {
@@ -119,11 +185,28 @@ export default async function ApplicationDetailPage({
       isAlwaysRequired: r.isAlwaysRequired,
       conditions:       (r.conditions ?? null) as Record<string, unknown> | null,
       sortOrder:        r.sortOrder,
+      preparedBy:       (r as any).preparedBy ?? null,
+      originalOrCopy:   (r as any).originalOrCopy ?? null,
     }));
   } catch (e) {
     console.error("[ApplicationDetailPage] getDocumentRequirements failed:", e);
   }
-  const issues = checkResult?.issues ?? [];
+
+  // この案件の在留資格・申請種別に合わせて保存されている必要書類テンプレート
+  let checklistTemplates: { id: string; name: string; note: string | null; itemCount: number }[] = [];
+  try {
+    const tplResult = await listDocumentTemplates(application.visaType, application.applicationType);
+    if (tplResult.success && tplResult.rows) {
+      checklistTemplates = tplResult.rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        note: r.note,
+        itemCount: r.itemCount,
+      }));
+    }
+  } catch (e) {
+    console.error("[ApplicationDetailPage] listDocumentTemplates failed:", e);
+  }
 
   // 申請人マスターのアップロード書類を取得（預証用）
   let azukariImages: { residenceCardFrontUrl?: string; residenceCardBackUrl?: string; passportUrl?: string } = {};
@@ -141,6 +224,30 @@ export default async function ApplicationDetailPage({
     }
   } catch (e) {
     console.error("[ApplicationDetailPage] applicantDocuments fetch failed:", e);
+  }
+
+  // 入管提出用添付書類を取得
+  let attachmentsList: {
+    id: string; documentType: string; documentLabel: string | null;
+    fileUrl: string; fileName: string; fileSize: number | null;
+    mimeType: string | null; uploadedAt: string;
+  }[] = [];
+  try {
+    const rows = await db.select().from(applicationAttachments)
+      .where(eq(applicationAttachments.applicationId, application.id))
+      .orderBy(desc(applicationAttachments.uploadedAt));
+    attachmentsList = rows.map(r => ({
+      id: r.id,
+      documentType: r.documentType,
+      documentLabel: r.documentLabel,
+      fileUrl: r.fileUrl,
+      fileName: r.fileName,
+      fileSize: r.fileSize,
+      mimeType: r.mimeType,
+      uploadedAt: r.uploadedAt.toISOString(),
+    }));
+  } catch (e) {
+    console.error("[ApplicationDetailPage] applicationAttachments fetch failed:", e);
   }
 
   const currentStepIndex = WORKFLOW_STEPS.findIndex((s) => s.key === application.status);
@@ -252,7 +359,7 @@ export default async function ApplicationDetailPage({
             currentStep={application.status}
             applicationId={application.id}
             userRole={userRole}
-            hasQuestionnaire={questionnaire.length > 0}
+            hasQuestionnaire={interviewQuestions.length > 0}
           />
         </CardContent>
       </Card>
@@ -391,45 +498,15 @@ export default async function ApplicationDetailPage({
                 </dd>
               </div>
               <div>
-                <dt className="text-gray-500">整合性チェック</dt>
-                <dd>
-                  {checkResult ? (
-                    issues.length === 0 ? (
-                      <span className="text-green-600 font-medium flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" /> 問題なし
-                      </span>
-                    ) : (
-                      <span className="text-red-600 font-medium flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> {issues.length}件の問題
-                      </span>
-                    )
-                  ) : (
-                    <span className="text-gray-400">未チェック</span>
-                  )}
-                </dd>
-              </div>
-              <div>
                 <dt className="text-gray-500">質問書</dt>
-                <dd>{questionnaire.length}件</dd>
+                <dd>{interviewQuestions.length}件</dd>
               </div>
             </dl>
           </CardContent>
         </Card>
       </div>
 
-      {/* 整合性チェック */}
-      {issues.length > 0 && (
-        <CollapsibleSection
-          title="整合性チェック結果"
-          badge={`${issues.length}件の問題`}
-          defaultOpen={true}
-          accentClass="bg-amber-400"
-        >
-          <ConsistencyCheckPanel issues={issues} applicationId={application.id} />
-        </CollapsibleSection>
-      )}
-
-      {/* 事件メモ（全ステータスで表示） */}
+      {/* 1. 事件メモ（全ステータスで表示） */}
       <CollapsibleSection
         title="事件メモ"
         defaultOpen={true}
@@ -438,32 +515,211 @@ export default async function ApplicationDetailPage({
         <CaseNotesPanel applicationId={application.id} />
       </CollapsibleSection>
 
-      {/* ⑤ 質問書（ステップ5以降） */}
-      {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted" || application.status === "completed") && (
+      {/* 1.5 打合せ・相談履歴（面談/電話/メール/LINE のタイムライン） */}
+      <CollapsibleSection
+        title="打合せ・相談履歴"
+        defaultOpen={false}
+        accentClass="bg-blue-500"
+      >
+        <ConsultationLogsPanel applicationId={application.id} />
+      </CollapsibleSection>
+
+      {/* 1.6 郵送・発送記録（追跡番号→日本郵便追跡リンク） */}
+      <CollapsibleSection
+        title="郵送・発送記録"
+        defaultOpen={false}
+        accentClass="bg-teal-500"
+      >
+        <DispatchRecordsPanel applicationId={application.id} />
+      </CollapsibleSection>
+
+      {/* 1.7 事件簿情報（行政書士法第11条: 受任日・報酬額・完結日） */}
+      <CollapsibleSection
+        title="事件簿情報"
+        defaultOpen={false}
+        accentClass="bg-indigo-500"
+      >
+        <LedgerInfoPanel applicationId={application.id} />
+      </CollapsibleSection>
+
+      {/* 1.75 必要書類チェックリスト（技人国・更新のみ。案件情報を自動反映） */}
+      {application.visaType === "engineer_humanities" && application.applicationType === "renewal" && (
+        <CollapsibleSection
+          title="必要書類チェックリスト（技人国・在留期間更新）"
+          defaultOpen={false}
+          accentClass="bg-blue-500"
+        >
+          <GijinkokuRenewalChecklist
+            applicationId={application.id}
+            defaultCaseName={application.caseNumber ?? ""}
+            defaultApplicantName={
+              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
+              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
+            }
+            defaultOrganizationName={organization?.nameJa ?? ""}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 1.755 必要書類チェックリスト（技人国・在留資格変更のみ。案件情報を自動反映） */}
+      {application.visaType === "engineer_humanities" && application.applicationType === "change" && (
+        <CollapsibleSection
+          title="必要書類チェックリスト（技人国・在留資格変更）"
+          defaultOpen={false}
+          accentClass="bg-teal-500"
+        >
+          <GijinkokuChangeOfStatusChecklist
+            applicationId={application.id}
+            defaultCaseName={application.caseNumber ?? ""}
+            defaultApplicantName={
+              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
+              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
+            }
+            defaultOrganizationName={organization?.nameJa ?? ""}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 1.765 必要書類チェックリスト（家族滞在・在留資格変更のみ。案件情報を自動反映） */}
+      {application.visaType === "dependent" && application.applicationType === "change" && (
+        <CollapsibleSection
+          title="必要書類チェックリスト（家族滞在・在留資格変更）"
+          defaultOpen={false}
+          accentClass="bg-rose-500"
+        >
+          <KazokuChangeOfStatusChecklist
+            applicationId={application.id}
+            defaultCaseName={application.caseNumber ?? ""}
+            defaultApplicantName={
+              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
+              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
+            }
+            defaultSupporterName={
+              supporter
+                ? ((`${supporter.familyNameJa ?? ""} ${supporter.givenNameJa ?? ""}`.trim()) ||
+                   (`${supporter.familyNameEn ?? ""} ${supporter.givenNameEn ?? ""}`.trim()))
+                : ""
+            }
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 1.76 必要書類チェックリスト（家族滞在・COEのみ。案件情報を自動反映） */}
+      {application.visaType === "dependent" && application.applicationType === "certification" && (
+        <CollapsibleSection
+          title="必要書類チェックリスト（家族滞在・在留資格認定証明書交付申請）"
+          defaultOpen={false}
+          accentClass="bg-rose-500"
+        >
+          <KazokuTairyuCoeChecklist
+            applicationId={application.id}
+            defaultCaseName={application.caseNumber ?? ""}
+            defaultApplicantName={
+              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
+              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
+            }
+            defaultSupporterName={
+              supporter
+                ? ((`${supporter.familyNameJa ?? ""} ${supporter.givenNameJa ?? ""}`.trim()) ||
+                   (`${supporter.familyNameEn ?? ""} ${supporter.givenNameEn ?? ""}`.trim()))
+                : ""
+            }
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 1.8 提出書類控え・預かり資料（ドラッグ&ドロップでBlob保管） */}
+      <CollapsibleSection
+        title="提出書類控え・預かり資料"
+        defaultOpen={false}
+        accentClass="bg-cyan-500"
+      >
+        <p className="text-xs text-gray-500 mb-3 px-1">
+          入管等へ提出した書類の控えや、依頼者からお預かりした資料（PDF・画像）をドラッグ＆ドロップで保管します。
+        </p>
+        <AttachmentUploadPanel
+          applicationId={application.id}
+          initialAttachments={attachmentsList}
+          sections={["case_file"]}
+          showHeader={false}
+        />
+      </CollapsibleSection>
+
+      {/* 2. 必要書類チェックリスト（申請書作成用添付書類のアップロードを統合） */}
+      <CollapsibleSection
+        title="必要書類チェックリスト"
+        badge={checklist.length > 0 ? `${checklist.length}件` : undefined}
+        defaultOpen={true}
+        accentClass="bg-blue-500"
+      >
+        <DocumentChecklist
+          availableMasterFiles={availableMasterFiles}
+          checklist={checklist.map((c) => ({
+            id: c.id,
+            documentName: c.documentName,
+            isRequiredByExpert: c.isRequiredByExpert,
+            status: c.status,
+            expertNotes: c.expertNotes,
+            preparedBy: (c as any).preparedBy ?? null,
+            masterOriginalOrCopy: (c as any).masterOriginalOrCopy ?? null,
+            ocrExtractedData: c.ocrExtractedData as Record<string, any> | null,
+            masterDescription: c.masterDescription,
+            descriptionOverride: (c as any).descriptionOverride ?? null,
+            documentRequirementId: c.documentRequirementId,
+            masterSortOrder: c.masterSortOrder,
+            createdAt: c.createdAt,
+            fileUrl: c.fileUrl,
+            fileName: c.fileName,
+            fileSize: c.fileSize,
+            mimeType: c.mimeType,
+            additionalFiles: c.additionalFiles ?? null,
+          }))}
+          applicationId={application.id}
+          userRole={userRole}
+          applicationStatus={application.status}
+        />
+        <DocumentSelector
+          applicationId={application.id}
+          masterDocuments={masterDocuments}
+          checklist={checklist.map((c) => ({
+            id: c.id,
+            documentName: c.documentName,
+            documentRequirementId: c.documentRequirementId,
+            isRequiredByExpert: c.isRequiredByExpert,
+            status: c.status,
+          }))}
+          templates={checklistTemplates}
+        />
+        <ChecklistTemplatePanel applicationId={application.id} />
+
+        {/* パスポート・在留カードのPDF印刷（申請人マスターの画像を使用） */}
+        <div className="mt-4 border border-gray-100 rounded-xl p-3 bg-gray-50/40">
+          <p className="text-sm font-semibold text-gray-700 mb-1">パスポート・在留カードの印刷</p>
+          <p className="text-xs text-gray-500 mb-2">
+            パスポート／在留カード（表・裏）をPDFで印刷します。パスポートと在留カード（裏表）は別々のページに出力されます。
+          </p>
+          <DocumentPrintButtons applicantId={application.applicantId} />
+        </div>
+      </CollapsibleSection>
+
+      {/* 3. 質問書・顧客聴取（ステップ5以降） */}
+      {(application.status === "questionnaire_sent" || application.status === "under_review" || application.status === "submitted" || application.status === "applying" || application.status === "completed") && (
         <CollapsibleSection
           title="質問書・顧客聴取"
-          badge={questionnaire.length > 0 ? `${questionnaire.length}件` : undefined}
+          badge={interviewQuestions.length > 0 ? `${interviewQuestions.length}件` : undefined}
           defaultOpen={application.status === "questionnaire_sent"}
           accentClass="bg-orange-400"
         >
           <QuestionnairePanel
-            questions={questionnaire.map((q) => ({
-              id: q.id,
-              fieldKey: q.fieldKey,
-              questionJa: q.questionJa,
-              answer: q.answer,
-              answeredAt: q.answeredAt,
-              isRequired: q.isRequired,
-              answerType: q.answerType,
-            }))}
+            questions={interviewQuestions}
             applicationId={application.id}
             userRole={userRole}
           />
         </CollapsibleSection>
       )}
 
-      {/* 署名済み申請書（⑦以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
+      {/* 4. 署名済み申請書（⑦以降・理由書等の提出書類アップロードを統合） */}
+      {(application.status === "submitted" || application.status === "applying" || application.status === "completed") && (
         <CollapsibleSection
           title="署名済み申請書"
           badge={((application.draftData as any)?._signedDocuments?.length ?? 0) > 0
@@ -477,13 +733,21 @@ export default async function ApplicationDetailPage({
             signedDocs={(application.draftData as any)?._signedDocuments ?? []}
             applicationStatus={application.status}
           />
+          <div className="p-4 border-t border-gray-100">
+            <AttachmentUploadPanel
+              applicationId={application.id}
+              initialAttachments={attachmentsList}
+              sections={["output"]}
+              showHeader={false}
+            />
+          </div>
         </CollapsibleSection>
       )}
 
-      {/* ⑦ 申請日・申請番号（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
+      {/* 申請日・申請番号の記録（submitted 以降） */}
+      {(application.status === "submitted" || application.status === "applying" || application.status === "completed") && (
         <CollapsibleSection
-          title="⑦ 申請日・申請番号の記録"
+          title="申請日・申請番号の記録"
           defaultOpen={!((application.draftData as any)?._submission?.applicationDate)}
           accentClass="bg-teal-500"
         >
@@ -494,10 +758,20 @@ export default async function ApplicationDetailPage({
         </CollapsibleSection>
       )}
 
-      {/* 預証作成（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
+      {/* 5. 入管オンライン申請XML管理 */}
+      <CollapsibleSection
+        title="入管オンライン申請XML管理"
+        defaultOpen={false}
+        accentClass="bg-indigo-400"
+      >
+        <RasensXmlPanel applicationId={application.id} />
+      </CollapsibleSection>
+
+      {/* 6. パスポート・在留カード預証（submitted 以降・変更/更新申請のみ） */}
+      {(application.status === "submitted" || application.status === "applying" || application.status === "completed") &&
+        (application.applicationType === "change" || application.applicationType === "renewal") && (
         <CollapsibleSection
-          title="在留カード預証"
+          title="パスポート・在留カード預証"
           defaultOpen={!((application.draftData as any)?._azukari?.residenceCardFrontUrl)}
           accentClass="bg-violet-500"
         >
@@ -516,8 +790,8 @@ export default async function ApplicationDetailPage({
         </CollapsibleSection>
       )}
 
-      {/* 納付書作成（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
+      {/* 7. 納付書作成（submitted 以降） */}
+      {(application.status === "submitted" || application.status === "applying" || application.status === "completed") && (
         <CollapsibleSection
           title="納付書作成"
           defaultOpen={false}
@@ -535,15 +809,16 @@ export default async function ApplicationDetailPage({
         </CollapsibleSection>
       )}
 
-      {/* ⑧ 許可・完了（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "completed") && (
+      {/* 8. 許可・完了処理（submitted 以降） */}
+      {(application.status === "submitted" || application.status === "applying" || application.status === "completed") && (
         <CollapsibleSection
-          title="⑧ 許可・完了処理"
+          title="許可・完了処理"
           defaultOpen={!((application.draftData as any)?._result?.completedAt)}
           accentClass="bg-emerald-500"
         >
           <PermitResultPanel
             applicationId={application.id}
+            applicantId={applicant.id}
             applicationType={application.applicationType}
             currentVisaType={(application.formData as any)?.currentStatusOfResidence}
             desiredVisaType={(application.formData as any)?.desiredStatusOfResidence}
@@ -551,54 +826,6 @@ export default async function ApplicationDetailPage({
           />
         </CollapsibleSection>
       )}
-
-      {/* 入管オンライン申請XML管理 */}
-      <CollapsibleSection
-        title="入管オンライン申請XML管理"
-        defaultOpen={false}
-        accentClass="bg-indigo-400"
-      >
-        <RasensXmlPanel applicationId={application.id} />
-      </CollapsibleSection>
-
-      {/* 必要書類チェックリスト */}
-      <CollapsibleSection
-        title="必要書類チェックリスト"
-        badge={checklist.length > 0 ? `${checklist.length}件` : undefined}
-        defaultOpen={true}
-        accentClass="bg-blue-500"
-      >
-        <DocumentChecklist
-          checklist={checklist.map((c) => ({
-            id: c.id,
-            documentName: c.documentName,
-            isRequiredByExpert: c.isRequiredByExpert,
-            status: c.status,
-            fileUrl: c.fileUrl,
-            fileName: c.fileName,
-            expertNotes: c.expertNotes,
-            ocrExtractedData: c.ocrExtractedData as Record<string, any> | null,
-            masterDescription: c.masterDescription,
-            documentRequirementId: c.documentRequirementId,
-            masterSortOrder: c.masterSortOrder,
-            createdAt: c.createdAt,
-          }))}
-          applicationId={application.id}
-          userRole={userRole}
-          applicationStatus={application.status}
-        />
-        <DocumentSelector
-          applicationId={application.id}
-          masterDocuments={masterDocuments}
-          checklist={checklist.map((c) => ({
-            id: c.id,
-            documentName: c.documentName,
-            documentRequirementId: c.documentRequirementId,
-            isRequiredByExpert: c.isRequiredByExpert,
-            status: c.status,
-          }))}
-        />
-      </CollapsibleSection>
     </div>
   );
 }

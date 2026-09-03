@@ -45,6 +45,7 @@ import { ConsultationLogsPanel } from "@/components/applications/consultation-lo
 import { DispatchRecordsPanel } from "@/components/applications/dispatch-records-panel";
 import { LedgerInfoPanel } from "@/components/applications/ledger-info-panel";
 import { GijinkokuRenewalChecklist } from "@/components/checklist/gijinkoku-renewal-checklist";
+import { GijinkokuChangeOfStatusChecklist } from "@/components/checklist/gijinkoku-change-of-status-checklist";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { NoufushoPanel } from "@/components/applications/noufusho-panel";
 import { AzukariPanel } from "@/components/applications/azukari-panel";
@@ -541,13 +542,32 @@ export default async function ApplicationDetailPage({
       </CollapsibleSection>
 
       {/* 1.75 必要書類チェックリスト（技人国・更新のみ。案件情報を自動反映） */}
-      {application.visaType === "engineer_humanities" && (
+      {application.visaType === "engineer_humanities" && application.applicationType === "renewal" && (
         <CollapsibleSection
           title="必要書類チェックリスト（技人国・在留期間更新）"
           defaultOpen={false}
           accentClass="bg-blue-500"
         >
           <GijinkokuRenewalChecklist
+            applicationId={application.id}
+            defaultCaseName={application.caseNumber ?? ""}
+            defaultApplicantName={
+              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
+              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
+            }
+            defaultOrganizationName={organization?.nameJa ?? ""}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 1.755 必要書類チェックリスト（技人国・在留資格変更のみ。案件情報を自動反映） */}
+      {application.visaType === "engineer_humanities" && application.applicationType === "change" && (
+        <CollapsibleSection
+          title="必要書類チェックリスト（技人国・在留資格変更）"
+          defaultOpen={false}
+          accentClass="bg-teal-500"
+        >
+          <GijinkokuChangeOfStatusChecklist
             applicationId={application.id}
             defaultCaseName={application.caseNumber ?? ""}
             defaultApplicantName={

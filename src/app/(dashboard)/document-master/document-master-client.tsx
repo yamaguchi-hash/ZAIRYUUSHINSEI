@@ -29,8 +29,10 @@ import { ConditionsEditor } from "./document-conditions-editor";
 import { FamilyStayConditionsEditor } from "./family-stay-conditions-editor";
 import { GIJINKOKU_VISA_TYPE, GIJINKOKU_RENEWAL_APPLICATION_TYPE } from "@/lib/gijinkoku-renewal-checklist";
 import { FAMILY_STAY_VISA_TYPE, FAMILY_STAY_COE_APPLICATION_TYPE } from "@/lib/kazoku-tairyu-coe-checklist";
+import { GIJINKOKU_CHANGE_VISA_TYPE, GIJINKOKU_CHANGE_APPLICATION_TYPE } from "@/lib/gijinkoku-change-of-status-checklist";
 import { GijinkokuRenewalChecklist } from "@/components/checklist/gijinkoku-renewal-checklist";
 import { KazokuTairyuCoeChecklist } from "@/components/checklist/kazoku-tairyu-coe-checklist";
+import { GijinkokuChangeOfStatusChecklist } from "@/components/checklist/gijinkoku-change-of-status-checklist";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
@@ -47,8 +49,9 @@ const APP_TYPES: { value: string; label: string }[] = [
   { value: "all", label: "（全申請種別に共通）" },
 ];
 
-// 技人国・更新チェックリストの「派遣先」、家族滞在・COEチェックリストの「扶養者」「申請代理人」を含む
-const PREPARED_BY_PRESETS = ["申請人", "受入企業", "弊所", "扶養者", "申請代理人", "派遣先"];
+// 技人国・更新チェックリストの「派遣先」、家族滞在・COEチェックリストの「扶養者」「申請代理人」、
+// 技人国・変更チェックリストの「行政書士」を含む
+const PREPARED_BY_PRESETS = ["申請人", "受入企業", "弊所", "扶養者", "申請代理人", "派遣先", "行政書士"];
 const ORIGINAL_OR_COPY_OPTIONS = ["", "原本", "写し", "原本＋写し", "提示のみ"];
 
 interface RowState extends DocMasterRow {
@@ -71,7 +74,8 @@ export function DocumentMasterClient() {
   // この場合は下の「一覧」「新規追加」の代わりにチェックリスト画面（編集機能つき）を表示する。
   const isGijinkokuRenewal = visaType === GIJINKOKU_VISA_TYPE && appType === GIJINKOKU_RENEWAL_APPLICATION_TYPE;
   const isFamilyStayCoe = visaType === FAMILY_STAY_VISA_TYPE && appType === FAMILY_STAY_COE_APPLICATION_TYPE;
-  const hasChecklist = isGijinkokuRenewal || isFamilyStayCoe;
+  const isGijinkokuChange = visaType === GIJINKOKU_CHANGE_VISA_TYPE && appType === GIJINKOKU_CHANGE_APPLICATION_TYPE;
+  const hasChecklist = isGijinkokuRenewal || isFamilyStayCoe || isGijinkokuChange;
   const [rows, setRows] = useState<RowState[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -674,6 +678,7 @@ export function DocumentMasterClient() {
           チェックリスト画面（編集機能つき）を表示する（申請条件・案件情報の入力欄も含む）。 */}
       {isGijinkokuRenewal && <GijinkokuRenewalChecklist />}
       {isFamilyStayCoe && <KazokuTairyuCoeChecklist />}
+      {isGijinkokuChange && <GijinkokuChangeOfStatusChecklist />}
 
       {!hasChecklist && (
       <>

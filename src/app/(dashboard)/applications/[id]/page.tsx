@@ -46,6 +46,7 @@ import { DispatchRecordsPanel } from "@/components/applications/dispatch-records
 import { LedgerInfoPanel } from "@/components/applications/ledger-info-panel";
 import { GijinkokuRenewalChecklist } from "@/components/checklist/gijinkoku-renewal-checklist";
 import { GijinkokuChangeOfStatusChecklist } from "@/components/checklist/gijinkoku-change-of-status-checklist";
+import { KazokuChangeOfStatusChecklist } from "@/components/checklist/kazoku-change-of-status-checklist";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { NoufushoPanel } from "@/components/applications/noufusho-panel";
 import { AzukariPanel } from "@/components/applications/azukari-panel";
@@ -575,6 +576,30 @@ export default async function ApplicationDetailPage({
               (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
             }
             defaultOrganizationName={organization?.nameJa ?? ""}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* 1.765 必要書類チェックリスト（家族滞在・在留資格変更のみ。案件情報を自動反映） */}
+      {application.visaType === "dependent" && application.applicationType === "change" && (
+        <CollapsibleSection
+          title="必要書類チェックリスト（家族滞在・在留資格変更）"
+          defaultOpen={false}
+          accentClass="bg-rose-500"
+        >
+          <KazokuChangeOfStatusChecklist
+            applicationId={application.id}
+            defaultCaseName={application.caseNumber ?? ""}
+            defaultApplicantName={
+              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
+              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
+            }
+            defaultSupporterName={
+              supporter
+                ? ((`${supporter.familyNameJa ?? ""} ${supporter.givenNameJa ?? ""}`.trim()) ||
+                   (`${supporter.familyNameEn ?? ""} ${supporter.givenNameEn ?? ""}`.trim()))
+                : ""
+            }
           />
         </CollapsibleSection>
       )}

@@ -30,9 +30,11 @@ import { FamilyStayConditionsEditor } from "./family-stay-conditions-editor";
 import { GIJINKOKU_VISA_TYPE, GIJINKOKU_RENEWAL_APPLICATION_TYPE } from "@/lib/gijinkoku-renewal-checklist";
 import { FAMILY_STAY_VISA_TYPE, FAMILY_STAY_COE_APPLICATION_TYPE } from "@/lib/kazoku-tairyu-coe-checklist";
 import { GIJINKOKU_CHANGE_VISA_TYPE, GIJINKOKU_CHANGE_APPLICATION_TYPE } from "@/lib/gijinkoku-change-of-status-checklist";
+import { KAZOKU_CHANGE_VISA_TYPE, KAZOKU_CHANGE_APPLICATION_TYPE } from "@/lib/kazoku-change-of-status-checklist";
 import { GijinkokuRenewalChecklist } from "@/components/checklist/gijinkoku-renewal-checklist";
 import { KazokuTairyuCoeChecklist } from "@/components/checklist/kazoku-tairyu-coe-checklist";
 import { GijinkokuChangeOfStatusChecklist } from "@/components/checklist/gijinkoku-change-of-status-checklist";
+import { KazokuChangeOfStatusChecklist } from "@/components/checklist/kazoku-change-of-status-checklist";
 import { VISA_TYPE_LABELS } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import {
@@ -75,7 +77,8 @@ export function DocumentMasterClient() {
   const isGijinkokuRenewal = visaType === GIJINKOKU_VISA_TYPE && appType === GIJINKOKU_RENEWAL_APPLICATION_TYPE;
   const isFamilyStayCoe = visaType === FAMILY_STAY_VISA_TYPE && appType === FAMILY_STAY_COE_APPLICATION_TYPE;
   const isGijinkokuChange = visaType === GIJINKOKU_CHANGE_VISA_TYPE && appType === GIJINKOKU_CHANGE_APPLICATION_TYPE;
-  const hasChecklist = isGijinkokuRenewal || isFamilyStayCoe || isGijinkokuChange;
+  const isKazokuChange = visaType === KAZOKU_CHANGE_VISA_TYPE && appType === KAZOKU_CHANGE_APPLICATION_TYPE;
+  const hasChecklist = isGijinkokuRenewal || isFamilyStayCoe || isGijinkokuChange || isKazokuChange;
   const [rows, setRows] = useState<RowState[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -679,6 +682,7 @@ export function DocumentMasterClient() {
       {isGijinkokuRenewal && <GijinkokuRenewalChecklist />}
       {isFamilyStayCoe && <KazokuTairyuCoeChecklist />}
       {isGijinkokuChange && <GijinkokuChangeOfStatusChecklist />}
+      {isKazokuChange && <KazokuChangeOfStatusChecklist />}
 
       {!hasChecklist && (
       <>

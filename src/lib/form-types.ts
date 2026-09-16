@@ -226,6 +226,34 @@ export interface ApplicationFormData {
   separationReason: string;         // 別居理由（別居の場合）
   // 定住者の場合の根拠
   longTermResidentReason: string;
+  // 身分又は地位（例:「永住者・特別永住者」の「未成年で未婚の実子」）
+  statusOrPosition: string;
+  // 申請人の勤務先等（名称・所在地・電話番号は employerName/employerBranchName/employerAddress/employerPhone を流用）
+  applicantAnnualIncome: string;
+  // 滞在費支弁方法（詳細。区分は fundingMethod/fundingMethodOther を流用）
+  fundingMonthlyAmount: string;      // 月平均支弁額（円）
+  fundingRemittanceType: string;     // 送金・携行等の別
+  fundingRemittanceAmount: string;   // 送金・携行等の別　金額（円）
+  // 経費支弁者
+  expensePayerName: string;
+  expensePayerNationality: string;   // 住所（国・地域）
+  expensePayerAddress: string;
+  expensePayerPhone: string;
+  expensePayerOccupation: string;    // 職業（勤務先の名称）
+  expensePayerWorkPhone: string;     // 電話番号（勤務場所）
+  expensePayerAnnualIncome: string;
+  // 在日身元保証人又は連絡先
+  guarantorName: string;
+  guarantorOccupation: string;
+  guarantorAddress: string;
+  guarantorPhone: string;
+  guarantorCellular: string;
+  // 受領方法等（COE申請全般・オンライン申請システム転記用）
+  coeReceiptMethod: string;          // 郵送 / 窓口受取
+  notificationEmail: string;
+  notificationEmailConfirm: string;
+  portalPhotoFileName: string;
+  portalAttachmentFileName: string;
 
   // ══════════════════════════════════════════════════════════════════════════
   // 申請人等作成用 Part 2 — R型（家族滞在）
@@ -661,6 +689,14 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   marriageDate: '', marriageRegistrationDate: '', marriageRegistrationPlace: '',
   cohabitation: '有', separationReason: '',
   longTermResidentReason: '',
+  statusOrPosition: '',
+  applicantAnnualIncome: '',
+  fundingMonthlyAmount: '', fundingRemittanceType: '', fundingRemittanceAmount: '',
+  expensePayerName: '', expensePayerNationality: '', expensePayerAddress: '', expensePayerPhone: '',
+  expensePayerOccupation: '', expensePayerWorkPhone: '', expensePayerAnnualIncome: '',
+  guarantorName: '', guarantorOccupation: '', guarantorAddress: '', guarantorPhone: '', guarantorCellular: '',
+  coeReceiptMethod: '郵送', notificationEmail: '', notificationEmailConfirm: '',
+  portalPhotoFileName: '', portalAttachmentFileName: '',
   // Part 2 R — 項目17: 婚姻・出生届出
   marriageNotificationPlaceJapan: '', marriageNotificationDateJapan: '',
   marriageNotificationPlaceForeign: '', marriageNotificationDateForeign: '',

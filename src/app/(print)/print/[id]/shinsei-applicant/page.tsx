@@ -20,9 +20,11 @@ import {
   fmtAdditionalOccupations, buildAddress,
   FormHeader, SignatureSection, AgentSection,
   FORM_TITLE_MAP, FORM_DECLARATION_MAP, getFormNumber, getPdfHeaderCategoryLabel,
+  buildShinseiFileNameBase,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
 import { ShinseiMarginControls } from "../shinsei-margin-controls";
+import { PageNumberStamp } from "../page-number-stamp";
 
 export default async function ShinseiApplicantPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -40,13 +42,17 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
   const formDeclaration = FORM_DECLARATION_MAP[formType];
   const categoryLabel = getPdfHeaderCategoryLabel(formType, app.visaType);
 
+  // PDF保存名: 「申請書　申請人用　<手続き種類>　<在留資格>　<申請人名>　<日付>」
+  const fileNameBase = buildShinseiFileNameBase("申請人用", formType, app.visaType, form);
+
   return (
     <>
         <meta charSet="utf-8" />
-        <title>申請人等作成用 - {form.familyNameEn} {form.givenNameEn}</title>
+        <title>{fileNameBase}</title>
         <style>{PRINT_STYLES}</style>
-        <ShinseiPrintToolbar applicationId={id} label="申請人等作成用（3ページ）" disableAutoPrint />
+        <ShinseiPrintToolbar applicationId={id} label="申請人等作成用（3ページ）" disableAutoPrint fileNameBase={fileNameBase} />
         <ShinseiMarginControls initialTopMm={7} initialBottomMm={7} sideMm={9} />
+        <PageNumberStamp kind="申請人用" />
 
         {/* ══════════════════════════════════════════════════════════════════════
             Page 1: 別記第三十号様式（第二十条関係）申請人等作成用 １
@@ -236,6 +242,23 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             </table>
           )}
 
+          {/* ── 受領方法等（COE申請・オンライン申請システム転記用） ── */}
+          {isCoe && (
+            <>
+              <div className="item-title">受領方法等</div>
+              <table>
+                <tbody>
+                  <tr>
+                    <td className="lbl" style={{ width: "25%" }}>在留資格認定証明書の受領方法</td>
+                    <td style={{ width: "25%" }}>{fmt(form.coeReceiptMethod)}</td>
+                    <td className="lbl" style={{ width: "25%" }}>通知送信用メールアドレス</td>
+                    <td style={{ width: "25%" }}>{fmt(form.notificationEmail)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </>
+          )}
+
           {/* ── 【申請人署名欄】（Part2を持たない区分のみPage1で完結するためここに配置） ── */}
           {!isVtype && !isNtype && !isTtype && !isRtype && !isPtype && <SignatureSection role="applicant" />}
         </div>
@@ -367,8 +390,135 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
                   <td colSpan={3}>{fmt(form.longTermResidentReason)}</td>
                 </tr>
               )}
+              <tr>
+                <td className="lbl">身分又は地位</td>
+                <td colSpan={3}>{fmt(form.statusOrPosition)}</td>
+              </tr>
             </tbody>
           </table>
+
+          <div className="section3">配偶者については婚姻、子については出生又は縁組の届出先及び届出年月日</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl" style={{width:'25%'}}>(1) 日本国届出先</td>
+                <td style={{width:'25%'}}>{fmt(form.marriageNotificationPlaceJapan)}</td>
+                <td className="lbl" style={{width:'25%'}}>　届出年月日</td>
+                <td style={{width:'25%'}}>{fmtDate(form.marriageNotificationDateJapan)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">(2) 本国等届出先</td>
+                <td>{fmt(form.marriageNotificationPlaceForeign)}</td>
+                <td className="lbl">　届出年月日</td>
+                <td>{fmtDate(form.marriageNotificationDateForeign)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">申請人の勤務先等</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl" style={{width:'25%'}}>名称</td>
+                <td style={{width:'25%'}}>{fmt(form.employerName)}</td>
+                <td className="lbl" style={{width:'25%'}}>支店・事業所名</td>
+                <td style={{width:'25%'}}>{fmt(form.employerBranchName)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">所在地</td>
+                <td colSpan={3}>{fmtAddr(form.employerAddress)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">電話番号</td>
+                <td>{fmt(form.employerPhone)}</td>
+                <td className="lbl">年収</td>
+                <td>{form.applicantAnnualIncome ? `${Number(form.applicantAnnualIncome).toLocaleString()} 円` : '　'}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">滞在費支弁方法</div>
+          <table>
+            <tbody>
+              <tr>
+                <td style={{padding:'5px 8px'}} colSpan={4}>
+                  {['親族負担','外国からの送金','身元保証人負担'].map(opt => (
+                    <span key={opt} style={{marginRight:'20px'}}>
+                      {form.fundingMethod === opt ? '■' : '□'} {opt}
+                    </span>
+                  ))}
+                  <span>
+                    {form.fundingMethod === 'その他' ? '■' : '□'} その他
+                    {form.fundingMethod === 'その他' && form.fundingMethodOther ? `（${form.fundingMethodOther}）` : '（　　　　　）'}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td className="lbl" style={{width:'25%'}}>月平均支弁額</td>
+                <td style={{width:'25%'}}>{form.fundingMonthlyAmount ? `${Number(form.fundingMonthlyAmount).toLocaleString()} 円` : '　'}</td>
+                <td className="lbl" style={{width:'25%'}}>送金・携行等の別</td>
+                <td style={{width:'25%'}}>{fmt(form.fundingRemittanceType)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">　　金額</td>
+                <td colSpan={3}>{form.fundingRemittanceAmount ? `${Number(form.fundingRemittanceAmount).toLocaleString()} 円` : '　'}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">経費支弁者</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl" style={{width:'25%'}}>氏名</td>
+                <td style={{width:'25%'}}>{fmt(form.expensePayerName)}</td>
+                <td className="lbl" style={{width:'25%'}}>住所（国・地域）</td>
+                <td style={{width:'25%'}}>{fmt(form.expensePayerNationality)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">住所</td>
+                <td colSpan={3}>{fmtAddr(form.expensePayerAddress)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">電話番号</td>
+                <td>{fmt(form.expensePayerPhone)}</td>
+                <td className="lbl">職業（勤務先の名称）</td>
+                <td>{fmt(form.expensePayerOccupation)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">電話番号（勤務場所）</td>
+                <td>{fmt(form.expensePayerWorkPhone)}</td>
+                <td className="lbl">年収</td>
+                <td>{form.expensePayerAnnualIncome ? `${Number(form.expensePayerAnnualIncome).toLocaleString()} 円` : '　'}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="section3">在日身元保証人又は連絡先</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl" style={{width:'25%'}}>氏名</td>
+                <td style={{width:'25%'}}>{fmt(form.guarantorName)}</td>
+                <td className="lbl" style={{width:'25%'}}>職業</td>
+                <td style={{width:'25%'}}>{fmt(form.guarantorOccupation)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">住所</td>
+                <td colSpan={3}>{fmtAddr(form.guarantorAddress)}</td>
+              </tr>
+              <tr>
+                <td className="lbl">電話番号</td>
+                <td>{fmt(form.guarantorPhone)}</td>
+                <td className="lbl">携帯電話番号</td>
+                <td>{fmt(form.guarantorCellular)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p style={{ fontSize: "9px", color: "#777", margin: "4px 0 8px" }}>
+            ※ 扶養者の情報は「所属機関等作成用（扶養者用）」の書類に記載しています。
+          </p>
 
           {/* ── 取次者 ── */}
           <AgentSection />

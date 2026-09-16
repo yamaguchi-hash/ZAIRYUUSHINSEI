@@ -1210,13 +1210,48 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       </Field>
                     </div>
                   )}
+                  <div className="sm:col-span-2">
+                    <Field label="身分又は地位" note="例:「永住者・特別永住者」の「未成年で未婚の実子」">
+                      <input className={inputCls} value={form.statusOrPosition} onChange={e => set("statusOrPosition", e.target.value)} />
+                    </Field>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle className="text-base">申請人の勤務先等</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="名称"><input className={inputCls} value={form.employerName} onChange={e => set("employerName", e.target.value)} /></Field>
+                  <Field label="支店・事業所名"><input className={inputCls} value={form.employerBranchName} onChange={e => set("employerBranchName", e.target.value)} /></Field>
+                  <div className="sm:col-span-2">
+                    <Field label="所在地">
+                      <AddressSplitSimple value={form.employerAddress} onChange={v => set("employerAddress", v)} inputClassName={inputCls} />
+                    </Field>
+                  </div>
+                  <Field label="電話番号"><input className={inputCls} value={form.employerPhone} onChange={e => set("employerPhone", e.target.value)} /></Field>
+                  <Field label="年収（円）"><input className={inputCls} value={form.applicantAnnualIncome} onChange={e => set("applicantAnnualIncome", e.target.value)} /></Field>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle className="text-base">在日身元保証人又は連絡先</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="氏名"><input className={inputCls} value={form.guarantorName} onChange={e => set("guarantorName", e.target.value)} /></Field>
+                  <Field label="職業"><input className={inputCls} value={form.guarantorOccupation} onChange={e => set("guarantorOccupation", e.target.value)} /></Field>
+                  <div className="sm:col-span-2">
+                    <Field label="住所">
+                      <AddressSplitSimple value={form.guarantorAddress} onChange={v => set("guarantorAddress", v)} inputClassName={inputCls} />
+                    </Field>
+                  </div>
+                  <Field label="電話番号"><input className={inputCls} value={form.guarantorPhone} onChange={e => set("guarantorPhone", e.target.value)} /></Field>
+                  <Field label="携帯電話番号"><input className={inputCls} value={form.guarantorCellular} onChange={e => set("guarantorCellular", e.target.value)} /></Field>
                 </CardContent>
               </Card>
             </>
           )}
 
-          {/* ── R型 Part 2（家族滞在）─────────────────────────────────────────── */}
-          {isRtype && (
+          {/* ── R型/T型 共用 Part 2（家族滞在・定住者。届出・扶養者情報を共用） ─────── */}
+          {(isRtype || isTtype) && (
             <>
               {/* 17. 婚姻・出生届出 */}
               <Card>
@@ -1284,9 +1319,42 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       <input className={inputCls} value={form.fundingMethodOther} onChange={e => set("fundingMethodOther", e.target.value)} />
                     </Field>
                   )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                    <Field label="月平均支弁額（円）">
+                      <input className={inputCls} value={form.fundingMonthlyAmount} onChange={e => set("fundingMonthlyAmount", e.target.value)} placeholder="例: 50000" />
+                    </Field>
+                    <Field label="送金・携行等の別">
+                      <input className={inputCls} value={form.fundingRemittanceType} onChange={e => set("fundingRemittanceType", e.target.value)} placeholder="例: 送金 / 携行" />
+                    </Field>
+                    <Field label="送金・携行等の別　金額（円）">
+                      <input className={inputCls} value={form.fundingRemittanceAmount} onChange={e => set("fundingRemittanceAmount", e.target.value)} />
+                    </Field>
+                  </div>
                 </CardContent>
               </Card>
 
+              {/* 経費支弁者（定住者COE等） */}
+              {isTtype && (
+                <Card>
+                  <CardHeader><CardTitle className="text-base">経費支弁者</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="氏名"><input className={inputCls} value={form.expensePayerName} onChange={e => set("expensePayerName", e.target.value)} /></Field>
+                    <Field label="住所（国・地域）"><input className={inputCls} value={form.expensePayerNationality} onChange={e => set("expensePayerNationality", e.target.value)} placeholder="例: 日本" /></Field>
+                    <div className="sm:col-span-2">
+                      <Field label="住所">
+                        <AddressSplitSimple value={form.expensePayerAddress} onChange={v => set("expensePayerAddress", v)} inputClassName={inputCls} />
+                      </Field>
+                    </div>
+                    <Field label="電話番号"><input className={inputCls} value={form.expensePayerPhone} onChange={e => set("expensePayerPhone", e.target.value)} /></Field>
+                    <Field label="職業（勤務先の名称）"><input className={inputCls} value={form.expensePayerOccupation} onChange={e => set("expensePayerOccupation", e.target.value)} /></Field>
+                    <Field label="電話番号（勤務場所）"><input className={inputCls} value={form.expensePayerWorkPhone} onChange={e => set("expensePayerWorkPhone", e.target.value)} /></Field>
+                    <Field label="年収（円）"><input className={inputCls} value={form.expensePayerAnnualIncome} onChange={e => set("expensePayerAnnualIncome", e.target.value)} /></Field>
+                  </CardContent>
+                </Card>
+              )}
+
+              {isRtype && (
+              <>
               {/* 19. 資格外活動の有無 */}
               <Card>
                 <CardHeader><CardTitle className="text-base">19. 資格外活動の有無</CardTitle></CardHeader>
@@ -1324,6 +1392,8 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   )}
                 </CardContent>
               </Card>
+              </>
+              )}
 
               {/* 扶養者情報（扶養者用Ｒ）*/}
               <Card>
@@ -1827,6 +1897,24 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
               </div>
             </CardContent>
           </Card>
+
+          {isCoe && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">受領方法等（オンライン申請システム転記用）</CardTitle></CardHeader>
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="在留資格認定証明書の受領方法">
+                  <select className={selectCls} value={form.coeReceiptMethod} onChange={e => set("coeReceiptMethod", e.target.value)}>
+                    <option value="郵送">郵送</option>
+                    <option value="窓口受取">窓口受取</option>
+                  </select>
+                </Field>
+                <Field label="通知送信用メールアドレス"><input className={inputCls} type="email" value={form.notificationEmail} onChange={e => set("notificationEmail", e.target.value)} /></Field>
+                <Field label="通知送信用メールアドレス再入力"><input className={inputCls} type="email" value={form.notificationEmailConfirm} onChange={e => set("notificationEmailConfirm", e.target.value)} /></Field>
+                <Field label="顔写真ファイル名" note="オンライン申請システムへ添付するファイル名（任意記録）"><input className={inputCls} value={form.portalPhotoFileName} onChange={e => set("portalPhotoFileName", e.target.value)} /></Field>
+                <Field label="資料添付ファイル名" note="オンライン申請システムへ添付するファイル名（任意記録）"><input className={inputCls} value={form.portalAttachmentFileName} onChange={e => set("portalAttachmentFileName", e.target.value)} /></Field>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
@@ -2009,8 +2097,10 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                         <Field label="就業の場所（名称）【任意】">
                           <input className={inputCls} value={form.orgVWorkplaceName} onChange={e => set("orgVWorkplaceName", e.target.value)} placeholder="例：〇〇工場" />
                         </Field>
+                        {/* 就業の場所（所在地）は任意。番地を含む住所をそのまま1行で入力できるよう
+                            分割住所ウィジェットではなく通常のテキスト入力にする（自動分割による入力乱れを防止）。 */}
                         <Field label="就業の場所（所在地）【任意】">
-                          <AddressSplitSimple value={form.orgVWorkplaceAddress} onChange={v => set("orgVWorkplaceAddress", v)} inputClassName={inputCls} />
+                          <input className={inputCls} value={(form.orgVWorkplaceAddress || "").replace(/^〒\d{7}\|/, "")} onChange={e => set("orgVWorkplaceAddress", e.target.value)} placeholder="例：埼玉県三郷市彦江1-165" />
                         </Field>
                       </div>
                       <div className="grid grid-cols-2 gap-3">

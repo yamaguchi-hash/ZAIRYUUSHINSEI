@@ -16,19 +16,21 @@ import { notFound } from "next/navigation";
 import {
   loadShinseiData, PRINT_STYLES,
   fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes, omitFor2Go,
-  fmtAdditionalOccupations, buildAddress, businessTypeLabel,
+  fmtAdditionalOccupations, buildAddress, businessTypeLabel, occupationLabel,
   FormHeader, SignatureSection, AgentSection,
   FORM_TITLE_MAP, getFormNumber, getPdfHeaderCategoryLabel,
+  buildShinseiFileNameBase,
 } from "../shinsei-shared";
 import { ShinseiPrintToolbar } from "../shinsei-print-toolbar";
 import { ShinseiMarginControls } from "../shinsei-margin-controls";
+import { PageNumberStamp } from "../page-number-stamp";
 
 export default async function ShinseiOrgPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const data = await loadShinseiData(id);
   if (!data) notFound();
 
-  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, isCoe, cat, isVtype, isNtype, isRtype, needsOrg, is2Go } = data;
+  const { app, applicant, org, form, familyMembers, workHistory, today, isChange, formType, isCoe, cat, isVtype, isNtype, isRtype, isTtype, needsOrg, is2Go } = data;
 
   // COE/Change/Extension の項目番号差異（N型: 派遣先の項目番号）— shinsei.tsx と同一の算出方法
   const orgDispatchNo = isCoe ? 12 : 11;
@@ -38,15 +40,20 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
   const formTitle = FORM_TITLE_MAP[formType];
   const categoryLabel = getPdfHeaderCategoryLabel(formType, app.visaType);
 
+  // PDF保存名: 「申請書　所属機関用　<手続き種類>　<在留資格>　<申請人名>　<日付>」
+  const fileNameBase = buildShinseiFileNameBase("所属機関用", formType, app.visaType, form);
+
   return (
     <>
         <meta charSet="utf-8" />
-        <title>所属機関等作成用 - {fmt(form.orgName)}</title>
+        <title>{fileNameBase}</title>
         <style>{PRINT_STYLES}</style>
-        <ShinseiPrintToolbar applicationId={id} label="所属機関等作成用（5ページ）" disableAutoPrint />
+        <ShinseiPrintToolbar applicationId={id} label="所属機関等作成用（5ページ）" disableAutoPrint fileNameBase={fileNameBase} />
         <ShinseiMarginControls initialTopMm={7} initialBottomMm={7} sideMm={9} />
+        {/* R型（家族滞在）・T型（定住者等）はこの書類が扶養者作成用のため「扶養者用」と表示する */}
+        <PageNumberStamp kind={(isRtype || isTtype) ? "扶養者用" : "所属機関用"} />
 
-        {!isVtype && !isNtype && !isRtype && !needsOrg && (
+        {!isVtype && !isNtype && !isRtype && !isTtype && !needsOrg && (
           <div className="no-print" style={{ padding: "60px 24px", textAlign: "center", color: "#64748b", fontSize: "14px", lineHeight: "1.8" }}>
             この在留資格区分では、所属機関用・扶養者用の書類は作成されません。<br />
             現在の申請内容では、この書類は出力されません。
@@ -143,8 +150,8 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
                 <td>{form.positionExists === "あり（Yes）" ? `あり：${fmt(form.position)}` : "なし"}</td>
                 <td className="lbl">{isCoe ? "10." : "9."} 職種コード</td>
                 <td>
-                  {fmt(form.occupationCode)}
-                  {form.occupationCodeOthers ? ` / 他：${form.occupationCodeOthers}` : ""}
+                  {occupationLabel(form.occupationCode ?? "")}
+                  {form.occupationCodeOthers ? ` / 他：${occupationLabel(form.occupationCodeOthers)}` : ""}
                 </td>
               </tr>
             </tbody>
@@ -210,7 +217,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
         </div>
         )}
 
-        {isRtype && (
+        {(isRtype || isTtype) && (
         <div className="page">
           <FormHeader
             showGov
@@ -219,10 +226,10 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             titleEn={formTitle.en}
             categoryLabel={categoryLabel}
           />
-          <div className="role-banner">【扶養者用】</div>
-
           <div className="section">
-            扶養者等作成用　１　Ｒ　—「家族滞在」{isChange ? '在留資格変更用' : '在留期間更新用'}
+            {isRtype
+              ? `扶養者等作成用　１　Ｒ　—「家族滞在」${isChange ? '在留資格変更用' : '在留期間更新用'}`
+              : '扶養者等作成用　１　Ｔ　—「定住者」等'}
           </div>
 
           <div className="section3">1. 扶養している家族（申請人）の氏名及び在留カード番号</div>
@@ -314,7 +321,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
         </div>
         )}
 
-        {needsOrg && !isNtype && !isRtype && form.freeformOrgNotes && (
+        {needsOrg && !isNtype && !isRtype && !isTtype && form.freeformOrgNotes && (
         <div className="page">
           <FormHeader
             showGov
@@ -324,7 +331,6 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             categoryLabel={categoryLabel}
           />
 
-          <div className="role-banner">【所属機関用】</div>
           <div className="section">所属機関等作成用</div>
           <table>
             <tbody>
@@ -395,7 +401,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             </tr>
             <tr>
               <td className="lbl" style={{ paddingLeft: "12px" }}>主たる職種番号</td>
-              <td>{fmt(form.orgOccupationNumber)}</td>
+              <td>{occupationLabel(form.orgOccupationNumber ?? "")}</td>
               <td className="lbl">追加職種番号</td>
               <td>{fmtAdditionalOccupations(form.orgOccupationNumberAdditional)}</td>
             </tr>
@@ -518,9 +524,9 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             </tr>
             <tr>
               <td className="lbl lbl-wrap">(4) 業種番号</td>
-              <td>{fmt(form.orgBusinessTypeCode)}</td>
+              <td>{businessTypeLabel(form.orgBusinessTypeCode ?? "")}</td>
               <td className="lbl">追加業種番号</td>
-              <td>{fmt(form.orgBusinessTypeOtherCode)}</td>
+              <td>{businessTypeLabel(form.orgBusinessTypeOtherCode ?? "")}</td>
             </tr>
             <tr>
               <td className="lbl">(5) 住所（所在地）<br /><span className="bilingual">Address</span></td>

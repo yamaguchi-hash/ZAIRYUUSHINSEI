@@ -809,23 +809,23 @@ export default async function ApplicationDetailPage({
         </CollapsibleSection>
       )}
 
-      {/* 8. 許可・完了処理（submitted 以降） */}
-      {(application.status === "submitted" || application.status === "applying" || application.status === "completed") && (
-        <CollapsibleSection
-          title="許可・完了処理"
-          defaultOpen={!((application.draftData as any)?._result?.completedAt)}
-          accentClass="bg-emerald-500"
-        >
-          <PermitResultPanel
-            applicationId={application.id}
-            applicantId={applicant.id}
-            applicationType={application.applicationType}
-            currentVisaType={(application.formData as any)?.currentStatusOfResidence}
-            desiredVisaType={(application.formData as any)?.desiredStatusOfResidence}
-            resultData={(application.draftData as any)?._result}
-          />
-        </CollapsibleSection>
-      )}
+      {/* 8. 許可・完了処理
+          実際の許可・新在留カード到着のタイミングは、内部ワークフローの進行状況（①〜⑦）とは
+          無関係に発生し得るため、ステータスによる表示制限は設けない（常に表示する）。 */}
+      <CollapsibleSection
+        title="許可・完了処理"
+        defaultOpen={!((application.draftData as any)?._result?.completedAt)}
+        accentClass="bg-emerald-500"
+      >
+        <PermitResultPanel
+          applicationId={application.id}
+          applicantId={applicant.id}
+          applicationType={application.applicationType}
+          currentVisaType={(application.formData as any)?.currentStatusOfResidence}
+          desiredVisaType={(application.formData as any)?.desiredStatusOfResidence}
+          resultData={(application.draftData as any)?._result}
+        />
+      </CollapsibleSection>
     </div>
   );
 }

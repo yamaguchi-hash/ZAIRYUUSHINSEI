@@ -139,6 +139,8 @@ export default async function ApplicationDetailPage({
   }
 
   const effectiveForm = buildEffectiveFormData(application, applicant, organization);
+  // 2つ目の申請書PDFの文言: 家族滞在（R型）の場合のみ「扶養者用」、それ以外は「所属機関用」
+  const secondShinseiPdfLabel = effectiveForm.visaFormCategory === 'R' ? "扶養者用PDFダウンロード" : "所属機関用PDFダウンロード";
   const interviewFormType = toFormType(effectiveForm.applicationFormType ?? application.applicationType);
   const interviewCategory = effectiveForm.visaFormCategory ?? "N";
   const interviewExcludedIds = new Set((application.interviewExcludedFields ?? []) as string[]);
@@ -305,6 +307,22 @@ export default async function ApplicationDetailPage({
           >
             <FileText className="w-4 h-4" />
             申請書を作成
+          </Link>
+          <Link
+            href={`/print/${application.id}/shinsei-applicant`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors whitespace-nowrap"
+          >
+            <FileDown className="w-4 h-4" />
+            申請人用PDF
+          </Link>
+          <Link
+            href={`/print/${application.id}/shinsei-org`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors whitespace-nowrap"
+          >
+            <FileDown className="w-4 h-4" />
+            {secondShinseiPdfLabel}
           </Link>
           <QuestionnaireDocxButton applicationId={application.id} />
           <MergePdfButton applicationId={application.id} />

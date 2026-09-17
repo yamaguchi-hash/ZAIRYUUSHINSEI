@@ -1334,6 +1334,27 @@ export async function saveApplicationFormData(
         if (Object.keys(educationHistory).length > 0) masterUpdate.educationHistory = educationHistory;
         if (workHistory.length > 0) masterUpdate.workHistory = workHistory;
 
+        // ── 日本における連絡先・在留カード番号等を申請人マスターへ同期 ──────────
+        // buildEffectiveFormData() はこれらの項目をマスターの値で常に上書きするため、
+        // マスターに未登録のまま申請書側だけで入力すると、次回開いたときに
+        // 空欄に戻ってしまう（例: 郵便番号）。申請書で入力された値をマスターにも
+        // 反映し、消えないようにする。
+        const CONTACT_FIELD_MAP: Record<string, string> = {
+          postalCodeInJapan: "postalCode",
+          prefectureInJapan: "japanPrefecture",
+          cityInJapan: "japanCity",
+          addressLineInJapan: "japanAddressLine",
+          addressInJapan: "japanAddress",
+          telephoneNo: "phone",
+          cellularPhoneNo: "mobilePhone",
+          currentPeriodExpiry: "currentVisaExpiry",
+          residenceCardNumber: "residenceCardNumber",
+        };
+        for (const [formKey, masterKey] of Object.entries(CONTACT_FIELD_MAP)) {
+          const v = formData[formKey];
+          if (typeof v === "string" && v.trim()) masterUpdate[masterKey] = v;
+        }
+
         if (Object.keys(masterUpdate).length > 0) {
           await db
             .update(applicantMaster)

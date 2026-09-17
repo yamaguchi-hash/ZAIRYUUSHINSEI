@@ -2090,7 +2090,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       </Field>
                       <Field label={`${isCoe ? "7." : "6."} 給与・報酬（税引き前）`} required aiStatus={aiStatus("salary")}>
                         <div className="flex gap-2">
-                          <input className={inputCls} value={form.salary} onChange={e => set("salary", e.target.value)} placeholder="例: 300000" />
+                          <MoneyInput className={inputCls} value={form.salary} onChange={v => set("salary", v)} placeholder="例: 300000" />
                           <select className="text-sm border border-gray-300 rounded-lg px-2 focus:outline-none bg-white" value={form.salaryType} onChange={e => set("salaryType", e.target.value)}>
                             <option value="月額">月額</option>
                             <option value="年額">年額</option>
@@ -2984,11 +2984,10 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   : undefined}
               >
                 <div className="flex gap-2 items-center">
-                  <input
+                  <MoneyInput
                     className={inputCls}
-                    type="number"
                     value={form.gaikatsuSalary}
-                    onChange={e => set("gaikatsuSalary", e.target.value)}
+                    onChange={v => set("gaikatsuSalary", v)}
                     placeholder={isRtype && form.partTimeWorkSalaryR ? form.partTimeWorkSalaryR : "例: 100000"}
                   />
                   <span className="text-sm text-gray-500 flex-shrink-0">円</span>

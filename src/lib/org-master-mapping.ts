@@ -125,7 +125,12 @@ export function mapOrganizationToFormData(
 ): Partial<ApplicationFormData> {
   if (!org) return {};
 
-  const address = [org.prefecture, org.city, org.addressLine].filter(Boolean).join("");
+  // 住所は AddressSplitSimple（src/components/ui/postal-code-input.tsx）の
+  // 保存形式に合わせ、郵便番号を "〒1234567|住所" の形で先頭に埋め込む。
+  // これを省略すると、上書きのたびに郵便番号欄が空になってしまう。
+  const rawAddress = [org.prefecture, org.city, org.addressLine].filter(Boolean).join("");
+  const cleanZip = (org.postalCode ?? "").replace(/[-ー−\s]/g, "");
+  const address = cleanZip.length === 7 ? `〒${cleanZip}|${rawAddress}` : rawAddress;
   // 主たる業種: マスターに正確なコード（businessTypeCode）があればそれを優先し、
   // なければ自由記載の industry からのあいまい一致にフォールバックする
   const businessTypeCode = org.businessTypeCode || industryToBusinessTypeCode(org.industry);

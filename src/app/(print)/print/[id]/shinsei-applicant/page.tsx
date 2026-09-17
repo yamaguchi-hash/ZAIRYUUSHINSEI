@@ -8,10 +8,8 @@
  * Page 2・3 は在留資格カテゴリが V（特定技能）の場合のみ出力する。
  * それ以外の在留資格では Page 1 のみを出力し、末尾に署名欄を付す。
  *
- * 様式番号・申請書タイトルはヘッド部分（FormHeader）で全ページ共通のデザインに統一しつつ、
- * 申請書類の種別（formType）に応じて getFormNumber() / FORM_TITLE_MAP から動的に取得する。
- * 各ページのヘッダーには、内部の構成順ラベルの代わりに「様式名－在留資格種類」
- * （categoryLabel、例: 在留資格変更許可申請書－家族滞在）を統一して表示する。
+ * 様式番号・申請書タイトルはヘッド部分（FormHeader）で Page 1 のみに表示する。
+ * Page 2・3 は様式タイトルの重複表示を避けるため、ヘッダーを表示せず本文から始める。
  */
 import { notFound } from "next/navigation";
 import {
@@ -268,10 +266,6 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             ════════════════════════════════════════════════════════════════════ */}
         {isNtype && (
         <div className="page">
-          <FormHeader
-            categoryLabel={categoryLabel}
-          />
-
           <div className="section3">{p2Base}. 勤務先</div>
           <table>
             <tbody>
@@ -340,10 +334,6 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             ════════════════════════════════════════════════════════════════════ */}
         {isTtype && (
         <div className="page">
-          <FormHeader
-            categoryLabel={categoryLabel}
-          />
-
           <div className="section3">配偶者・日本人等の情報</div>
           <table>
             <tbody>
@@ -532,10 +522,6 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             ════════════════════════════════════════════════════════════════════ */}
         {isPtype && (
         <div className="page">
-          <FormHeader
-            categoryLabel={categoryLabel}
-          />
-
           <div className="section3">在籍学校の情報</div>
           <table>
             <tbody>
@@ -590,10 +576,6 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             ════════════════════════════════════════════════════════════════════ */}
         {isRtype && (
         <div className="page">
-          <FormHeader
-            categoryLabel={categoryLabel}
-          />
-
           <div className="section">
             申請人等作成用　２　Ｒ　—「家族滞在」{isChange ? '在留資格変更用' : '在留期間更新用'}　（項目 17〜20）
           </div>
@@ -714,11 +696,6 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         <>
         {/* Page 2: 申請人等作成用 ２ V（「特定技能（１号）」・「特定技能（２号）」） */}
         <div className="page">
-          {/* 2ページ目以降は様式タイトルの重複表示を避け、categoryLabel（様式名－在留資格種類）のみ表示する */}
-          <FormHeader
-            categoryLabel={categoryLabel}
-          />
-
           {/* 17. 特定技能所属機関 */}
           <div className="item-title">
             17 申請人を雇用する本邦の公私の機関の名称等
@@ -843,11 +820,6 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             Page 3: 申請人等作成用 ３ V（「特定技能（１号）」・「特定技能（２号）」）
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          {/* 2ページ目以降は様式タイトルの重複表示を避け、categoryLabel（様式名－在留資格種類）のみ表示する */}
-          <FormHeader
-            categoryLabel={categoryLabel}
-          />
-
           {/* 確認事項（22〜27） */}
           <table className="v-tbl"><tbody>
             {([

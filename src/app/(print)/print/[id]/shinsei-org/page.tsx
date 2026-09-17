@@ -8,9 +8,9 @@
  *
  * 上記のいずれにも該当しない在留資格区分の場合は何も出力しない（画面上に案内のみ表示）。
  *
- * 様式番号・申請書タイトルはヘッド部分（FormHeader）で全ページ共通のデザインに統一する。
- * すべてのページのヘッダーは categoryLabel（[様式名]－[在留資格種類]）を表示し、
- * 【扶養者用】【所属機関用】のロールバナーは別要素として保持される。
+ * 様式番号・申請書タイトルはヘッド部分（FormHeader）で各セクションの1ページ目のみに表示する。
+ * 2ページ目以降（V型の派遣先等・コンプライアンス確認等）は様式タイトルの重複表示を避けるため、
+ * ヘッダーを表示せず本文から始める。【扶養者用】【所属機関用】のロールバナーは別要素として保持される。
  */
 import { notFound } from "next/navigation";
 import {
@@ -582,11 +582,6 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 2: 所属機関等作成用 2 V — 派遣先・職業紹介事業者・取次機関
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          {/* 2ページ目以降は様式タイトルの重複表示を避け、categoryLabel（様式名－在留資格種類）のみ表示する */}
-          <FormHeader
-            categoryLabel={categoryLabel}
-          />
-
           {/* 4. 派遣先 */}
           <div className="item-title">
             4 派遣先（雇用形態が労働者派遣の場合に記入）
@@ -751,11 +746,6 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 3: 所属機関等作成用 3 V — コンプライアンス確認（(11)〜(21)）
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          {/* 2ページ目以降は様式タイトルの重複表示を避け、categoryLabel（様式名－在留資格種類）のみ表示する */}
-          <FormHeader
-            categoryLabel={categoryLabel}
-          />
-
           <div className="item-title">
             コンプライアンス確認事項（(11)〜(21)）
             <span className="bilingual">　Compliance check items</span>
@@ -794,11 +784,6 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 4: 所属機関等作成用 4 V — コンプライアンス(22)〜(33) ＋ 所属機関署名
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          {/* 2ページ目以降は様式タイトルの重複表示を避け、categoryLabel（様式名－在留資格種類）のみ表示する */}
-          <FormHeader
-            categoryLabel={categoryLabel}
-          />
-
           <div className="item-title">
             コンプライアンス確認事項（(22)〜(33)）
             <span className="bilingual">　Compliance check items (continued)</span>
@@ -885,11 +870,6 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             Page 5: 所属機関等作成用 4 V — 1号特定技能外国人支援計画（(34)〜(42)・4(1)〜(16)）＋ 取次者・署名
             ════════════════════════════════════════════════════════════════════ */}
         <div className="page">
-          {/* 2ページ目以降は様式タイトルの重複表示を避け、categoryLabel（様式名－在留資格種類）のみ表示する */}
-          <FormHeader
-            categoryLabel={categoryLabel}
-          />
-
           <div className="item-title">
             1号特定技能外国人支援計画（(34)〜(42)）
             <span className="bilingual">　Support plan for Specified Skilled Worker (i)</span>

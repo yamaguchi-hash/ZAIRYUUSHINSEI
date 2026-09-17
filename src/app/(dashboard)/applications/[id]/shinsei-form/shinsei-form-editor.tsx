@@ -337,6 +337,17 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
     const updated = (form.familyInJapan ?? []).map((m, i) => i === idx ? { ...m, [key]: value } : m);
     set("familyInJapan", updated);
   }
+  // 申請人マスターから選択した在日親族の情報を、その行へ反映する（続柄・勤務先・同居有無は引き継がず手入力のまま）
+  function applyFamilyMemberMaster(idx: number, master: SupporterCandidate) {
+    const updated = (form.familyInJapan ?? []).map((m, i) => i === idx ? {
+      ...m,
+      name: [master.familyNameEn, master.givenNameEn].filter(Boolean).join(' '),
+      dateOfBirth: master.dateOfBirth ?? '',
+      nationality: master.nationality,
+      residenceCardNumber: master.residenceCardNumber ?? '',
+    } : m);
+    set("familyInJapan", updated);
+  }
   function addFamilyMember() {
     set("familyInJapan", [...(form.familyInJapan ?? []), {
       relationship: '', name: '', dateOfBirth: '', nationality: '',
@@ -989,6 +1000,25 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     {(form.familyInJapan ?? []).map((m, idx) => (
                       <div key={idx} className="border border-gray-200 rounded-lg p-3 relative">
                         <button onClick={() => removeFamilyMember(idx)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                        {localSupporterCandidates.length > 0 && (
+                          <div className="mb-3 flex items-center gap-2">
+                            <span className="text-[11px] text-gray-400 whitespace-nowrap">申請人マスターから選択（任意）:</span>
+                            <select
+                              className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-600"
+                              value=""
+                              onChange={e => {
+                                const master = localSupporterCandidates.find(a => a.id === e.target.value);
+                                if (master) applyFamilyMemberMaster(idx, master);
+                                e.target.value = "";
+                              }}
+                            >
+                              <option value="">選択してください</option>
+                              {localSupporterCandidates.map(a => (
+                                <option key={a.id} value={a.id}>{a.familyNameEn} {a.givenNameEn}（{a.nationality}）</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                           <Field label="続柄"><input className={inputCls} value={m.relationship} onChange={e => updateFamilyMember(idx, "relationship", e.target.value)} placeholder="配偶者・子 等" /></Field>
                           <Field label="氏名"><input className={inputCls} value={m.name} onChange={e => updateFamilyMember(idx, "name", e.target.value)} /></Field>

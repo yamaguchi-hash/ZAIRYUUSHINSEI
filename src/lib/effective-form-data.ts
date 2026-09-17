@@ -12,6 +12,7 @@ export interface ApplicantMasterLike {
   familyNameJa?: string | null;
   givenNameJa?: string | null;
   gender?: string | null;
+  maritalStatus?: string | null;
   postalCode?: string | null;
   japanPrefecture?: string | null;
   japanCity?: string | null;
@@ -24,6 +25,12 @@ export interface ApplicantMasterLike {
   currentVisaType?: string | null;
   currentVisaExpiry?: string | null;
   residenceCardNumber?: string | null;
+  placeOfBirth?: string | null;
+  homeCountryAddress?: string | null;
+  /** 申請書保存時に同期される最終学歴（educationCountry 等のキーを持つオブジェクト） */
+  educationHistory?: unknown;
+  /** 申請書保存時に同期される職歴（WorkHistoryEntry[] 相当の配列） */
+  workHistory?: unknown;
 }
 
 /** applications の行のうち、本関数が参照するフィールドのみの構造的型 */
@@ -64,6 +71,9 @@ export function buildEffectiveFormData(
     familyNameJa:               applicant.familyNameJa ?? '',
     givenNameJa:                applicant.givenNameJa ?? '',
     sex:                        applicant.gender === 'M' ? '男' : applicant.gender === 'F' ? '女' : '',
+    maritalStatus:              applicant.maritalStatus ?? '',
+    placeOfBirth:               applicant.placeOfBirth ?? '',
+    homeTownCity:               applicant.homeCountryAddress ?? '',
     postalCodeInJapan:          applicant.postalCode ?? '',
     prefectureInJapan:          applicant.japanPrefecture ?? '',
     cityInJapan:                applicant.japanCity ?? '',
@@ -107,10 +117,46 @@ export function buildEffectiveFormData(
     residenceCardNumber:      applicant.residenceCardNumber ?? '',
   };
 
+  // 出生地・本国における居住地（マスターに値がある場合は常にマスターの最新値を使用する。
+  // マスター未登録の場合のみ、保存済みフォームの値を維持する）
+  const masterProfileFallbacks = {
+    ...(applicant.placeOfBirth ? { placeOfBirth: applicant.placeOfBirth } : {}),
+    ...(applicant.homeCountryAddress ? { homeTownCity: applicant.homeCountryAddress } : {}),
+    // 婚姻の有無（配偶者の有無）: マスターに値がある場合は常にマスターの最新値を反映する
+    ...(applicant.maritalStatus ? { maritalStatus: applicant.maritalStatus } : {}),
+  };
+
+  // 学歴・職歴（申請書保存時にマスターへ同期された値を、フォーム側が未入力の場合のみ
+  // 初期値として補完する。新規案件で過去の申請の入力を使い回すための仕組み。
+  // フォームで入力済みの値はマスターより優先する＝編集中の案件を上書きしない）
+  const EDUCATION_KEYS = [
+    "educationCountry", "educationDegree", "educationSchoolName", "educationGraduationDate",
+    "majorCategory", "majorCategoryOther", "itQualificationExists", "itQualificationName",
+  ] as const;
+  const masterEdu = (applicant.educationHistory ?? null) as Record<string, string> | null;
+  const educationFallbacks: Partial<ApplicationFormData> = {};
+  if (masterEdu && typeof masterEdu === "object" && !Array.isArray(masterEdu)) {
+    for (const k of EDUCATION_KEYS) {
+      const formVal = (savedForm as Record<string, unknown> | null)?.[k];
+      if (!formVal && typeof masterEdu[k] === "string" && masterEdu[k]) {
+        (educationFallbacks as Record<string, string>)[k] = masterEdu[k];
+      }
+    }
+  }
+  const masterWork = Array.isArray(applicant.workHistory) ? applicant.workHistory : null;
+  const savedWork = savedForm?.workHistory;
+  const workHistoryFallback =
+    masterWork && masterWork.length > 0 && (!Array.isArray(savedWork) || savedWork.length === 0)
+      ? { workHistory: masterWork as ApplicationFormData["workHistory"] }
+      : {};
+
   return {
     ...EMPTY_FORM_DATA,
     ...(savedForm ?? masterData),
     ...masterContactFields,
     ...masterStatusFields,
+    ...masterProfileFallbacks,
+    ...educationFallbacks,
+    ...workHistoryFallback,
   } as ApplicationFormData;
 }

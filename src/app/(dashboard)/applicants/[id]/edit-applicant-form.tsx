@@ -6,6 +6,7 @@ import { VISA_TYPE_LABELS, isWorkVisaType } from "@/lib/utils";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { AddressSplitInput } from "@/components/ui/postal-code-input";
 import { PREFECTURES } from "@/lib/prefectures";
+import { MAJOR_CATEGORIES_UNIVERSITY, MAJOR_CATEGORIES_VOCATIONAL } from "@/lib/form-types";
 import { Plus, Trash2 } from "lucide-react";
 
 /** 最終学歴（申請書作成の教育欄と同じキー構成。src/lib/effective-form-data.ts の EDUCATION_KEYS と揃える） */
@@ -445,8 +446,28 @@ export function EditApplicantForm({ applicant, organizations, supporters }: Edit
           </div>
         </div>
         <div className="mt-2">
-          <label className="block text-xs font-medium text-gray-600 mb-1">専攻・専門分野</label>
-          <input name="majorCategory" value={education.majorCategory} onChange={handleEducationChange} placeholder="例: 情報工学" className="input-field text-sm py-1.5" />
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            {education.educationDegree === "専門学校" ? "専攻分野（専門学校）" : "専攻・専門分野"}
+          </label>
+          {education.educationDegree === "大学院（博士）" || education.educationDegree === "大学院（修士）" || education.educationDegree === "大学" || education.educationDegree === "短期大学" ? (
+            <select name="majorCategory" value={education.majorCategory} onChange={handleEducationChange} className="input-field text-sm py-1.5">
+              <option value="">選択してください</option>
+              {MAJOR_CATEGORIES_UNIVERSITY.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          ) : education.educationDegree === "専門学校" ? (
+            <select name="majorCategory" value={education.majorCategory} onChange={handleEducationChange} className="input-field text-sm py-1.5">
+              <option value="">選択してください</option>
+              {MAJOR_CATEGORIES_VOCATIONAL.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          ) : (
+            <input name="majorCategory" value={education.majorCategory} onChange={handleEducationChange} placeholder="例: 情報工学" className="input-field text-sm py-1.5" />
+          )}
+          {["その他人文・社会科学", "その他自然科学", "その他"].includes(education.majorCategory) && (
+            <div className="mt-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">その他の詳細</label>
+              <input name="majorCategoryOther" value={education.majorCategoryOther} onChange={handleEducationChange} className="input-field text-sm py-1.5" />
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-2 mt-2">
           <div>

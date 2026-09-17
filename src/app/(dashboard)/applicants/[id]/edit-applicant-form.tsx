@@ -137,7 +137,16 @@ export function EditApplicantForm({ applicant, organizations, supporters }: Edit
     setStatus("idle");
   }
   function updateWorkHistoryRow(idx: number, key: keyof WorkHistoryEntry, value: string) {
-    setWorkHistory((prev) => prev.map((w, i) => (i === idx ? { ...w, [key]: value } : w)));
+    setWorkHistory((prev) => prev.map((w, i) => {
+      if (i !== idx) return w;
+      const updated = { ...w, [key]: value };
+      // 勤務先名称の入力欄は廃止し、機関名（英語表記／漢字表記等）から自動的に反映する
+      // （印刷・転記シート等、既存のemployerフィールドを参照する箇所との互換性のため）
+      if (key === "employerNameEn" || key === "employerNameKanji") {
+        updated.employer = updated.employerNameKanji || updated.employerNameEn || "";
+      }
+      return updated;
+    }));
     setStatus("idle");
   }
   function addWorkHistoryRow() {
@@ -484,38 +493,39 @@ export function EditApplicantForm({ applicant, organizations, supporters }: Edit
                     <label className="block text-[11px] text-gray-500 mb-1">国・地域</label>
                     <input value={w.country} onChange={(e) => updateWorkHistoryRow(idx, "country", e.target.value)} className="input-field text-sm py-1.5" />
                   </div>
-                  <div>
-                    <label className="block text-[11px] text-gray-500 mb-1">勤務先名称</label>
-                    <input value={w.employer} onChange={(e) => updateWorkHistoryRow(idx, "employer", e.target.value)} className="input-field text-sm py-1.5" />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-gray-500 mb-1">機関名（英語表記）の有無</label>
-                    <select value={w.employerNameEnExists} onChange={(e) => updateWorkHistoryRow(idx, "employerNameEnExists", e.target.value)} className="input-field text-sm py-1.5">
-                      <option value="">—</option>
-                      <option value="有">有</option>
-                      <option value="無">無</option>
-                    </select>
-                  </div>
-                  {w.employerNameEnExists === "有" && (
-                    <div>
-                      <label className="block text-[11px] text-gray-500 mb-1">機関名（英語表記）</label>
-                      <input value={w.employerNameEn} onChange={(e) => updateWorkHistoryRow(idx, "employerNameEn", e.target.value)} className="input-field text-sm py-1.5" />
+                  <div />
+                  <div className="flex gap-2 items-end">
+                    <div className="w-24 flex-none">
+                      <label className="block text-[11px] text-gray-500 mb-1">機関名（英語表記）の有無</label>
+                      <select value={w.employerNameEnExists} onChange={(e) => updateWorkHistoryRow(idx, "employerNameEnExists", e.target.value)} className="input-field text-sm py-1.5">
+                        <option value="">—</option>
+                        <option value="有">有</option>
+                        <option value="無">無</option>
+                      </select>
                     </div>
-                  )}
-                  <div>
-                    <label className="block text-[11px] text-gray-500 mb-1">機関名（漢字表記等）の有無</label>
-                    <select value={w.employerNameKanjiExists} onChange={(e) => updateWorkHistoryRow(idx, "employerNameKanjiExists", e.target.value)} className="input-field text-sm py-1.5">
-                      <option value="">—</option>
-                      <option value="有">有</option>
-                      <option value="無">無</option>
-                    </select>
+                    {w.employerNameEnExists === "有" && (
+                      <div className="flex-1">
+                        <label className="block text-[11px] text-gray-500 mb-1">機関名（英語表記）</label>
+                        <input value={w.employerNameEn} onChange={(e) => updateWorkHistoryRow(idx, "employerNameEn", e.target.value)} className="input-field text-sm py-1.5" />
+                      </div>
+                    )}
                   </div>
-                  {w.employerNameKanjiExists === "有" && (
-                    <div>
-                      <label className="block text-[11px] text-gray-500 mb-1">機関名（漢字表記等）</label>
-                      <input value={w.employerNameKanji} onChange={(e) => updateWorkHistoryRow(idx, "employerNameKanji", e.target.value)} className="input-field text-sm py-1.5" />
+                  <div className="flex gap-2 items-end">
+                    <div className="w-24 flex-none">
+                      <label className="block text-[11px] text-gray-500 mb-1">機関名（漢字表記等）の有無</label>
+                      <select value={w.employerNameKanjiExists} onChange={(e) => updateWorkHistoryRow(idx, "employerNameKanjiExists", e.target.value)} className="input-field text-sm py-1.5">
+                        <option value="">—</option>
+                        <option value="有">有</option>
+                        <option value="無">無</option>
+                      </select>
                     </div>
-                  )}
+                    {w.employerNameKanjiExists === "有" && (
+                      <div className="flex-1">
+                        <label className="block text-[11px] text-gray-500 mb-1">機関名（漢字表記等）</label>
+                        <input value={w.employerNameKanji} onChange={(e) => updateWorkHistoryRow(idx, "employerNameKanji", e.target.value)} className="input-field text-sm py-1.5" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

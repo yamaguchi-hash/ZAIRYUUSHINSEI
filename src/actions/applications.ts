@@ -2306,6 +2306,49 @@ export async function completeWithPermit(
   }
 }
 
+/**
+ * 完了済み案件で、後から届いた新しい在留カードの番号・在留期限を「許可・完了処理」の
+ * 結果表示（draftData._result）に反映する。許可通知（葉書等）は先に受け取り案件を完了
+ * 済みにしていても、物理的な新在留カードは後日届くことが多いため、完了後の追記を可能にする。
+ * 申請人マスター本体の更新は confirmResidenceCardRenewal（src/actions/ocr.ts）が担う。
+ */
+export async function updatePermitResultCard(
+  applicationId: string,
+  data: { newCardNumber?: string; newVisaExpiry?: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "認証が必要です" };
+    const tenantId = requireTenantId((session.user as any).tenantId);
+
+    const [app] = await db.select().from(applications)
+      .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId))).limit(1);
+    if (!app) return { success: false, error: "申請案件が見つかりません" };
+
+    const existing = (app.draftData as Record<string, any>) ?? {};
+    const existingResult = (existing._result as Record<string, any>) ?? {};
+
+    await db.update(applications)
+      .set({
+        draftData: {
+          ...existing,
+          _result: {
+            ...existingResult,
+            ...(data.newCardNumber ? { newCardNumber: data.newCardNumber } : {}),
+            ...(data.newVisaExpiry ? { newVisaExpiry: data.newVisaExpiry } : {}),
+          },
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(applications.id, applicationId));
+
+    revalidatePath(`/applications/${applicationId}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "更新に失敗しました" };
+  }
+}
+
 // ─── 納付書データ保存 ────────────────────────────────────────────────────────
 export async function saveNoufushoData(
   applicationId: string,

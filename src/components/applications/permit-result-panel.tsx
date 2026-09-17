@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { completeWithPermit } from "@/actions/applications";
+import { completeWithPermit, updatePermitResultCard } from "@/actions/applications";
 import { previewResidenceCardRenewal, confirmResidenceCardRenewal, getApplicantDocuments } from "@/actions/ocr";
 import { DocumentLink, isImageFile } from "@/components/applicants/document-viewer";
 import {
@@ -159,6 +159,15 @@ export function PermitResultPanel({
       if (cardPreview.residenceCardNumber) setNewCardNumber(cardPreview.residenceCardNumber);
       if (cardPreview.currentVisaExpiry) setNewVisaExpiry(cardPreview.currentVisaExpiry);
 
+      // 既に完了済みの案件でも、後から届いた在留カードの内容を「許可・完了処理」の
+      // 結果表示へ反映する（申請人マスター側は上のconfirmResidenceCardRenewalで更新済み）
+      if (isCompleted) {
+        await updatePermitResultCard(applicationId, {
+          newCardNumber: cardPreview.residenceCardNumber || undefined,
+          newVisaExpiry: cardPreview.currentVisaExpiry || undefined,
+        });
+      }
+
       setCardSuccess("新しい在留カードを保存し、申請人マスターを更新しました");
       setCardPreview(null);
       refreshRenewalDocs();
@@ -199,57 +208,60 @@ export function PermitResultPanel({
 
   const isPreviewPdf = cardPreview?.fileName.toLowerCase().endsWith(".pdf");
 
-  // 完了済み表示
-  if (isCompleted) {
-    return (
-      <div className="border border-emerald-200 rounded-xl bg-emerald-50 overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-100 border-b border-emerald-200">
-          <CheckCircle className="w-4 h-4 text-emerald-600" />
-          <span className="text-sm font-semibold text-emerald-800">⑧ 申請完了</span>
-        </div>
-        <div className="p-4 grid grid-cols-2 gap-3 text-sm">
-          <div><span className="text-gray-500 text-xs">許可日</span><p className="font-medium">{resultData?.permittedDate || "—"}</p></div>
-          {needsCard && (
-            <>
-              <div><span className="text-gray-500 text-xs">新在留カード番号</span><p className="font-medium">{resultData?.newCardNumber || "—"}</p></div>
-              <div><span className="text-gray-500 text-xs">新在留期限</span><p className="font-medium">{resultData?.newVisaExpiry || "—"}</p></div>
-              <div><span className="text-gray-500 text-xs">新在留資格</span><p className="font-medium">{resultData?.newVisaType || "—"}</p></div>
-            </>
-          )}
-          <div className="col-span-2"><span className="text-gray-500 text-xs">完了日時</span><p className="font-medium text-xs">{resultData?.completedAt ? new Date(resultData.completedAt).toLocaleString("ja-JP") : "—"}</p></div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="border border-emerald-200 rounded-xl bg-emerald-50 overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-emerald-200 bg-emerald-100">
-        <Trophy className="w-4 h-4 text-emerald-700" />
-        <span className="text-sm font-semibold text-emerald-800">⑧ 許可・完了処理</span>
+        {isCompleted ? <CheckCircle className="w-4 h-4 text-emerald-600" /> : <Trophy className="w-4 h-4 text-emerald-700" />}
+        <span className="text-sm font-semibold text-emerald-800">{isCompleted ? "⑧ 申請完了" : "⑧ 許可・完了処理"}</span>
       </div>
 
       <div className="p-4 space-y-4">
-        <p className="text-xs text-emerald-700">
-          許可通知を受け取ったら許可日を記録してください。
-          {needsCard && " 更新・変更申請の場合は新しい在留カード情報を入力して申請人マスターを更新します。"}
-        </p>
+        {/* 完了済みの場合はこれまでの記録を表示（新在留カードのアップロードは完了後も可能） */}
+        {isCompleted && (
+          <div className="grid grid-cols-2 gap-3 text-sm bg-white border border-emerald-100 rounded-lg p-3">
+            <div><span className="text-gray-500 text-xs">許可日</span><p className="font-medium">{permittedDate || "—"}</p></div>
+            {needsCard && (
+              <>
+                <div><span className="text-gray-500 text-xs">新在留カード番号</span><p className="font-medium">{newCardNumber || "—"}</p></div>
+                <div><span className="text-gray-500 text-xs">新在留期限</span><p className="font-medium">{newVisaExpiry || "—"}</p></div>
+                <div><span className="text-gray-500 text-xs">新在留資格</span><p className="font-medium">{newVisaType || "—"}</p></div>
+              </>
+            )}
+            <div className="col-span-2"><span className="text-gray-500 text-xs">完了日時</span><p className="font-medium text-xs">{resultData?.completedAt ? new Date(resultData.completedAt).toLocaleString("ja-JP") : "—"}</p></div>
+          </div>
+        )}
 
-        {/* 許可日 */}
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5" />
-            許可日 <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            value={permittedDate}
-            onChange={e => setPermittedDate(e.target.value)}
-            className="w-48 text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-emerald-400 bg-white"
-          />
-        </div>
+        {!isCompleted && (
+          <>
+            <p className="text-xs text-emerald-700">
+              許可通知を受け取ったら許可日を記録してください。
+              {needsCard && " 更新・変更申請の場合は新しい在留カード情報を入力して申請人マスターを更新します。"}
+            </p>
 
-        {/* 新在留カード情報（更新・変更のみ） */}
+            {/* 許可日 */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                許可日 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={permittedDate}
+                onChange={e => setPermittedDate(e.target.value)}
+                className="w-48 text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-emerald-400 bg-white"
+              />
+            </div>
+          </>
+        )}
+
+        {isCompleted && needsCard && !newCardNumber && (
+          <p className="text-xs text-amber-600 flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            新しい在留カードが届いたら、以下からアップロードしてください。
+          </p>
+        )}
+
+        {/* 新在留カード情報（更新・変更のみ。完了後でもアップロード・上書き可能） */}
         {needsCard && (
           <div className="border border-emerald-200 rounded-lg p-3 bg-white space-y-3">
             <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
@@ -382,17 +394,21 @@ export function PermitResultPanel({
           </div>
         )}
 
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {!isCompleted && (
+          <>
+            {error && <p className="text-xs text-red-500">{error}</p>}
 
-        <button
-          onClick={handleComplete}
-          disabled={saving}
-          className="inline-flex items-center gap-2 h-10 px-5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 rounded-lg transition-colors"
-        >
-          {saving
-            ? <><Loader2 className="w-4 h-4 animate-spin" />処理中...</>
-            : <><CheckCircle className="w-4 h-4" />許可日を記録して完了</>}
-        </button>
+            <button
+              onClick={handleComplete}
+              disabled={saving}
+              className="inline-flex items-center gap-2 h-10 px-5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 rounded-lg transition-colors"
+            >
+              {saving
+                ? <><Loader2 className="w-4 h-4 animate-spin" />処理中...</>
+                : <><CheckCircle className="w-4 h-4" />許可日を記録して完了</>}
+            </button>
+          </>
+        )}
       </div>
 
       {/* AI読み取り結果の確認モーダル（承認後にマスター更新・履歴退避） */}

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition, useMemo, useRef } from "react";
-import { addDocumentsToChecklist, addCustomDocumentToChecklist, addRequiredDocumentsToChecklist } from "@/actions/applications";
+import { addDocumentsToChecklist, addCustomDocumentToChecklist, applyDocumentTemplateToChecklist } from "@/actions/applications";
 import {
   PlusCircle, ChevronDown, ChevronRight, CheckSquare,
-  Square, Loader2, Search, ListChecks, X, FilePlus, Zap,
+  Loader2, Search, ListChecks, X, FilePlus, FolderOpen, Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,10 @@ interface DocumentMaster {
   isAlwaysRequired: boolean;
   conditions: any;
   sortOrder: number;
+  /** 必要書類マスターで設定した担当（申請人/受入企業/弊所/自由記載） */
+  preparedBy?: string | null;
+  /** 必要書類マスターで設定した原本/写し区分 */
+  originalOrCopy?: string | null;
 }
 
 interface ChecklistItem {
@@ -25,19 +29,27 @@ interface ChecklistItem {
   status: string;
 }
 
+interface TemplateOption {
+  id: string;
+  name: string;
+  note: string | null;
+  itemCount: number;
+}
+
 interface Props {
   applicationId: string;
   masterDocuments: DocumentMaster[];
   checklist: ChecklistItem[];
+  /** この案件の在留資格・申請種別に合わせて保存されているテンプレート */
+  templates?: TemplateOption[];
 }
 
-export function DocumentSelector({ applicationId, masterDocuments, checklist }: Props) {
+export function DocumentSelector({ applicationId, masterDocuments, checklist, templates = [] }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [isPending, startTransition] = useTransition();
+  const [addingDocId, setAddingDocId] = useState<string | null>(null);
   const [isAddingCustom, startAddCustom] = useTransition();
-  const [isAddingRequired, startAddRequired] = useTransition();
+  const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [customName, setCustomName] = useState("");
   const [customError, setCustomError] = useState("");
@@ -66,39 +78,17 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
     return map;
   }, [masterDocuments, search]);
 
-  function toggleSelect(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function selectAll() {
-    const ids = masterDocuments
-      .filter((d) => !addedIds.has(d.id))
-      .map((d) => d.id);
-    setSelected(new Set(ids));
-  }
-
-  function clearAll() {
-    setSelected(new Set());
-  }
-
-  function handleAdd() {
-    if (selected.size === 0) return;
+  // 書類を1件だけ即時追加する（クリックした行がそのままチェックリストに反映される）
+  function handleAddOne(docId: string) {
     setMessage("");
-    startTransition(async () => {
-      const result = await addDocumentsToChecklist(applicationId, [...selected]);
-      if (result.success) {
-        setSelected(new Set());
-        setMessage(`${selected.size}件を追加しました`);
-        setTimeout(() => setMessage(""), 3000);
-      } else {
+    setAddingDocId(docId);
+    void (async () => {
+      const result = await addDocumentsToChecklist(applicationId, [docId]);
+      setAddingDocId(null);
+      if (!result.success) {
         setMessage(`エラー: ${result.error}`);
       }
-    });
+    })();
   }
 
   function handleAddCustom() {
@@ -118,44 +108,65 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
     });
   }
 
-  function handleAddRequired() {
+  function handleApplyTemplate(tpl: TemplateOption) {
     setMessage("");
-    startAddRequired(async () => {
-      const result = await addRequiredDocumentsToChecklist(applicationId);
-      if (result.success) {
-        if (result.count && result.count > 0) {
-          // 追加成功 → ページ再読み込みして反映
-          window.location.reload();
-        } else {
-          setMessage("追加できる必須書類はありません（すべて追加済み）");
-          setTimeout(() => setMessage(""), 4000);
-        }
-      } else {
+    setApplyingTemplateId(tpl.id);
+    void (async () => {
+      const result = await applyDocumentTemplateToChecklist(applicationId, tpl.id);
+      setApplyingTemplateId(null);
+      if (!result.success) {
         setMessage(`エラー: ${result.error}`);
+        return;
       }
-    });
+      if (result.count && result.count > 0) {
+        setMessage(`テンプレート「${tpl.name}」から${result.count}件を追加しました`);
+      } else {
+        setMessage(`テンプレート「${tpl.name}」の書類はすべて追加済みです`);
+      }
+      setTimeout(() => setMessage(""), 4000);
+    })();
   }
 
-  // 未追加の選択件数
-  const selectableCount = [...selected].filter((id) => !addedIds.has(id)).length;
-
   return (
-    <div className="mt-4">
+    <div className="mt-4 space-y-2">
+      {/* テンプレートから一括反映 */}
+      {templates.length > 0 && (
+        <div className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-3">
+          <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5 mb-2">
+            <FolderOpen className="w-3.5 h-3.5" />
+            必要書類マスターのテンプレートから一括反映
+          </p>
+          <div className="space-y-1.5">
+            {templates.map((tpl) => (
+              <div key={tpl.id} className="flex items-center gap-2 bg-white border border-emerald-100 rounded-lg px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-800 truncate">{tpl.name}</p>
+                  <p className="text-[11px] text-gray-400">
+                    {tpl.itemCount} 件{tpl.note && <span className="ml-2">{tpl.note}</span>}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleApplyTemplate(tpl)}
+                  disabled={applyingTemplateId === tpl.id}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded px-2.5 py-1 disabled:opacity-50 flex-shrink-0"
+                >
+                  {applyingTemplateId === tpl.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderOpen className="w-3 h-3" />}
+                  反映する
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {message && (
+        <div className={cn("px-3 py-2 rounded-lg text-xs font-medium", message.startsWith("エラー") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700")}>
+          {message}
+        </div>
+      )}
+
       {/* 操作ボタン行 */}
       <div className="flex gap-2">
-        {/* 必須書類を自動追加 */}
-        <button
-          onClick={handleAddRequired}
-          disabled={isAddingRequired}
-          className="flex items-center gap-1.5 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-colors text-sm font-medium disabled:opacity-50"
-          title="isAlwaysRequired=trueの書類を一括追加"
-        >
-          {isAddingRequired
-            ? <Loader2 className="w-4 h-4 animate-spin" />
-            : <Zap className="w-4 h-4" />}
-          必須書類を自動追加
-        </button>
-
         {/* 書類選択パネルトグル */}
         <button
           onClick={() => setIsOpen((v) => !v)}
@@ -163,7 +174,7 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
         >
           <span className="flex items-center gap-2">
             <ListChecks className="w-4 h-4" />
-            入管必要書類から選択して追加
+            入管必要書類から個別に選んで追加
           </span>
           {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
@@ -185,23 +196,8 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
               />
               {search && <button onClick={() => setSearch("")}><X className="w-3 h-3 text-gray-400" /></button>}
             </div>
-            <button onClick={selectAll} className="text-xs text-blue-600 hover:underline whitespace-nowrap">全選択</button>
-            <button onClick={clearAll} className="text-xs text-gray-500 hover:underline whitespace-nowrap">解除</button>
-            <button
-              onClick={handleAdd}
-              disabled={selectableCount === 0 || isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed ml-auto whitespace-nowrap"
-            >
-              {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlusCircle className="w-3.5 h-3.5" />}
-              {selectableCount > 0 ? `${selectableCount}件を追加` : "チェックリストに追加"}
-            </button>
+            <p className="text-[11px] text-gray-400 whitespace-nowrap">書類をクリックすると1件ずつ追加されます</p>
           </div>
-
-          {message && (
-            <div className={cn("px-4 py-2 text-xs font-medium", message.startsWith("エラー") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700")}>
-              {message}
-            </div>
-          )}
 
           {/* 書類リスト（カテゴリー別） */}
           <div className="max-h-96 overflow-y-auto">
@@ -215,9 +211,9 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
                   key={category}
                   category={category}
                   docs={docs}
-                  selected={selected}
                   addedIds={addedIds}
-                  onToggle={toggleSelect}
+                  addingDocId={addingDocId}
+                  onAdd={handleAddOne}
                 />
               ))
             )}
@@ -263,16 +259,15 @@ export function DocumentSelector({ applicationId, masterDocuments, checklist }: 
 
 // カテゴリーグループ（折りたたみ可能）
 function CategoryGroup({
-  category, docs, selected, addedIds, onToggle,
+  category, docs, addedIds, addingDocId, onAdd,
 }: {
   category: string;
   docs: DocumentMaster[];
-  selected: Set<string>;
   addedIds: Set<string>;
-  onToggle: (id: string) => void;
+  addingDocId: string | null;
+  onAdd: (id: string) => void;
 }) {
   const [open, setOpen] = useState(true);
-  const checkedCount = docs.filter((d) => selected.has(d.id)).length;
   const addedCount = docs.filter((d) => addedIds.has(d.id)).length;
 
   return (
@@ -285,8 +280,7 @@ function CategoryGroup({
         <span className="text-xs font-semibold text-gray-700 flex-1">{category}</span>
         <span className="text-xs text-gray-400">
           {addedCount > 0 && <span className="text-green-600 mr-1">{addedCount}件追加済</span>}
-          {checkedCount > 0 && <span className="text-blue-600">{checkedCount}件選択中</span>}
-          {addedCount === 0 && checkedCount === 0 && `${docs.length}件`}
+          {`${docs.length}件`}
         </span>
       </button>
 
@@ -294,41 +288,53 @@ function CategoryGroup({
         <div>
           {docs.map((doc) => {
             const isAdded = addedIds.has(doc.id);
-            const isSelected = selected.has(doc.id);
+            const isAdding = addingDocId === doc.id;
             return (
               <button
                 key={doc.id}
-                onClick={() => !isAdded && onToggle(doc.id)}
-                disabled={isAdded}
+                onClick={() => !isAdded && !isAdding && onAdd(doc.id)}
+                disabled={isAdded || isAdding}
                 className={cn(
                   "w-full flex items-start gap-3 px-5 py-2.5 text-left transition-colors",
-                  isAdded ? "opacity-50 cursor-not-allowed" :
-                  isSelected ? "bg-blue-50" : "hover:bg-gray-50"
+                  isAdded ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-50"
                 )}
               >
                 <span className="flex-shrink-0 mt-0.5">
                   {isAdded ? (
                     <CheckSquare className="w-4 h-4 text-green-600" />
-                  ) : isSelected ? (
-                    <CheckSquare className="w-4 h-4 text-blue-600" />
+                  ) : isAdding ? (
+                    <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
                   ) : (
-                    <Square className="w-4 h-4 text-gray-300" />
+                    <PlusCircle className="w-4 h-4 text-gray-300" />
                   )}
                 </span>
                 <span className="flex-1 min-w-0">
                   <span className="text-sm text-gray-800 block">
                     {doc.documentName}
                   </span>
-                  {doc.isAlwaysRequired && (
-                    <span className="text-xs text-red-500 font-medium">必須</span>
-                  )}
+                  {/* 必要書類マスターの設定（担当・原本/写し・必須） */}
+                  <span className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                    {doc.isAlwaysRequired && (
+                      <span className="text-xs text-red-500 font-medium">必須</span>
+                    )}
+                    {doc.preparedBy && (
+                      <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100">
+                        担当: {doc.preparedBy}
+                      </span>
+                    )}
+                    {doc.originalOrCopy && (
+                      <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                        {doc.originalOrCopy}
+                      </span>
+                    )}
+                  </span>
                   {doc.description && (
                     <span className="text-xs text-blue-600 block mt-0.5 leading-relaxed">
                       ℹ {doc.description}
                     </span>
                   )}
                 </span>
-                {isAdded && <span className="text-xs text-green-600 flex-shrink-0 mt-0.5">追加済</span>}
+                {isAdded && <span className="text-xs text-green-600 flex-shrink-0 mt-0.5 flex items-center gap-0.5"><Check className="w-3 h-3" />追加済</span>}
               </button>
             );
           })}

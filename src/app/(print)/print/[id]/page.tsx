@@ -1,9 +1,12 @@
 import { auth } from "@/lib/auth";
 import { db, applications, applicantMaster, organizationMaster, applicationDocumentChecklist, documentRequirementMaster } from "@/lib/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
+import { buildChecklistPdfFileName } from "@/lib/checklist-pdf-file-name";
+import { selectChecklistItemsForPrint } from "@/lib/checklist-print-items";
 import { PrintTrigger } from "./print-trigger";
+import { ChecklistFilterTable, type ChecklistPrintItem } from "./checklist-filter-table";
 
 function formatDateJa(date?: Date | string | null): string {
   if (!date) return "—";
@@ -49,8 +52,12 @@ export default async function ChecklistPrintPage({
       isRequiredByExpert: applicationDocumentChecklist.isRequiredByExpert,
       status: applicationDocumentChecklist.status,
       expertNotes: applicationDocumentChecklist.expertNotes,
+      descriptionOverride: applicationDocumentChecklist.descriptionOverride,
+      preparedBy: applicationDocumentChecklist.preparedBy,
       createdAt: applicationDocumentChecklist.createdAt,
       masterSortOrder: documentRequirementMaster.sortOrder,
+      masterOriginalOrCopy: documentRequirementMaster.originalOrCopy,
+      masterDescription: documentRequirementMaster.description,
     })
     .from(applicationDocumentChecklist)
     .leftJoin(
@@ -59,17 +66,63 @@ export default async function ChecklistPrintPage({
     )
     .where(eq(applicationDocumentChecklist.applicationId, id));
 
+  // documentRequirementId が無い（またはFK解決できない）項目も、書類名が現在有効な
+  // マスターと一致すればその並び順に従わせるためのフォールバック（画面側と同じロジック）
+  const searchVisaTypes = ["common", String(application.visaType)];
+  const searchAppTypes = ["all", String(application.applicationType)];
+  const allActiveMasters = await db
+    .select({
+      id: documentRequirementMaster.id,
+      documentName: documentRequirementMaster.documentName,
+      sortOrder: documentRequirementMaster.sortOrder,
+      originalOrCopy: documentRequirementMaster.originalOrCopy,
+      description: documentRequirementMaster.description,
+      preparedBy: documentRequirementMaster.preparedBy,
+    })
+    .from(documentRequirementMaster)
+    .where(and(
+      eq(documentRequirementMaster.isActive, true),
+      inArray(documentRequirementMaster.visaType, searchVisaTypes),
+      inArray(documentRequirementMaster.applicationType, searchAppTypes),
+    ));
+  const masterSortOrderByName: Record<string, number> = {};
+  for (const m of allActiveMasters) {
+    if (masterSortOrderByName[m.documentName] === undefined || m.sortOrder < masterSortOrderByName[m.documentName]) {
+      masterSortOrderByName[m.documentName] = m.sortOrder;
+    }
+  }
+
   // masterSortOrder → createdAt でソート
   rawChecklist.sort((a, b) => {
-    const sortA = a.masterSortOrder ?? 9999;
-    const sortB = b.masterSortOrder ?? 9999;
+    const sortA = a.masterSortOrder ?? masterSortOrderByName[a.documentName] ?? 9999;
+    const sortB = b.masterSortOrder ?? masterSortOrderByName[b.documentName] ?? 9999;
     if (sortA !== sortB) return sortA - sortB;
     const ca = a.createdAt ? (a.createdAt instanceof Date ? a.createdAt.toISOString() : String(a.createdAt)) : "";
     const cb = b.createdAt ? (b.createdAt instanceof Date ? b.createdAt.toISOString() : String(b.createdAt)) : "";
     return ca.localeCompare(cb);
   });
 
-  const requiredItems = rawChecklist.filter(c => c.isRequiredByExpert);
+  const masterItems = allActiveMasters.map((master) => ({
+    id: `master-${master.id}`,
+    documentName: master.documentName,
+    documentRequirementId: master.id,
+    isRequiredByExpert: false,
+    status: "not_submitted" as const,
+    expertNotes: null,
+    descriptionOverride: null,
+    preparedBy: master.preparedBy,
+    createdAt: null,
+    masterSortOrder: master.sortOrder,
+    masterOriginalOrCopy: master.originalOrCopy,
+    masterDescription: master.description,
+  }));
+  const requiredItems = selectChecklistItemsForPrint(masterItems, rawChecklist);
+  requiredItems.sort((a, b) => {
+    const sortA = a.masterSortOrder ?? masterSortOrderByName[a.documentName] ?? 9999;
+    const sortB = b.masterSortOrder ?? masterSortOrderByName[b.documentName] ?? 9999;
+    if (sortA !== sortB) return sortA - sortB;
+    return a.documentName.localeCompare(b.documentName, "ja");
+  });
 
   // 写真を含む書類は番号なし
   let docNum = 0;
@@ -78,21 +131,38 @@ export default async function ChecklistPrintPage({
     docNumbers[item.id] = item.documentName.includes("写真") ? null : ++docNum;
   }
 
+  const checklistItems: ChecklistPrintItem[] = requiredItems.map((item) => ({
+    id: item.id,
+    documentName: item.documentName,
+    masterOriginalOrCopy: item.masterOriginalOrCopy ?? null,
+    preparedBy: item.preparedBy ?? null,
+    status: item.status,
+    // 注意事項: 案件別の上書きがあればそれを優先し、無ければマスターの注意事項を使う
+    masterDescription: item.descriptionOverride ?? item.masterDescription ?? null,
+    expertNotes: item.expertNotes ?? null,
+    docNumber: docNumbers[item.id],
+  }));
+
   const today = formatDateJa(new Date());
   const applicantName = [applicant?.familyNameEn, applicant?.givenNameEn].filter(Boolean).join(" ");
   const applicantNameJa = [applicant?.familyNameJa, applicant?.givenNameJa].filter(Boolean).join(" ");
+  const fileName = buildChecklistPdfFileName(
+    VISA_TYPE_LABELS[application.visaType] ?? application.visaType,
+    APPLICATION_TYPE_LABELS[application.applicationType] ?? application.applicationType,
+  );
 
   return (
     <>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>必要書類チェックリスト - {applicantName}</title>
+        <title>{fileName}</title>
         <style>{`
-          /* 必要書類チェックリスト（本ファイル）専用のページ設定。固定A4サイズ(210mm)を採用しており、
-             --pdf-print-width（shinsei-applicant/shinsei-org等）とは独立している。 */
+          /* 必要書類チェックリスト（本ファイル）専用のページ設定。備考欄が広くなるようA4横向き(297mm)を
+             採用しており、--pdf-print-width（shinsei-applicant/shinsei-org等）とは独立している。 */
           * { box-sizing: border-box; margin: 0; padding: 0; }
+          @page { size: A4 portrait; margin: 10mm 12mm; }
           body { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif; font-size: 12px; color: #111; background: #f3f4f6; }
-          .page { background: white; max-width: 210mm; margin: 0 auto; padding: 16mm 18mm; min-height: 297mm; }
+          .page { background: white; max-width: 210mm; margin: 0 auto; padding: 12mm; min-height: 297mm; }
 
           /* ヘッダー */
           .header { border-bottom: 2px solid #1e293b; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; }
@@ -111,18 +181,19 @@ export default async function ChecklistPrintPage({
           .notice-title { font-weight: 700; margin-bottom: 3px; }
 
           /* チェックリストテーブル */
-          .checklist { width: 100%; border-collapse: collapse; font-size: 11.5px; }
-          .checklist th { background: #1e293b; color: white; padding: 6px 8px; text-align: left; }
+          .checklist { width: 100%; border-collapse: collapse; font-size: 10px; table-layout: fixed; }
+          .checklist th { background: #1e293b; color: white; padding: 5px 4px; text-align: left; }
           .checklist th.center { text-align: center; }
-          .checklist td { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; }
+          .checklist td { border: 1px solid #cbd5e1; padding: 5px 4px; vertical-align: top; overflow-wrap: anywhere; }
           .checklist tr:nth-child(even) td { background: #f8fafc; }
-          .col-no { width: 30px; text-align: center; color: #94a3b8; font-size: 10px; }
-          .col-check { width: 28px; text-align: center; font-size: 15px; }
-          .col-doc { width: auto; }
-          .col-status { width: 55px; text-align: center; font-size: 10px; }
-          .col-notes { width: 120px; }
+          .col-no { width: 26px; text-align: center; color: #94a3b8; font-size: 9px; }
+          .col-check { width: 24px; text-align: center; font-size: 13px; }
+          .col-doc { width: 43%; }
+          .col-status { display: none; }
+          .col-prepared { width: 52px; text-align: center; font-size: 9px; }
+          .col-notes { width: auto; }
           .doc-name { font-weight: 600; line-height: 1.4; }
-          .notes-cell { color: #475569; font-size: 10.5px; line-height: 1.5; min-height: 30px; }
+          .notes-cell { color: #475569; font-size: 9px; line-height: 1.4; min-height: 24px; }
 
           /* ステータスバッジ */
           .status-ok { color: #15803d; font-weight: 700; }
@@ -140,7 +211,7 @@ export default async function ChecklistPrintPage({
           /* 印刷時 */
           @media print {
             body { background: white; }
-            .page { padding: 10mm 15mm; min-height: auto; max-width: 100%; }
+            .page { padding: 0; min-height: auto; max-width: 100%; }
             .no-print { display: none !important; }
             .checklist tr { page-break-inside: avoid; }
           }
@@ -149,14 +220,14 @@ export default async function ChecklistPrintPage({
           }
         `}</style>
         {/* 画面表示のみ：印刷ボタンバー */}
-        <PrintTrigger applicationId={application.id} />
+        <PrintTrigger applicationId={application.id} fileName={fileName} />
 
         <div className="page" style={{ paddingTop: "60px" }}>
           {/* ヘッダー */}
           <div className="header">
             <div>
               <div className="header-title">在留資格申請　必要書類チェックリスト</div>
-              <div className="header-sub">行政書士法人 JLS　（yamaguchi@jls-gyosei.jp）</div>
+              <div className="header-sub">行政書士 JLS　（yamaguchi@jls-gyosei.jp）</div>
             </div>
             <div className="header-right">
               <div>作成日：{today}</div>
@@ -172,6 +243,7 @@ export default async function ChecklistPrintPage({
                 <td>
                   <strong>{applicantName}</strong>
                   {applicantNameJa && <span style={{ marginLeft: "8px", color: "#64748b" }}>（{applicantNameJa}）</span>}
+                  <span style={{ marginLeft: "4px" }}>様</span>
                 </td>
                 <td className="label" style={{ width: "60px" }}>国籍</td>
                 <td>{applicant?.nationality ?? "—"}</td>
@@ -185,7 +257,7 @@ export default async function ChecklistPrintPage({
               {organization && (
                 <tr>
                   <td className="label">所属機関</td>
-                  <td colSpan={3}>{organization.nameJa}</td>
+                  <td colSpan={3}>{organization.nameJa} 御中</td>
                 </tr>
               )}
             </tbody>
@@ -200,68 +272,15 @@ export default async function ChecklistPrintPage({
             </div>
           </div>
 
-          {/* チェックリスト */}
-          <table className="checklist">
-            <thead>
-              <tr>
-                <th className="col-no center">No.</th>
-                <th className="col-check center">□</th>
-                <th>書類名</th>
-                <th className="col-status center">状態</th>
-                <th className="col-notes">備考</th>
-              </tr>
-            </thead>
-            <tbody>
-              {requiredItems.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: "24px", color: "#94a3b8" }}>
-                    必要書類が登録されていません
-                  </td>
-                </tr>
-              ) : requiredItems.map((item) => (
-                  <tr key={item.id}>
-                    <td className="col-no">{docNumbers[item.id] ?? "—"}</td>
-                    <td className="col-check">
-                      {item.status === "approved" ? "✓" :
-                       item.status === "submitted" ? "◎" : "□"}
-                    </td>
-                    <td className="col-doc">
-                      <div className="doc-name">{item.documentName}</div>
-                    </td>
-                    <td className="col-status">
-                      {item.status === "approved" ? <span className="status-ok">確認済</span> :
-                       item.status === "submitted" ? <span className="status-submitted">提出済</span> :
-                       item.status === "resubmit_required" ? <span className="status-resubmit">再提出</span> :
-                       <span className="status-pending">未提出</span>}
-                    </td>
-                    <td className="col-notes">
-                      <div className="notes-cell">{item.expertNotes ?? ""}</div>
-                    </td>
-                  </tr>
-              ))
-              }
-            </tbody>
-          </table>
-
-          {/* 凡例 */}
-          <div className="legend">
-            <span>□ 未提出</span>
-            <span>◎ 提出済（確認中）</span>
-            <span>✓ 確認済</span>
-          </div>
+          {/* チェックリスト（担当・状態フィルター付き） */}
+          <ChecklistFilterTable items={checklistItems} />
 
           {/* フッター */}
           <div className="footer">
             <div className="footer-title">【ご連絡先】</div>
-            <div>行政書士法人 JLS</div>
+            <div>行政書士 JLS</div>
             <div>Email: yamaguchi@jls-gyosei.jp</div>
             <div className="footer-note">書類に関してご不明な点は、お気軽にご相談ください。</div>
-          </div>
-
-          {/* 合計 */}
-          <div className="total-row">
-            必要書類合計：{requiredItems.length} 件　／
-            提出済：{requiredItems.filter(i => i.status !== "not_submitted").length} 件
           </div>
         </div>
     </>

@@ -5,17 +5,18 @@
  * ──────────────────────────────────────────
  * 書類の要否・提出状況・備考の管理に加え、項目ごとのドロップインアップロード枠
  * （ChecklistDropzone）を提供する。アップロードされた書類は
- *  ① fillAllFieldsFromDocs によるAI自動入力のソース
- *  ② 提出用データ一括ダウンロード（Zip）の対象
- * として連動する。
+ * fillAllFieldsFromDocs によるAI自動入力のソースとして連動する。
  */
 import { useState, useTransition, useRef, useEffect, useCallback, memo } from "react";
 import {
   toggleExpertCheckmark,
   updateDocumentStatus,
   updateChecklistNotes,
+  updateChecklistDescription,
+  updateChecklistPreparedBy,
   generateApplicationFormDraft,
   removeDocumentFromChecklist,
+  removeDocumentsFromChecklist,
   addCustomDocumentToChecklist,
 } from "@/actions/applications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +24,7 @@ import {
   CheckSquare, Square, CheckCircle, XCircle, AlertCircle,
   Clock, Loader2, FileText,
   Pencil, Check, X, FileEdit, ArrowRight, Plus, FilePlus,
-  Upload, Download, Trash2, CheckCircle2,
+  Upload, Trash2, CheckCircle2,
   User, Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -45,8 +46,15 @@ interface ChecklistItem {
   isRequiredByExpert: boolean;
   status: string;
   expertNotes: string | null;
+  /** 書類の作成・取得の担当（申請人/受入企業/弊所、または自由記載） */
+  preparedBy?: string | null;
+  /** マスターで設定された原本/写し区分 */
+  masterOriginalOrCopy?: string | null;
   ocrExtractedData?: Record<string, any> | null;
+  /** 注意事項の実効値（案件別上書き ?? マスターの注意事項） */
   masterDescription?: string | null;
+  /** 注意事項の案件別上書き（編集中の状態表示に使用。nullならマスター値を表示中） */
+  descriptionOverride?: string | null;
   documentRequirementId?: string | null;
   masterSortOrder?: number;
   createdAt?: string | null;
@@ -511,18 +519,21 @@ export function DocumentChecklist({
   }, [checklist]);
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
   const [editingNotesValue, setEditingNotesValue] = useState("");
+  const [editingDescId, setEditingDescId] = useState<string | null>(null);
+  const [editingDescValue, setEditingDescValue] = useState("");
   const [isDraftGenerating, setIsDraftGenerating] = useState(false);
   const [draftMessage, setDraftMessage] = useState("");
   const [customDocName, setCustomDocName] = useState("");
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [customDocError, setCustomDocError] = useState("");
   const customDocInputRef = useRef<HTMLInputElement>(null);
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
-  const [zipError, setZipError] = useState("");
   const [aiFillMessage, setAiFillMessage] = useState("");
   const [mismatchWarning, setMismatchWarning] = useState("");
   const [needsManualClassification, setNeedsManualClassification] = useState<Set<string>>(new Set());
   const [isReassigning, setIsReassigning] = useState<Set<string>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const isExpert = userRole === "expert" || userRole === "admin";
   const requiredItems = localChecklist.filter((i) => i.isRequiredByExpert);
@@ -549,6 +560,37 @@ export function DocumentChecklist({
     setEditingNotesValue(item.expertNotes ?? "");
   }
 
+  // ── 作成・取得の担当（申請人/受入企業/弊所/その他自由記載） ──────────────
+  const PREPARED_BY_PRESETS = ["申請人", "受入企業", "弊所"];
+  const [editingPreparedById, setEditingPreparedById] = useState<string | null>(null);
+  const [editingPreparedByValue, setEditingPreparedByValue] = useState("");
+
+  function persistPreparedBy(itemId: string, value: string) {
+    setLocalChecklist((prev) =>
+      prev.map((i) => (i.id === itemId ? { ...i, preparedBy: value || null } : i))
+    );
+    startTransition(async () => { await updateChecklistPreparedBy(itemId, value); });
+  }
+
+  function handlePreparedBySelect(item: ChecklistItem, value: string) {
+    if (value === "__other__") {
+      // 自由記載モードへ（既存の自由記載値があれば引き継ぐ）
+      setEditingPreparedById(item.id);
+      setEditingPreparedByValue(
+        item.preparedBy && !PREPARED_BY_PRESETS.includes(item.preparedBy) ? item.preparedBy : ""
+      );
+      return;
+    }
+    setEditingPreparedById(null);
+    persistPreparedBy(item.id, value);
+  }
+
+  function savePreparedByOther(itemId: string) {
+    const v = editingPreparedByValue.trim();
+    setEditingPreparedById(null);
+    persistPreparedBy(itemId, v);
+  }
+
   async function saveNotes(itemId: string) {
     const notes = editingNotesValue.trim();
     setLocalChecklist((prev) =>
@@ -561,6 +603,28 @@ export function DocumentChecklist({
   function cancelEditNotes() {
     setEditingNotesId(null);
     setEditingNotesValue("");
+  }
+
+  // ── 注意事項（案件別上書き）の編集 ─────────────────────────────────────
+  function startEditDesc(item: ChecklistItem) {
+    setEditingDescId(item.id);
+    setEditingDescValue(item.masterDescription ?? "");
+  }
+
+  async function saveDesc(itemId: string) {
+    const desc = editingDescValue.trim();
+    setLocalChecklist((prev) =>
+      prev.map((i) => (i.id === itemId
+        ? { ...i, masterDescription: desc || null, descriptionOverride: desc || null }
+        : i))
+    );
+    setEditingDescId(null);
+    await updateChecklistDescription(itemId, desc);
+  }
+
+  function cancelEditDesc() {
+    setEditingDescId(null);
+    setEditingDescValue("");
   }
 
   const allRequiredCollected =
@@ -666,34 +730,6 @@ export function DocumentChecklist({
     }
   }, []);
 
-  async function handleZipDownload() {
-    setIsDownloadingZip(true);
-    setZipError("");
-    try {
-      const res = await fetch(`/api/applications/${applicationId}/submission-package`);
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Zipの生成に失敗しました");
-      }
-      const blob = await res.blob();
-      const cd = res.headers.get("Content-Disposition") ?? "";
-      const m = cd.match(/filename\*=UTF-8''([^;]+)/);
-      const fileName = m ? decodeURIComponent(m[1]) : "submission-package.zip";
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setZipError(err.message ?? "ダウンロードに失敗しました");
-    } finally {
-      setIsDownloadingZip(false);
-    }
-  }
-
   async function handleAddCustomDoc() {
     const name = customDocName.trim();
     if (!name) { setCustomDocError("書類名を入力してください"); return; }
@@ -764,7 +800,7 @@ export function DocumentChecklist({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <CardTitle className="flex items-center gap-2">
               <FileText className="w-4 h-4" />
@@ -782,19 +818,17 @@ export function DocumentChecklist({
               </p>
             )}
           </div>
-          <button
-            onClick={handleZipDownload}
-            disabled={isDownloadingZip}
-            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex-shrink-0"
-            title="申請書データと添付書類を1つのZipファイルにまとめてダウンロード"
-          >
-            {isDownloadingZip
-              ? <Loader2 className="w-4 h-4 animate-spin" />
-              : <Download className="w-4 h-4" />}
-            提出用データ（一括）ダウンロード
-          </button>
+          {localChecklist.length > 0 && !selectMode && (
+            <button
+              type="button"
+              onClick={() => setSelectMode(true)}
+              className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-red-600 bg-white border border-red-200 hover:bg-red-50 rounded-lg transition-colors whitespace-nowrap flex-shrink-0"
+            >
+              <Trash2 className="w-4 h-4" />
+              選択して一括削除
+            </button>
+          )}
         </div>
-        {zipError && <p className="text-xs text-red-500 whitespace-pre-wrap mt-2">{zipError}</p>}
         {mismatchWarning && (
           <div className="mt-2 flex items-start gap-1.5 text-xs px-3 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
             <span className="flex-shrink-0 mt-0.5">⚠</span>
@@ -828,6 +862,60 @@ export function DocumentChecklist({
             <p className="text-xs mt-1">下の「入管必要書類から選択」から追加してください</p>
           </div>
         ) : (
+          <>
+            {/* 一括削除ツールバー（選択モード中のみ表示） */}
+            {selectMode && (
+              <div className="flex items-center gap-3 px-6 py-2.5 border-b border-red-100 bg-red-50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedIds((prev) =>
+                      prev.size === localChecklist.length
+                        ? new Set()
+                        : new Set(localChecklist.map((i) => i.id))
+                    );
+                  }}
+                  className="text-xs font-medium text-blue-700 hover:underline whitespace-nowrap"
+                >
+                  {selectedIds.size === localChecklist.length ? "全解除" : "全選択"}
+                </button>
+                <span className="text-xs text-gray-600 font-medium">{selectedIds.size}件選択中</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (selectedIds.size === 0) return;
+                    if (!confirm(`選択した${selectedIds.size}件の書類をチェックリストから削除しますか？\n（アップロード済みのファイルがある場合も削除されます）`)) return;
+                    setIsBulkDeleting(true);
+                    try {
+                      const ids = [...selectedIds];
+                      const result = await removeDocumentsFromChecklist(applicationId, ids);
+                      if (result.success) {
+                        setLocalChecklist((prev) => prev.filter((i) => !selectedIds.has(i.id)));
+                        setSelectedIds(new Set());
+                        setSelectMode(false);
+                      } else {
+                        alert(result.error ?? "削除に失敗しました");
+                      }
+                    } finally {
+                      setIsBulkDeleting(false);
+                    }
+                  }}
+                  disabled={selectedIds.size === 0 || isBulkDeleting}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                >
+                  {isBulkDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  選択した書類を削除
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }}
+                  className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+                >
+                  キャンセル
+                </button>
+              </div>
+            )}
+
           <div className="divide-y divide-gray-50">
             {localChecklist.map((item) => {
               const side = getDocumentSide(item.documentName);
@@ -840,6 +928,25 @@ export function DocumentChecklist({
                 )}
               >
                 <div className="flex items-center gap-3">
+                  {/* 一括削除モードのチェックボックス */}
+                  {selectMode && (
+                    <button
+                      onClick={() => {
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(item.id)) next.delete(item.id);
+                          else next.add(item.id);
+                          return next;
+                        });
+                      }}
+                      className="flex-shrink-0"
+                      title={selectedIds.has(item.id) ? "選択を解除" : "選択"}
+                    >
+                      {selectedIds.has(item.id)
+                        ? <CheckSquare className="w-4 h-4 text-red-600" />
+                        : <Square className="w-4 h-4 text-gray-300" />}
+                    </button>
+                  )}
                   {/* 連番バッジ */}
                   {item.isRequiredByExpert ? (
                     <div className="flex-shrink-0 w-7 text-center">
@@ -890,14 +997,51 @@ export function DocumentChecklist({
                         )
                       )}
                       <span className="text-sm font-medium leading-tight">{item.documentName}</span>
+                      {item.masterOriginalOrCopy && (
+                        <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 flex-shrink-0">
+                          {item.masterOriginalOrCopy}
+                        </span>
+                      )}
                       {item.isRequiredByExpert && (
                         <span className="text-xs text-red-500 font-normal flex-shrink-0">必須</span>
                       )}
                     </div>
-                    {item.masterDescription && (
-                      <p className="text-xs text-blue-600 mt-0.5 leading-relaxed">
-                        ℹ {item.masterDescription}
-                      </p>
+                    {/* 注意事項（クリックで案件別に編集可能。マスターは変更しない） */}
+                    {editingDescId === item.id ? (
+                      <div className="flex items-center gap-1 mt-1">
+                        <input
+                          type="text"
+                          value={editingDescValue}
+                          onChange={(e) => setEditingDescValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveDesc(item.id);
+                            if (e.key === "Escape") cancelEditDesc();
+                          }}
+                          placeholder="注意事項を入力（PDFの備考欄にも反映されます）"
+                          autoFocus
+                          className="flex-1 text-xs border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-blue-50"
+                        />
+                        <button onClick={() => saveDesc(item.id)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="保存">
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={cancelEditDesc} className="p-1 text-gray-400 hover:bg-gray-50 rounded" title="キャンセル">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 mt-0.5 group/desc cursor-pointer" onClick={() => startEditDesc(item)}>
+                        {item.masterDescription ? (
+                          <p className="text-xs text-blue-600 leading-relaxed">ℹ {item.masterDescription}</p>
+                        ) : (
+                          <p className="text-xs text-gray-300 group-hover/desc:text-gray-400">+ 注意事項を追加</p>
+                        )}
+                        <button
+                          className="p-0.5 text-gray-300 hover:text-blue-400 rounded opacity-0 group-hover/desc:opacity-100 transition-opacity flex-shrink-0"
+                          title="注意事項を編集"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </div>
                     )}
                     {/* 備考欄 */}
                     {editingNotesId === item.id ? (
@@ -936,6 +1080,59 @@ export function DocumentChecklist({
                         </button>
                       </div>
                     )}
+
+                    {/* 作成・取得の担当（申請人/受入企業/弊所/その他自由記載） */}
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[10px] text-gray-400 flex-shrink-0">担当:</span>
+                      <select
+                        value={
+                          editingPreparedById === item.id
+                            ? "__other__"
+                            : PREPARED_BY_PRESETS.includes(item.preparedBy ?? "")
+                              ? (item.preparedBy ?? "")
+                              : item.preparedBy
+                                ? "__other__"
+                                : ""
+                        }
+                        onChange={(e) => handlePreparedBySelect(item, e.target.value)}
+                        className={cn(
+                          "text-xs border rounded px-1.5 py-0.5 bg-white focus:outline-none focus:border-purple-400",
+                          item.preparedBy ? "border-purple-200 text-purple-700" : "border-gray-200 text-gray-400"
+                        )}
+                        title="この書類を誰が作成・取得するか"
+                      >
+                        <option value="">—</option>
+                        <option value="申請人">申請人</option>
+                        <option value="受入企業">受入企業</option>
+                        <option value="弊所">弊所</option>
+                        <option value="__other__">その他（自由記載）</option>
+                      </select>
+                      {editingPreparedById === item.id ? (
+                        <input
+                          type="text"
+                          value={editingPreparedByValue}
+                          onChange={(e) => setEditingPreparedByValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") savePreparedByOther(item.id);
+                            if (e.key === "Escape") setEditingPreparedById(null);
+                          }}
+                          onBlur={() => savePreparedByOther(item.id)}
+                          placeholder="担当を自由に記載（例: 登録支援機関）"
+                          autoFocus
+                          className="text-xs border border-purple-300 rounded px-2 py-0.5 w-52 bg-purple-50 focus:outline-none focus:ring-1 focus:ring-purple-300"
+                        />
+                      ) : (
+                        item.preparedBy && !PREPARED_BY_PRESETS.includes(item.preparedBy) && (
+                          <button
+                            onClick={() => handlePreparedBySelect(item, "__other__")}
+                            className="text-xs text-purple-700 hover:underline"
+                            title="クリックして編集"
+                          >
+                            {item.preparedBy}
+                          </button>
+                        )
+                      )}
+                    </div>
 
                     {/* 全項目にドロップイン枠を表示 */}
                     <div className="mt-1.5">
@@ -1036,6 +1233,7 @@ export function DocumentChecklist({
               );
             })}
           </div>
+          </>
         )}
 
         {/* ── 追加書類入力欄 ── */}

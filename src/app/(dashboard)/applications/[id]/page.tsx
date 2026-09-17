@@ -252,6 +252,60 @@ export default async function ApplicationDetailPage({
 
   const currentStepIndex = WORKFLOW_STEPS.findIndex((s) => s.key === application.status);
 
+  // 必要書類チェックリスト・プランナー（在留資格・手続き種類の組み合わせに応じて1つだけ表示）。
+  // 「必要書類チェックリスト」カード内で、下のDocumentChecklist（実際のアップロード・ステータス管理）
+  // と1つに統合して表示する。
+  const applicantDisplayName =
+    (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
+    (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim());
+  const supporterDisplayName = supporter
+    ? ((`${supporter.familyNameJa ?? ""} ${supporter.givenNameJa ?? ""}`.trim()) ||
+       (`${supporter.familyNameEn ?? ""} ${supporter.givenNameEn ?? ""}`.trim()))
+    : "";
+  let checklistPlannerTitle: string | null = null;
+  let checklistPlanner: React.ReactNode = null;
+  if (application.visaType === "engineer_humanities" && application.applicationType === "renewal") {
+    checklistPlannerTitle = "技人国・在留期間更新";
+    checklistPlanner = (
+      <GijinkokuRenewalChecklist
+        applicationId={application.id}
+        defaultCaseName={application.caseNumber ?? ""}
+        defaultApplicantName={applicantDisplayName}
+        defaultOrganizationName={organization?.nameJa ?? ""}
+      />
+    );
+  } else if (application.visaType === "engineer_humanities" && application.applicationType === "change") {
+    checklistPlannerTitle = "技人国・在留資格変更";
+    checklistPlanner = (
+      <GijinkokuChangeOfStatusChecklist
+        applicationId={application.id}
+        defaultCaseName={application.caseNumber ?? ""}
+        defaultApplicantName={applicantDisplayName}
+        defaultOrganizationName={organization?.nameJa ?? ""}
+      />
+    );
+  } else if (application.visaType === "dependent" && application.applicationType === "change") {
+    checklistPlannerTitle = "家族滞在・在留資格変更";
+    checklistPlanner = (
+      <KazokuChangeOfStatusChecklist
+        applicationId={application.id}
+        defaultCaseName={application.caseNumber ?? ""}
+        defaultApplicantName={applicantDisplayName}
+        defaultSupporterName={supporterDisplayName}
+      />
+    );
+  } else if (application.visaType === "dependent" && application.applicationType === "certification") {
+    checklistPlannerTitle = "家族滞在・在留資格認定証明書交付申請";
+    checklistPlanner = (
+      <KazokuTairyuCoeChecklist
+        applicationId={application.id}
+        defaultCaseName={application.caseNumber ?? ""}
+        defaultApplicantName={applicantDisplayName}
+        defaultSupporterName={supporterDisplayName}
+      />
+    );
+  }
+
   return (
     <div className="p-8 max-w-5xl">
       {/* Back + 削除ボタン */}
@@ -534,92 +588,6 @@ export default async function ApplicationDetailPage({
         <LedgerInfoPanel applicationId={application.id} />
       </CollapsibleSection>
 
-      {/* 1.75 必要書類チェックリスト（技人国・更新のみ。案件情報を自動反映） */}
-      {application.visaType === "engineer_humanities" && application.applicationType === "renewal" && (
-        <CollapsibleSection
-          title="必要書類チェックリスト（技人国・在留期間更新）"
-          defaultOpen={false}
-          accentClass="bg-blue-500"
-        >
-          <GijinkokuRenewalChecklist
-            applicationId={application.id}
-            defaultCaseName={application.caseNumber ?? ""}
-            defaultApplicantName={
-              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
-              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
-            }
-            defaultOrganizationName={organization?.nameJa ?? ""}
-          />
-        </CollapsibleSection>
-      )}
-
-      {/* 1.755 必要書類チェックリスト（技人国・在留資格変更のみ。案件情報を自動反映） */}
-      {application.visaType === "engineer_humanities" && application.applicationType === "change" && (
-        <CollapsibleSection
-          title="必要書類チェックリスト（技人国・在留資格変更）"
-          defaultOpen={false}
-          accentClass="bg-teal-500"
-        >
-          <GijinkokuChangeOfStatusChecklist
-            applicationId={application.id}
-            defaultCaseName={application.caseNumber ?? ""}
-            defaultApplicantName={
-              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
-              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
-            }
-            defaultOrganizationName={organization?.nameJa ?? ""}
-          />
-        </CollapsibleSection>
-      )}
-
-      {/* 1.765 必要書類チェックリスト（家族滞在・在留資格変更のみ。案件情報を自動反映） */}
-      {application.visaType === "dependent" && application.applicationType === "change" && (
-        <CollapsibleSection
-          title="必要書類チェックリスト（家族滞在・在留資格変更）"
-          defaultOpen={false}
-          accentClass="bg-rose-500"
-        >
-          <KazokuChangeOfStatusChecklist
-            applicationId={application.id}
-            defaultCaseName={application.caseNumber ?? ""}
-            defaultApplicantName={
-              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
-              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
-            }
-            defaultSupporterName={
-              supporter
-                ? ((`${supporter.familyNameJa ?? ""} ${supporter.givenNameJa ?? ""}`.trim()) ||
-                   (`${supporter.familyNameEn ?? ""} ${supporter.givenNameEn ?? ""}`.trim()))
-                : ""
-            }
-          />
-        </CollapsibleSection>
-      )}
-
-      {/* 1.76 必要書類チェックリスト（家族滞在・COEのみ。案件情報を自動反映） */}
-      {application.visaType === "dependent" && application.applicationType === "certification" && (
-        <CollapsibleSection
-          title="必要書類チェックリスト（家族滞在・在留資格認定証明書交付申請）"
-          defaultOpen={false}
-          accentClass="bg-rose-500"
-        >
-          <KazokuTairyuCoeChecklist
-            applicationId={application.id}
-            defaultCaseName={application.caseNumber ?? ""}
-            defaultApplicantName={
-              (`${applicant.familyNameJa ?? ""} ${applicant.givenNameJa ?? ""}`.trim()) ||
-              (`${applicant.familyNameEn ?? ""} ${applicant.givenNameEn ?? ""}`.trim())
-            }
-            defaultSupporterName={
-              supporter
-                ? ((`${supporter.familyNameJa ?? ""} ${supporter.givenNameJa ?? ""}`.trim()) ||
-                   (`${supporter.familyNameEn ?? ""} ${supporter.givenNameEn ?? ""}`.trim()))
-                : ""
-            }
-          />
-        </CollapsibleSection>
-      )}
-
       {/* 1.8 提出書類控え・預かり資料（ドラッグ&ドロップでBlob保管） */}
       <CollapsibleSection
         title="提出書類控え・預かり資料"
@@ -644,6 +612,14 @@ export default async function ApplicationDetailPage({
         defaultOpen={true}
         accentClass="bg-blue-500"
       >
+        {checklistPlanner && (
+          <div className="mb-5 pb-5 border-b border-gray-100">
+            <p className="text-xs font-semibold text-gray-500 mb-3 px-1">
+              必要書類の判定・印刷（{checklistPlannerTitle}）
+            </p>
+            {checklistPlanner}
+          </div>
+        )}
         <DocumentChecklist
           availableMasterFiles={availableMasterFiles}
           checklist={checklist.map((c) => ({

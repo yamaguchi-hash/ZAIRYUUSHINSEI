@@ -40,6 +40,9 @@ type ExtraFile = {
   fileName: string;
   fileSize: number;
   mimeType: string;
+  // このエントリがマスター（applicantDocuments）から反映されたものかどうか。
+  // trueの場合、マスター側も同じBlob URLを参照しているため物理削除してはならない。
+  sourcedFromMaster?: boolean;
 };
 
 function normalizeMime(m: string): string {
@@ -206,7 +209,12 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
       }
 
       const toDelete = extras[index];
-      if (toDelete?.fileUrl && process.env.BLOB_READ_WRITE_TOKEN && toDelete.fileUrl.startsWith("https://")) {
+      // マスターから反映されたエントリは申請人マスター側も同じBlob URLを参照しているため、
+      // Blob自体は削除せず配列からの参照のみ外す。
+      if (
+        !toDelete?.sourcedFromMaster &&
+        toDelete?.fileUrl && process.env.BLOB_READ_WRITE_TOKEN && toDelete.fileUrl.startsWith("https://")
+      ) {
         try { await del(toDelete.fileUrl); } catch (e) {
           console.warn("[extra-file DELETE] blob del failed:", e);
         }

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Printer, ArrowLeft, Eye, EyeOff, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
+import { setPrintDocumentTitle } from "@/lib/print-document-title";
 
 /** 省略可能セクションのキーとラベル */
 const OMITTABLE_SECTIONS = [
@@ -16,19 +17,28 @@ const OMITTABLE_SECTIONS = [
 ] as const;
 
 export function PrintTrigger({
-  applicationId, disableAutoPrint,
-}: { applicationId: string; disableAutoPrint?: boolean }) {
+  applicationId, disableAutoPrint, fileName,
+}: { applicationId: string; disableAutoPrint?: boolean; fileName?: string }) {
   const [showDate, setShowDate] = useState(true);
   const [omitSections, setOmitSections] = useState<Record<string, boolean>>({});
   const [showOmitPanel, setShowOmitPanel] = useState(false);
+
+  const printWithFileName = useCallback(() => {
+    if (fileName) setPrintDocumentTitle(document, fileName);
+    window.print();
+  }, [fileName]);
+
+  useEffect(() => {
+    if (fileName) setPrintDocumentTitle(document, fileName);
+  }, [fileName]);
 
   // 自動印刷（800ms後）。余白ドラッグ調整UIがある画面では、調整前に
   // 印刷ダイアログが開いてしまうため disableAutoPrint で無効化できる。
   useEffect(() => {
     if (disableAutoPrint) return;
-    const timer = setTimeout(() => window.print(), 800);
+    const timer = setTimeout(printWithFileName, 800);
     return () => clearTimeout(timer);
-  }, [disableAutoPrint]);
+  }, [disableAutoPrint, printWithFileName]);
 
   // 年月日の表示/非表示を body クラスで制御
   useEffect(() => {
@@ -145,7 +155,7 @@ export function PrintTrigger({
 
           {/* 印刷ボタン */}
           <button
-            onClick={() => window.print()}
+            onClick={printWithFileName}
             style={{
               display: "inline-flex",
               alignItems: "center",

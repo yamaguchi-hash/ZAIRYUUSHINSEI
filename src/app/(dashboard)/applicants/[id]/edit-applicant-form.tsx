@@ -25,7 +25,17 @@ interface WorkHistoryEntry {
   joinDate: string;
   leaveDate: string;
   employer: string;
+  country: string;
+  employerNameEnExists: string;
+  employerNameEn: string;
+  employerNameKanjiExists: string;
+  employerNameKanji: string;
 }
+
+const EMPTY_WORK_HISTORY_ROW: WorkHistoryEntry = {
+  joinDate: "", leaveDate: "", employer: "", country: "",
+  employerNameEnExists: "", employerNameEn: "", employerNameKanjiExists: "", employerNameKanji: "",
+};
 
 const EMPTY_EDUCATION: EducationHistoryData = {
   educationCountry: "", educationDegree: "", educationSchoolName: "", educationGraduationDate: "",
@@ -131,7 +141,7 @@ export function EditApplicantForm({ applicant, organizations, supporters }: Edit
     setStatus("idle");
   }
   function addWorkHistoryRow() {
-    setWorkHistory((prev) => [...prev, { joinDate: "", leaveDate: "", employer: "" }]);
+    setWorkHistory((prev) => [...prev, { ...EMPTY_WORK_HISTORY_ROW }]);
   }
   function removeWorkHistoryRow(idx: number) {
     setWorkHistory((prev) => prev.filter((_, i) => i !== idx));
@@ -198,7 +208,9 @@ export function EditApplicantForm({ applicant, organizations, supporters }: Edit
           supporterId: form.currentVisaType === "dependent" ? (form.supporterId || null) : null,
           educationHistory: education,
           // 完全に空の行は保存しない（申請書作成側のsaveApplicationFormDataと同じ絞り込み）
-          workHistory: workHistory.filter((w) => w.joinDate || w.leaveDate || w.employer),
+          workHistory: workHistory.filter((w) =>
+            w.joinDate || w.leaveDate || w.employer || w.country || w.employerNameEn || w.employerNameKanji
+          ),
         });
         setStatus("success");
         setMessage("保存しました");
@@ -455,23 +467,55 @@ export function EditApplicantForm({ applicant, organizations, supporters }: Edit
         ) : (
           <div className="space-y-2">
             {workHistory.map((w, idx) => (
-              <div key={idx} className="grid grid-cols-3 gap-2 items-end">
-                <div>
-                  <label className="block text-[11px] text-gray-500 mb-1">入社年月</label>
-                  <input type="month" value={w.joinDate} onChange={(e) => updateWorkHistoryRow(idx, "joinDate", e.target.value)} className="input-field text-sm py-1.5" />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-gray-500 mb-1">退社年月</label>
-                  <input type="month" value={w.leaveDate} onChange={(e) => updateWorkHistoryRow(idx, "leaveDate", e.target.value)} className="input-field text-sm py-1.5" />
-                </div>
-                <div className="flex gap-1">
-                  <div className="flex-1">
+              <div key={idx} className="border border-gray-200 rounded-lg p-2.5 relative">
+                <button type="button" onClick={() => removeWorkHistoryRow(idx)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">入社年月</label>
+                    <input type="month" value={w.joinDate} onChange={(e) => updateWorkHistoryRow(idx, "joinDate", e.target.value)} className="input-field text-sm py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">退社年月</label>
+                    <input type="month" value={w.leaveDate} onChange={(e) => updateWorkHistoryRow(idx, "leaveDate", e.target.value)} className="input-field text-sm py-1.5" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">国・地域</label>
+                    <input value={w.country} onChange={(e) => updateWorkHistoryRow(idx, "country", e.target.value)} className="input-field text-sm py-1.5" />
+                  </div>
+                  <div>
                     <label className="block text-[11px] text-gray-500 mb-1">勤務先名称</label>
                     <input value={w.employer} onChange={(e) => updateWorkHistoryRow(idx, "employer", e.target.value)} className="input-field text-sm py-1.5" />
                   </div>
-                  <button type="button" onClick={() => removeWorkHistoryRow(idx)} className="mb-1.5 text-gray-300 hover:text-red-500 self-end">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">機関名（英語表記）の有無</label>
+                    <select value={w.employerNameEnExists} onChange={(e) => updateWorkHistoryRow(idx, "employerNameEnExists", e.target.value)} className="input-field text-sm py-1.5">
+                      <option value="">—</option>
+                      <option value="有">有</option>
+                      <option value="無">無</option>
+                    </select>
+                  </div>
+                  {w.employerNameEnExists === "有" && (
+                    <div>
+                      <label className="block text-[11px] text-gray-500 mb-1">機関名（英語表記）</label>
+                      <input value={w.employerNameEn} onChange={(e) => updateWorkHistoryRow(idx, "employerNameEn", e.target.value)} className="input-field text-sm py-1.5" />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">機関名（漢字表記等）の有無</label>
+                    <select value={w.employerNameKanjiExists} onChange={(e) => updateWorkHistoryRow(idx, "employerNameKanjiExists", e.target.value)} className="input-field text-sm py-1.5">
+                      <option value="">—</option>
+                      <option value="有">有</option>
+                      <option value="無">無</option>
+                    </select>
+                  </div>
+                  {w.employerNameKanjiExists === "有" && (
+                    <div>
+                      <label className="block text-[11px] text-gray-500 mb-1">機関名（漢字表記等）</label>
+                      <input value={w.employerNameKanji} onChange={(e) => updateWorkHistoryRow(idx, "employerNameKanji", e.target.value)} className="input-field text-sm py-1.5" />
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

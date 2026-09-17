@@ -1326,7 +1326,7 @@ export async function saveApplicationFormData(
         }
         const workHistory = Array.isArray(formData.workHistory)
           ? formData.workHistory.filter(
-              (w: any) => w && (w.joinDate || w.leaveDate || w.employer)
+              (w: any) => w && (w.joinDate || w.leaveDate || w.employer || w.country || w.employerNameEn || w.employerNameKanji)
             )
           : [];
 

@@ -328,7 +328,10 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
     set("workHistory", updated);
   }
   function addWorkHistory() {
-    set("workHistory", [...(form.workHistory ?? []), { joinDate: '', leaveDate: '', employer: '' }]);
+    set("workHistory", [...(form.workHistory ?? []), {
+      joinDate: '', leaveDate: '', employer: '', country: '',
+      employerNameEnExists: '', employerNameEn: '', employerNameKanjiExists: '', employerNameKanji: '',
+    }]);
   }
   function removeWorkHistory(idx: number) {
     set("workHistory", (form.workHistory ?? []).filter((_, i) => i !== idx));
@@ -1153,12 +1156,25 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {(form.workHistory ?? []).map((w, idx) => (
-                    <div key={idx} className="grid grid-cols-3 gap-2 items-end">
-                      <Field label={`${idx + 1}. 入社年月`}><input className={inputCls} type="month" value={w.joinDate} onChange={e => updateWorkHistory(idx, "joinDate", e.target.value)} /></Field>
-                      <Field label="退社年月（在職中は空欄）"><input className={inputCls} type="month" value={w.leaveDate} onChange={e => updateWorkHistory(idx, "leaveDate", e.target.value)} /></Field>
-                      <div className="flex gap-1">
-                        <div className="flex-1"><Field label="勤務先名称"><input className={inputCls} value={w.employer} onChange={e => updateWorkHistory(idx, "employer", e.target.value)} /></Field></div>
-                        <button onClick={() => removeWorkHistory(idx)} className="mb-1 text-gray-300 hover:text-red-500 self-end"><Trash2 className="w-4 h-4" /></button>
+                    <div key={idx} className="border border-gray-200 rounded-lg p-3 relative">
+                      <button onClick={() => removeWorkHistory(idx)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <Field label={`${idx + 1}. 入社年月`}><input className={inputCls} type="month" value={w.joinDate} onChange={e => updateWorkHistory(idx, "joinDate", e.target.value)} /></Field>
+                        <Field label="退社年月（在職中は空欄）"><input className={inputCls} type="month" value={w.leaveDate} onChange={e => updateWorkHistory(idx, "leaveDate", e.target.value)} /></Field>
+                        <Field label="国・地域"><input className={inputCls} value={w.country} onChange={e => updateWorkHistory(idx, "country", e.target.value)} /></Field>
+                        <Field label="勤務先名称"><input className={inputCls} value={w.employer} onChange={e => updateWorkHistory(idx, "employer", e.target.value)} /></Field>
+                        <Field label="機関名（英語表記）の有無">
+                          <RadioGroup value={w.employerNameEnExists} onChange={v => updateWorkHistory(idx, "employerNameEnExists", v)} options={["有", "無"]} />
+                        </Field>
+                        {w.employerNameEnExists === "有" && (
+                          <Field label="機関名（英語表記）"><input className={inputCls} value={w.employerNameEn} onChange={e => updateWorkHistory(idx, "employerNameEn", e.target.value)} /></Field>
+                        )}
+                        <Field label="機関名（漢字表記等）の有無">
+                          <RadioGroup value={w.employerNameKanjiExists} onChange={v => updateWorkHistory(idx, "employerNameKanjiExists", v)} options={["有", "無"]} />
+                        </Field>
+                        {w.employerNameKanjiExists === "有" && (
+                          <Field label="機関名（漢字表記等）"><input className={inputCls} value={w.employerNameKanji} onChange={e => updateWorkHistory(idx, "employerNameKanji", e.target.value)} /></Field>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1860,12 +1876,25 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {(form.workHistory ?? []).map((w, idx) => (
-                    <div key={idx} className="grid grid-cols-3 gap-2 items-end">
-                      <Field label={`${idx + 1}. 入社年月`}><input className={inputCls} type="month" value={w.joinDate} onChange={e => updateWorkHistory(idx, "joinDate", e.target.value)} /></Field>
-                      <Field label="退社年月（在職中は空欄）"><input className={inputCls} type="month" value={w.leaveDate} onChange={e => updateWorkHistory(idx, "leaveDate", e.target.value)} /></Field>
-                      <div className="flex gap-1">
-                        <div className="flex-1"><Field label="勤務先名称"><input className={inputCls} value={w.employer} onChange={e => updateWorkHistory(idx, "employer", e.target.value)} /></Field></div>
-                        <button onClick={() => removeWorkHistory(idx)} className="mb-1 text-gray-300 hover:text-red-500 self-end"><Trash2 className="w-4 h-4" /></button>
+                    <div key={idx} className="border border-gray-200 rounded-lg p-3 relative">
+                      <button onClick={() => removeWorkHistory(idx)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <Field label={`${idx + 1}. 入社年月`}><input className={inputCls} type="month" value={w.joinDate} onChange={e => updateWorkHistory(idx, "joinDate", e.target.value)} /></Field>
+                        <Field label="退社年月（在職中は空欄）"><input className={inputCls} type="month" value={w.leaveDate} onChange={e => updateWorkHistory(idx, "leaveDate", e.target.value)} /></Field>
+                        <Field label="国・地域"><input className={inputCls} value={w.country} onChange={e => updateWorkHistory(idx, "country", e.target.value)} /></Field>
+                        <Field label="勤務先名称"><input className={inputCls} value={w.employer} onChange={e => updateWorkHistory(idx, "employer", e.target.value)} /></Field>
+                        <Field label="機関名（英語表記）の有無">
+                          <RadioGroup value={w.employerNameEnExists} onChange={v => updateWorkHistory(idx, "employerNameEnExists", v)} options={["有", "無"]} />
+                        </Field>
+                        {w.employerNameEnExists === "有" && (
+                          <Field label="機関名（英語表記）"><input className={inputCls} value={w.employerNameEn} onChange={e => updateWorkHistory(idx, "employerNameEn", e.target.value)} /></Field>
+                        )}
+                        <Field label="機関名（漢字表記等）の有無">
+                          <RadioGroup value={w.employerNameKanjiExists} onChange={v => updateWorkHistory(idx, "employerNameKanjiExists", v)} options={["有", "無"]} />
+                        </Field>
+                        {w.employerNameKanjiExists === "有" && (
+                          <Field label="機関名（漢字表記等）"><input className={inputCls} value={w.employerNameKanji} onChange={e => updateWorkHistory(idx, "employerNameKanji", e.target.value)} /></Field>
+                        )}
                       </div>
                     </div>
                   ))}

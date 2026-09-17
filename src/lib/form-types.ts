@@ -65,6 +65,11 @@ export interface WorkHistoryEntry {
   joinDate: string;    // 入社年月
   leaveDate: string;   // 退社年月
   employer: string;    // 勤務先名称
+  country: string;                 // 国・地域
+  employerNameEnExists: string;    // 機関名（英語表記）の有無: 有/無
+  employerNameEn: string;          // 機関名（英語表記）
+  employerNameKanjiExists: string; // 機関名（漢字表記等）の有無: 有/無
+  employerNameKanji: string;       // 機関名（漢字表記等）
 }
 
 export interface FamilyMember {
@@ -676,8 +681,8 @@ export const EMPTY_FORM_DATA: ApplicationFormData = {
   majorCategory: '', majorCategoryOther: '',
   itQualificationExists: '無', itQualificationName: '',
   workHistory: [
-    { joinDate: '', leaveDate: '', employer: '' },
-    { joinDate: '', leaveDate: '', employer: '' },
+    { joinDate: '', leaveDate: '', employer: '', country: '', employerNameEnExists: '', employerNameEn: '', employerNameKanjiExists: '', employerNameKanji: '' },
+    { joinDate: '', leaveDate: '', employer: '', country: '', employerNameEnExists: '', employerNameEn: '', employerNameKanjiExists: '', employerNameKanji: '' },
   ],
   representativeName: '', representativeRelationship: '',
   representativeAddress: '', representativePhone: '', representativeCellular: '',

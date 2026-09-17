@@ -316,6 +316,12 @@ export const PRINT_STYLES = `
     table{margin-bottom:3px;}
     .form-header{margin-bottom:4px;}
     .bilingual,.bilingual-block{font-size:6.8px;line-height:1.1;}
+    /* 見出し・署名欄の余白も圧縮し、最後がわずかに次ページへあふれるのを防ぐ */
+    .section{margin:6px 0 3px;}
+    .section2{margin:5px 0 2px;}
+    .section3{margin:3px 0 2px;}
+    .item-title{margin:2px 0 1px;}
+    .sign-section{margin-top:4px;}
   }
 
   /* ── 印刷枚数の計測モード（body.print-measure） ──────────────────────────
@@ -611,7 +617,7 @@ export function AgentSection({ variant = "full" }: { variant?: "full" | "compact
   if (variant === "compact") {
     return (
       <>
-        <div className="section3" style={{ marginTop: "10px" }}>※ 取次者</div>
+        <div className="section3" style={{ marginTop: "5px" }}>※ 取次者</div>
         <table>
           <tbody>
             <tr>
@@ -637,7 +643,7 @@ export function AgentSection({ variant = "full" }: { variant?: "full" | "compact
   }
   return (
     <>
-      <div className="item-title" style={{ marginTop: "10px" }}>
+      <div className="item-title" style={{ marginTop: "5px" }}>
         ※ 取次者
         <span className="bilingual">　Agent or other authorized person</span>
       </div>

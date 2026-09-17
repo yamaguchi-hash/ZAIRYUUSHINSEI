@@ -14,7 +14,6 @@ import {
 } from "@/lib/utils";
 import {
   ArrowLeft,
-  CheckCircle,
   XCircle,
   Clock,
   FileText,
@@ -28,7 +27,6 @@ import { DocumentChecklist } from "@/components/applications/document-checklist"
 import { DocumentSelector } from "@/components/applications/document-selector";
 import { ChecklistTemplatePanel } from "@/components/applications/checklist-template-panel";
 import { DocumentPrintButtons } from "@/components/applications/document-print-buttons";
-import { ApproveButton } from "@/components/applications/approve-button";
 import { QuestionnairePanel } from "@/components/applications/questionnaire-panel";
 import { getDocumentRequirements } from "@/actions/applications";
 import { listDocumentTemplates } from "@/actions/document-master";
@@ -331,20 +329,6 @@ export default async function ApplicationDetailPage({
             <Zap className="w-4 h-4" />
             RASENS転記シート
           </Link>
-
-          {/* 区切り */}
-          <div className="h-6 w-px bg-gray-200" />
-
-          {/* ── 承認 ── */}
-          {(userRole === "expert" || userRole === "admin") && !application.isApproved && (
-            <ApproveButton applicationId={application.id} />
-          )}
-          {application.isApproved && (
-            <div className="inline-flex items-center gap-1.5 h-9 px-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm font-medium whitespace-nowrap">
-              <CheckCircle className="w-4 h-4" />
-              承認済み（{formatDate(application.approvedAt)}）
-            </div>
-          )}
         </div>
       </div>
 
@@ -486,16 +470,6 @@ export default async function ApplicationDetailPage({
               <div>
                 <dt className="text-gray-500">最終更新</dt>
                 <dd>{formatDate(application.updatedAt)}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-500">承認状況</dt>
-                <dd>
-                  {application.isApproved ? (
-                    <span className="text-green-600 font-medium">承認済み</span>
-                  ) : (
-                    <span className="text-gray-500">未承認</span>
-                  )}
-                </dd>
               </div>
               <div>
                 <dt className="text-gray-500">質問書</dt>

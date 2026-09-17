@@ -9,7 +9,6 @@ import {
   applicationDocumentChecklist,
   documentRequirementMaster,
   documentRequirementTemplates,
-  applicationSnapshots,
   auditLog,
   applicantDocuments,
   organizationDocuments,
@@ -547,60 +546,6 @@ export async function updateApplicationStatus(
     console.error("[updateApplicationStatus]", err);
     return { success: false, error: err.message ?? "ステータス更新に失敗しました" };
   }
-}
-
-export async function approveApplication(applicationId: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("認証が必要です");
-  const tenantId = requireTenantId((session.user as any).tenantId);
-  const userRole = (session.user as any).role;
-
-  if (userRole !== "expert" && userRole !== "admin") {
-    throw new Error("承認権限がありません");
-  }
-
-  const { application, applicant, organization } = await getApplicationById(applicationId);
-
-  // Create snapshots
-  await db.insert(applicationSnapshots).values([
-    {
-      applicationId,
-      snapshotType: "applicant",
-      snapshotData: applicant as any,
-    },
-    ...(organization
-      ? [
-          {
-            applicationId,
-            snapshotType: "organization",
-            snapshotData: organization as any,
-          },
-        ]
-      : []),
-  ]);
-
-  await db
-    .update(applications)
-    .set({
-      isApproved: true,
-      approvedAt: new Date(),
-      approvedBy: session.user.id,
-      status: "approved",
-      updatedAt: new Date(),
-    })
-    .where(and(eq(applications.id, applicationId), eq(applications.tenantId, tenantId)));
-
-  await db.insert(auditLog).values({
-    tenantId,
-    applicationId,
-    userId: session.user.id,
-    action: "approve",
-    entityType: "application",
-    entityId: applicationId,
-    newValue: "approved",
-  });
-
-  revalidatePath(`/applications/${applicationId}`);
 }
 
 export async function updateDocumentStatus(

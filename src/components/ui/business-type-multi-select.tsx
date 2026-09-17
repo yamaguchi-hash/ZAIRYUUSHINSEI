@@ -15,7 +15,9 @@ function parseCodes(value: string): number[] {
     new Set(
       (value ?? "")
         .split(/[,、]/)
-        .map((s) => Number(s.trim()))
+        .map((s) => s.trim())
+        .filter((s) => s !== "")
+        .map((s) => Number(s))
         .filter((n) => Number.isFinite(n))
     )
   );

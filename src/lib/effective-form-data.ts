@@ -52,8 +52,9 @@ function toApplicationFormType(t: string): ApplicationFormData["applicationFormT
 /**
  * 申請書フォームの「実効値」を構築する。
  * 優先順位: 保存済みformData ＞ マスター（申請人・所属機関）由来の値 ＞ EMPTY_FORM_DATA。
- * 「8. 日本における連絡先」「現在の在留資格・期限・カード番号」は savedForm の有無に関わらず
- * 常にマスターの最新値を使用する（shinsei-form/page.tsx の既存仕様を踏襲）。
+ * 「8. 日本における連絡先」「現在の在留資格・期限・カード番号」「出生地・本国住所・婚姻の有無」
+ * 「最終学歴・専攻分野・職歴」は savedForm の有無に関わらず、マスターに値があれば
+ * 常にその最新値で上書きする（shinsei-form/page.tsx の既存仕様を踏襲）。
  */
 export function buildEffectiveFormData(
   application: ApplicationMasterLike,
@@ -126,27 +127,25 @@ export function buildEffectiveFormData(
     ...(applicant.maritalStatus ? { maritalStatus: applicant.maritalStatus } : {}),
   };
 
-  // 学歴・職歴（申請書保存時にマスターへ同期された値を、フォーム側が未入力の場合のみ
-  // 初期値として補完する。新規案件で過去の申請の入力を使い回すための仕組み。
-  // フォームで入力済みの値はマスターより優先する＝編集中の案件を上書きしない）
+  // 学歴・職歴（顧客名簿（個人）に値がある場合は常にマスターの最新値を使用する。
+  // マスター未登録の項目のみ、保存済みフォームの値を維持する＝マスターの更新を
+  // 常に申請書へ反映する）
   const EDUCATION_KEYS = [
     "educationCountry", "educationDegree", "educationSchoolName", "educationGraduationDate",
     "majorCategory", "majorCategoryOther", "itQualificationExists", "itQualificationName",
   ] as const;
   const masterEdu = (applicant.educationHistory ?? null) as Record<string, string> | null;
-  const educationFallbacks: Partial<ApplicationFormData> = {};
+  const educationOverrides: Partial<ApplicationFormData> = {};
   if (masterEdu && typeof masterEdu === "object" && !Array.isArray(masterEdu)) {
     for (const k of EDUCATION_KEYS) {
-      const formVal = (savedForm as Record<string, unknown> | null)?.[k];
-      if (!formVal && typeof masterEdu[k] === "string" && masterEdu[k]) {
-        (educationFallbacks as Record<string, string>)[k] = masterEdu[k];
+      if (typeof masterEdu[k] === "string" && masterEdu[k]) {
+        (educationOverrides as Record<string, string>)[k] = masterEdu[k];
       }
     }
   }
   const masterWork = Array.isArray(applicant.workHistory) ? applicant.workHistory : null;
-  const savedWork = savedForm?.workHistory;
-  const workHistoryFallback =
-    masterWork && masterWork.length > 0 && (!Array.isArray(savedWork) || savedWork.length === 0)
+  const workHistoryOverride =
+    masterWork && masterWork.length > 0
       ? { workHistory: masterWork as ApplicationFormData["workHistory"] }
       : {};
 
@@ -156,7 +155,7 @@ export function buildEffectiveFormData(
     ...masterContactFields,
     ...masterStatusFields,
     ...masterProfileFallbacks,
-    ...educationFallbacks,
-    ...workHistoryFallback,
+    ...educationOverrides,
+    ...workHistoryOverride,
   } as ApplicationFormData;
 }

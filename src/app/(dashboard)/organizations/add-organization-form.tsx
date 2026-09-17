@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Loader2, CheckCircle } from "lucide-react";
 import { AddressSplitInput } from "@/components/ui/postal-code-input";
 import { BusinessTypeMultiSelect } from "@/components/ui/business-type-multi-select";
+import { MoneyInput } from "@/components/ui/money-input";
 import { BUSINESS_TYPES } from "@/lib/form-types";
 
 type OrgForm = {
@@ -120,6 +121,12 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setSuccess(false);
+    setError("");
+  }
+
+  function handleFieldChange(name: keyof OrgForm, value: string) {
+    setForm((prev) => ({ ...prev, [name]: value }));
     setSuccess(false);
     setError("");
   }
@@ -251,11 +258,10 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">資本金（円）</label>
-                <input
+                <MoneyInput
                   name="capital"
-                  type="number"
                   value={form.capital}
-                  onChange={handleChange}
+                  onChange={(v) => handleFieldChange("capital", v)}
                   placeholder="例：10000000"
                   className="input-field"
                 />
@@ -265,11 +271,10 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
                   年間売上金額（円）
                   <span className="ml-1 text-amber-600 font-normal">※ 要更新</span>
                 </label>
-                <input
+                <MoneyInput
                   name="annualSales"
-                  type="number"
                   value={form.annualSales}
-                  onChange={handleChange}
+                  onChange={(v) => handleFieldChange("annualSales", v)}
                   placeholder="例：500000000"
                   className="input-field"
                 />

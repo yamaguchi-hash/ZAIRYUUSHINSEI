@@ -13,6 +13,7 @@ import {
 import { cn, VISA_TYPE_LABELS } from "@/lib/utils";
 import { AddressSplitInput, AddressSplitSimple } from "@/components/ui/postal-code-input";
 import { BusinessTypeMultiSelect } from "@/components/ui/business-type-multi-select";
+import { MoneyInput } from "@/components/ui/money-input";
 import type { ApplicationFormData, WorkHistoryEntry, FamilyMember, ApplicationFormType, VisaFormCategory } from "@/lib/form-types";
 import {
   FORM_TYPE_LABELS, PURPOSE_OF_ENTRY_OPTIONS,
@@ -1296,7 +1297,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     </Field>
                   </div>
                   <Field label="電話番号"><input className={inputCls} value={form.employerPhone} onChange={e => set("employerPhone", e.target.value)} /></Field>
-                  <Field label="年収（円）"><input className={inputCls} value={form.applicantAnnualIncome} onChange={e => set("applicantAnnualIncome", e.target.value)} /></Field>
+                  <Field label="年収（円）"><MoneyInput className={inputCls} value={form.applicantAnnualIncome} onChange={v => set("applicantAnnualIncome", v)} /></Field>
                 </CardContent>
               </Card>
 
@@ -1388,13 +1389,13 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
                     <Field label="月平均支弁額（円）">
-                      <input className={inputCls} value={form.fundingMonthlyAmount} onChange={e => set("fundingMonthlyAmount", e.target.value)} placeholder="例: 50000" />
+                      <MoneyInput className={inputCls} value={form.fundingMonthlyAmount} onChange={v => set("fundingMonthlyAmount", v)} placeholder="例: 50000" />
                     </Field>
                     <Field label="送金・携行等の別">
                       <input className={inputCls} value={form.fundingRemittanceType} onChange={e => set("fundingRemittanceType", e.target.value)} placeholder="例: 送金 / 携行" />
                     </Field>
                     <Field label="送金・携行等の別　金額（円）">
-                      <input className={inputCls} value={form.fundingRemittanceAmount} onChange={e => set("fundingRemittanceAmount", e.target.value)} />
+                      <MoneyInput className={inputCls} value={form.fundingRemittanceAmount} onChange={v => set("fundingRemittanceAmount", v)} />
                     </Field>
                   </div>
                 </CardContent>
@@ -1415,7 +1416,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     <Field label="電話番号"><input className={inputCls} value={form.expensePayerPhone} onChange={e => set("expensePayerPhone", e.target.value)} /></Field>
                     <Field label="職業（勤務先の名称）"><input className={inputCls} value={form.expensePayerOccupation} onChange={e => set("expensePayerOccupation", e.target.value)} /></Field>
                     <Field label="電話番号（勤務場所）"><input className={inputCls} value={form.expensePayerWorkPhone} onChange={e => set("expensePayerWorkPhone", e.target.value)} /></Field>
-                    <Field label="年収（円）"><input className={inputCls} value={form.expensePayerAnnualIncome} onChange={e => set("expensePayerAnnualIncome", e.target.value)} /></Field>
+                    <Field label="年収（円）"><MoneyInput className={inputCls} value={form.expensePayerAnnualIncome} onChange={v => set("expensePayerAnnualIncome", v)} /></Field>
                   </CardContent>
                 </Card>
               )}
@@ -1448,7 +1449,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       </Field>
                       <Field label="(4) 報酬（円）">
                         <div className="flex gap-2">
-                          <input className={inputCls} value={form.partTimeWorkSalaryR} onChange={e => set("partTimeWorkSalaryR", e.target.value)} placeholder="例: 100000" />
+                          <MoneyInput className={inputCls} value={form.partTimeWorkSalaryR} onChange={v => set("partTimeWorkSalaryR", v)} placeholder="例: 100000" />
                           <select className="text-sm border border-gray-300 rounded-lg px-2 bg-white" value={form.partTimeWorkSalaryTypeR} onChange={e => set("partTimeWorkSalaryTypeR", e.target.value)}>
                             <option value="月額">月額</option>
                             <option value="日額">日額</option>
@@ -1589,7 +1590,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     <input className={inputCls} value={form.supporterEmployerPhone} onChange={e => set("supporterEmployerPhone", e.target.value)} placeholder="例: 06-0000-0000" />
                   </Field>
                   <Field label="(13) 年収（円）">
-                    <input className={inputCls} value={form.supporterAnnualIncome} onChange={e => set("supporterAnnualIncome", e.target.value)} placeholder="例: 5000000" />
+                    <MoneyInput className={inputCls} value={form.supporterAnnualIncome} onChange={v => set("supporterAnnualIncome", v)} placeholder="例: 5000000" />
                   </Field>
                 </CardContent>
               </Card>
@@ -1643,7 +1644,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     <input className={inputCls} type="date" value={form.expectedGraduationDate} onChange={e => set("expectedGraduationDate", e.target.value)} />
                   </Field>
                   <Field label="年間学費（円）">
-                    <input className={inputCls} value={form.annualTuition} onChange={e => set("annualTuition", e.target.value)} placeholder="例: 535800" />
+                    <MoneyInput className={inputCls} value={form.annualTuition} onChange={v => set("annualTuition", v)} placeholder="例: 535800" />
                   </Field>
                 </CardContent>
               </Card>
@@ -1666,13 +1667,13 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                     </select>
                   </Field>
                   <Field label="月額生活費（概算・円）">
-                    <input className={inputCls} value={form.fundingAmount} onChange={e => set("fundingAmount", e.target.value)} placeholder="例: 100000" />
+                    <MoneyInput className={inputCls} value={form.fundingAmount} onChange={v => set("fundingAmount", v)} placeholder="例: 100000" />
                   </Field>
                   <Field label="奨学金の名称（奨学金の場合）">
                     <input className={inputCls} value={form.scholarshipName} onChange={e => set("scholarshipName", e.target.value)} />
                   </Field>
                   <Field label="奨学金の額（月額・円）">
-                    <input className={inputCls} value={form.scholarshipAmount} onChange={e => set("scholarshipAmount", e.target.value)} />
+                    <MoneyInput className={inputCls} value={form.scholarshipAmount} onChange={v => set("scholarshipAmount", v)} />
                   </Field>
                   <Field label="資格外活動許可の有無">
                     <RadioGroup value={form.partTimeWorkPermit} onChange={v => set("partTimeWorkPermit", v)} options={["有", "無"]} />
@@ -1878,7 +1879,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       {key === "overseasExpensesExists" && form.overseasExpensesExists === "有" && (
                         <div className="mt-2 grid grid-cols-2 gap-2">
                           <Field label="外国機関名"><input className={inputCls} value={form.overseasExpensesOrgName} onChange={e => set("overseasExpensesOrgName", e.target.value)} /></Field>
-                          <Field label="費用額（円換算）"><input className={inputCls} value={form.overseasExpensesAmount} onChange={e => set("overseasExpensesAmount", e.target.value)} placeholder="例：500000" /></Field>
+                          <Field label="費用額（円換算）"><MoneyInput className={inputCls} value={form.overseasExpensesAmount} onChange={v => set("overseasExpensesAmount", v)} placeholder="例：500000" /></Field>
                         </div>
                       )}
                     </div>
@@ -2048,8 +2049,8 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                       <Field label="    他の業種（複数選択可）"><BusinessTypeMultiSelect value={form.orgBusinessTypeOtherCode} onChange={v => set("orgBusinessTypeOtherCode", v)} /></Field>
                       <div className="sm:col-span-2"><Field label="(6) 所在地（Address）" required><AddressSplitSimple value={form.orgAddress} onChange={v => set("orgAddress", v)} inputClassName={inputCls} /></Field></div>
                       <Field label="    電話番号"><input className={inputCls} value={form.orgPhone} onChange={e => set("orgPhone", e.target.value)} /></Field>
-                      <Field label="(7) 資本金（円）"><input className={inputCls} value={form.orgCapital} onChange={e => set("orgCapital", e.target.value)} placeholder="例: 10000000" /></Field>
-                      <Field label="(8) 年間売上高（直近年度・円）"><input className={inputCls} value={form.orgAnnualSales} onChange={e => set("orgAnnualSales", e.target.value)} /></Field>
+                      <Field label="(7) 資本金（円）"><MoneyInput className={inputCls} value={form.orgCapital} onChange={v => set("orgCapital", v)} placeholder="例: 10000000" /></Field>
+                      <Field label="(8) 年間売上高（直近年度・円）"><MoneyInput className={inputCls} value={form.orgAnnualSales} onChange={v => set("orgAnnualSales", v)} /></Field>
                       <Field label="(9) 従業員数（全体）" note="名"><input className={inputCls} value={form.orgEmployeeCount} onChange={e => set("orgEmployeeCount", e.target.value)} /></Field>
                       <Field label="    うち外国人職員数" note="名"><input className={inputCls} value={form.orgForeignEmployeeCount} onChange={e => set("orgForeignEmployeeCount", e.target.value)} /></Field>
                       <Field label="    うち技能実習生" note="名"><input className={inputCls} value={form.orgTechInternCount} onChange={e => set("orgTechInternCount", e.target.value)} /></Field>
@@ -2248,11 +2249,11 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                         </div>
                       </Field>
                       <Field label="(4) 月額報酬（各種手当（通勤・住宅・扶養等）・実費弁償の性格を有するものを除く）">
-                        <input className={inputCls} type="number" value={form.salary} onChange={e => set("salary", e.target.value)} placeholder="200000" />
+                        <MoneyInput className={inputCls} value={form.salary} onChange={v => set("salary", v)} placeholder="200000" />
                       </Field>
                       <div className="grid grid-cols-2 gap-3">
-                        <Field label="基本給の時間換算額（円）"><input className={inputCls} type="number" value={form.orgTimeConvertedBasicSalary} onChange={e => set("orgTimeConvertedBasicSalary", e.target.value)} /></Field>
-                        <Field label="同等の業務に従事する日本人の月額報酬（円）"><input className={inputCls} type="number" value={form.orgJapaneseEquivalentSalary} onChange={e => set("orgJapaneseEquivalentSalary", e.target.value)} /></Field>
+                        <Field label="基本給の時間換算額（円）"><MoneyInput className={inputCls} value={form.orgTimeConvertedBasicSalary} onChange={v => set("orgTimeConvertedBasicSalary", v)} /></Field>
+                        <Field label="同等の業務に従事する日本人の月額報酬（円）"><MoneyInput className={inputCls} value={form.orgJapaneseEquivalentSalary} onChange={v => set("orgJapaneseEquivalentSalary", v)} /></Field>
                       </div>
                       <Field label="報酬の額が日本人が従事する場合の報酬の額と同等以上であることの有無">
                         <div className="flex gap-4 mt-1">
@@ -2446,8 +2447,8 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   </Field>
                   <Field label="電話番号"><input className={inputCls} value={form.orgPhone} onChange={e => set("orgPhone", e.target.value)} /></Field>
                   <div className="grid grid-cols-3 gap-3">
-                    <Field label="(6) 資本金（円）"><input className={inputCls} type="number" value={form.orgCapital} onChange={e => set("orgCapital", e.target.value)} /></Field>
-                    <Field label="(7) 年間売上金額（直近年度）"><input className={inputCls} type="number" value={form.orgAnnualSales} onChange={e => set("orgAnnualSales", e.target.value)} /></Field>
+                    <Field label="(6) 資本金（円）"><MoneyInput className={inputCls} value={form.orgCapital} onChange={v => set("orgCapital", v)} /></Field>
+                    <Field label="(7) 年間売上金額（直近年度）"><MoneyInput className={inputCls} value={form.orgAnnualSales} onChange={v => set("orgAnnualSales", v)} /></Field>
                     <Field label="(8) 常勤職員数（名）"><input className={inputCls} type="number" value={form.orgEmployeeCount} onChange={e => set("orgEmployeeCount", e.target.value)} /></Field>
                   </div>
                   <Field label="(9) 代表者の氏名"><input className={inputCls} value={form.position} onChange={e => set("position", e.target.value)} /></Field>
@@ -2785,7 +2786,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="(12) 対応可能言語"><input className={inputCls} value={form.rsoAvailableLanguages} onChange={e => set("rsoAvailableLanguages", e.target.value)} placeholder="日本語、英語、中国語" disabled={is2Go || isSkip("rso5")} /></Field>
-                    <Field label="(13) 支援委託費用（月額・円）"><input className={inputCls} type="number" value={form.rsoFeePerMonth} onChange={e => set("rsoFeePerMonth", e.target.value)} disabled={is2Go || isSkip("rso5")} /></Field>
+                    <Field label="(13) 支援委託費用（月額・円）"><MoneyInput className={inputCls} value={form.rsoFeePerMonth} onChange={v => set("rsoFeePerMonth", v)} disabled={is2Go || isSkip("rso5")} /></Field>
                   </div>
                 </CardContent>
               </Card>
@@ -2812,8 +2813,8 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                 </Field>
                 <div className="sm:col-span-2"><Field label="(6) 所在地（Address）"><AddressSplitSimple value={form.dispatchOrgAddress} onChange={v => set("dispatchOrgAddress", v)} inputClassName={inputCls} /></Field></div>
                 <Field label="    電話番号"><input className={inputCls} value={form.dispatchOrgPhone} onChange={e => set("dispatchOrgPhone", e.target.value)} /></Field>
-                <Field label="(7) 資本金（円）"><input className={inputCls} value={form.dispatchOrgCapital} onChange={e => set("dispatchOrgCapital", e.target.value)} /></Field>
-                <Field label="(8) 年間売上高（直近年度・円）"><input className={inputCls} value={form.dispatchOrgAnnualSales} onChange={e => set("dispatchOrgAnnualSales", e.target.value)} /></Field>
+                <Field label="(7) 資本金（円）"><MoneyInput className={inputCls} value={form.dispatchOrgCapital} onChange={v => set("dispatchOrgCapital", v)} /></Field>
+                <Field label="(8) 年間売上高（直近年度・円）"><MoneyInput className={inputCls} value={form.dispatchOrgAnnualSales} onChange={v => set("dispatchOrgAnnualSales", v)} /></Field>
                 <div className="sm:col-span-2"><Field label="(9) 派遣予定期間"><input className={inputCls} value={form.dispatchPeriod} onChange={e => set("dispatchPeriod", e.target.value)} placeholder="例: 2025年4月1日〜2026年3月31日" /></Field></div>
               </CardContent>
             </Card>

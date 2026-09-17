@@ -5,6 +5,8 @@ import { createOrganization, updateOrganization } from "@/actions/organizations"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Loader2, CheckCircle } from "lucide-react";
 import { AddressSplitInput } from "@/components/ui/postal-code-input";
+import { BusinessTypeMultiSelect } from "@/components/ui/business-type-multi-select";
+import { BUSINESS_TYPES } from "@/lib/form-types";
 
 type OrgForm = {
   nameJa: string;
@@ -24,6 +26,9 @@ type OrgForm = {
   foreignEmployeeCount: string;
   technicalInternCount: string;
   industry: string;
+  businessTypeCode: string;
+  /** カンマ区切り文字列（BusinessTypeMultiSelectの値形式）。送信時に配列へ変換する */
+  businessTypeOtherCodes: string;
   employmentInsuranceNo: string;
   laborInsuranceNo: string;
   socialInsuranceSymbol: string;
@@ -36,6 +41,7 @@ const EMPTY_FORM: OrgForm = {
   prefecture: "", city: "", addressLine: "", phone: "", fax: "", email: "",
   category: "", capital: "", annualSales: "", employeeCount: "",
   foreignEmployeeCount: "", technicalInternCount: "", industry: "",
+  businessTypeCode: "", businessTypeOtherCodes: "",
   employmentInsuranceNo: "", laborInsuranceNo: "",
   socialInsuranceSymbol: "",
   representativeTitle: "", representativeName: "",
@@ -60,6 +66,8 @@ type EditingOrg = {
   foreignEmployeeCount?: number | null;
   technicalInternCount?: number | null;
   industry?: string;
+  businessTypeCode?: string | null;
+  businessTypeOtherCodes?: unknown;
   employmentInsuranceNo?: string;
   laborInsuranceNo?: string;
   socialInsuranceSymbol?: string;
@@ -98,6 +106,10 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
       foreignEmployeeCount: editingOrg.foreignEmployeeCount != null ? String(editingOrg.foreignEmployeeCount) : "",
       technicalInternCount: editingOrg.technicalInternCount != null ? String(editingOrg.technicalInternCount) : "",
       industry: editingOrg.industry ?? "",
+      businessTypeCode: editingOrg.businessTypeCode ?? "",
+      businessTypeOtherCodes: Array.isArray(editingOrg.businessTypeOtherCodes)
+        ? (editingOrg.businessTypeOtherCodes as unknown[]).filter(Boolean).join(", ")
+        : "",
       employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? "",
       laborInsuranceNo: editingOrg.laborInsuranceNo ?? "",
       socialInsuranceSymbol: editingOrg.socialInsuranceSymbol ?? "",
@@ -123,6 +135,9 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
           employeeCount: form.employeeCount ? parseInt(form.employeeCount)   : undefined,
           foreignEmployeeCount: form.foreignEmployeeCount ? parseInt(form.foreignEmployeeCount) : undefined,
           technicalInternCount: form.technicalInternCount ? parseInt(form.technicalInternCount) : undefined,
+          businessTypeOtherCodes: form.businessTypeOtherCodes
+            ? form.businessTypeOtherCodes.split(",").map((s) => s.trim()).filter(Boolean)
+            : [],
         };
         if (isEdit && editingOrg) {
           await updateOrganization(editingOrg.id, payload);
@@ -317,8 +332,32 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">業種</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">業種（自由記載）</label>
                 <input name="industry" value={form.industry} onChange={handleChange} placeholder="IT・情報通信" className="input-field" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── 業種（別紙「業種一覧」番号。申請書作成の業種欄に自動反映されます） ── */}
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-700 mb-1">業種（別紙「業種一覧」番号）</p>
+            <p className="text-xs text-gray-400 mb-2">申請書作成画面の「業種」欄に自動で反映されます。</p>
+            <div className="grid grid-cols-1 gap-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">主たる業種</label>
+                <select name="businessTypeCode" value={form.businessTypeCode} onChange={handleChange} className="input-field">
+                  <option value="">選択してください</option>
+                  {BUSINESS_TYPES.map((b) => (
+                    <option key={b.code} value={String(b.code)}>{b.code}. {b.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">他の業種（複数選択可）</label>
+                <BusinessTypeMultiSelect
+                  value={form.businessTypeOtherCodes}
+                  onChange={(v) => { setForm((prev) => ({ ...prev, businessTypeOtherCodes: v })); setSuccess(false); setError(""); }}
+                />
               </div>
             </div>
           </div>

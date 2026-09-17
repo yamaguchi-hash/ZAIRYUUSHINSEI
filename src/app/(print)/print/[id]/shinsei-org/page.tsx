@@ -16,7 +16,7 @@ import { notFound } from "next/navigation";
 import {
   loadShinseiData, PRINT_STYLES,
   fmt, fmtDate, fmtMoney, fmtAddr, fmtSex, fmtYesNo, yes, omitFor2Go,
-  fmtAdditionalOccupations, buildAddress, businessTypeLabel, occupationLabel,
+  fmtAdditionalOccupations, buildAddress, businessTypeLabel, businessTypeLabels, occupationLabel,
   FormHeader, SignatureSection, AgentSection,
   FORM_TITLE_MAP, getFormNumber, getPdfHeaderCategoryLabel,
   buildShinseiFileNameBase,
@@ -91,7 +91,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
                 <td className="lbl">業種番号</td>
                 <td>
                   {businessTypeLabel(form.orgBusinessTypeCode ?? "")}
-                  {form.orgBusinessTypeOtherCode ? `　他：${form.orgBusinessTypeOtherCode}` : ""}
+                  {form.orgBusinessTypeOtherCode ? `　他：${businessTypeLabels(form.orgBusinessTypeOtherCode)}` : ""}
                 </td>
                 <td className="lbl">所在地</td><td>{fmtAddr(form.orgAddress)}</td>
               </tr>
@@ -526,7 +526,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
               <td className="lbl lbl-wrap">(4) 業種番号</td>
               <td>{businessTypeLabel(form.orgBusinessTypeCode ?? "")}</td>
               <td className="lbl">追加業種番号</td>
-              <td>{businessTypeLabel(form.orgBusinessTypeOtherCode ?? "")}</td>
+              <td>{businessTypeLabels(form.orgBusinessTypeOtherCode ?? "")}</td>
             </tr>
             <tr>
               <td className="lbl">(5) 住所（所在地）<br /><span className="bilingual">Address</span></td>

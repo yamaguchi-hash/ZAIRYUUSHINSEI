@@ -26,6 +26,8 @@ type Org = {
   foreignEmployeeCount: number | null;
   technicalInternCount: number | null;
   industry: string | null;
+  businessTypeCode: string | null;
+  businessTypeOtherCodes: unknown;
   employmentInsuranceNo: string | null;
   laborInsuranceNo: string | null;
   socialInsuranceSymbol: string | null;
@@ -137,6 +139,8 @@ export function OrganizationList({ organizations }: { organizations: Org[] }) {
             foreignEmployeeCount: editingOrg.foreignEmployeeCount,
             technicalInternCount: editingOrg.technicalInternCount,
             industry: editingOrg.industry ?? undefined,
+            businessTypeCode: editingOrg.businessTypeCode,
+            businessTypeOtherCodes: editingOrg.businessTypeOtherCodes,
             employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? undefined,
             laborInsuranceNo: editingOrg.laborInsuranceNo ?? undefined,
             socialInsuranceSymbol: editingOrg.socialInsuranceSymbol ?? undefined,

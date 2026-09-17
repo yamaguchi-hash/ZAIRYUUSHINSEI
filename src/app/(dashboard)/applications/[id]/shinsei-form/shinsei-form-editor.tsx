@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn, VISA_TYPE_LABELS } from "@/lib/utils";
 import { AddressSplitInput, AddressSplitSimple } from "@/components/ui/postal-code-input";
+import { BusinessTypeMultiSelect } from "@/components/ui/business-type-multi-select";
 import type { ApplicationFormData, WorkHistoryEntry, FamilyMember, ApplicationFormType, VisaFormCategory } from "@/lib/form-types";
 import {
   FORM_TYPE_LABELS, PURPOSE_OF_ENTRY_OPTIONS,
@@ -1984,7 +1985,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                           {BUSINESS_TYPES.map(b => <option key={b.code} value={String(b.code)}>{b.code}. {b.label}</option>)}
                         </select>
                       </Field>
-                      <Field label="    他の業種（複数選択可）"><input className={inputCls} value={form.orgBusinessTypeOtherCode} onChange={e => set("orgBusinessTypeOtherCode", e.target.value)} placeholder="例: 14, 27" /></Field>
+                      <Field label="    他の業種（複数選択可）"><BusinessTypeMultiSelect value={form.orgBusinessTypeOtherCode} onChange={v => set("orgBusinessTypeOtherCode", v)} /></Field>
                       <div className="sm:col-span-2"><Field label="(6) 所在地（Address）" required><AddressSplitSimple value={form.orgAddress} onChange={v => set("orgAddress", v)} inputClassName={inputCls} /></Field></div>
                       <Field label="    電話番号"><input className={inputCls} value={form.orgPhone} onChange={e => set("orgPhone", e.target.value)} /></Field>
                       <Field label="(7) 資本金（円）"><input className={inputCls} value={form.orgCapital} onChange={e => set("orgCapital", e.target.value)} placeholder="例: 10000000" /></Field>
@@ -2378,7 +2379,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                         {BUSINESS_TYPES.map(b => <option key={b.code} value={String(b.code)}>{b.code}. {b.label}</option>)}
                       </select>
                     </Field>
-                    <Field label="追加業種番号（複数選択可）"><input className={inputCls} value={form.orgBusinessTypeOtherCode} onChange={e => set("orgBusinessTypeOtherCode", e.target.value)} placeholder="複数選択可" /></Field>
+                    <Field label="追加業種番号（複数選択可）"><BusinessTypeMultiSelect value={form.orgBusinessTypeOtherCode} onChange={v => set("orgBusinessTypeOtherCode", v)} /></Field>
                   </div>
                   <Field label="(5) 住所（所在地）※本店又は主たる事務所">
                     <AddressSplitSimple value={form.orgAddress} onChange={v => set("orgAddress", v)} inputClassName={inputCls} />

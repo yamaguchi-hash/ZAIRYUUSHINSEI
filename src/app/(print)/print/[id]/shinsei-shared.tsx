@@ -52,6 +52,11 @@ export function businessTypeLabel(code: string): string {
   const hit = BUSINESS_TYPES.find(b => b.code === num);
   return hit ? `${num}.${hit.label}` : `${code}`;
 }
+/** カンマ区切りの複数業種コード（例: "14, 27"）を、それぞれラベル化して「、」区切りで返す */
+export function businessTypeLabels(codes: string): string {
+  if (!codes) return "　";
+  return codes.split(/[,、]/).map(c => c.trim()).filter(Boolean).map(businessTypeLabel).join("、");
+}
 export function occupationLabel(code: string): string {
   if (!code) return "　";
   const num = Number(code);

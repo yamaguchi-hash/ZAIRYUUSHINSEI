@@ -36,8 +36,10 @@ export const ORG_MASTER_COMMON_FIELD_KEYS = [
   "postalCode", "prefecture", "city", "addressLine",
   // 電話番号 / FAX番号 / メールアドレス
   "phone", "fax", "email",
-  // 業種（メインの事業内容）・カテゴリー（入管区分。企業規模等で決まる共通属性）
+  // 業種（メインの事業内容・自由記載）・カテゴリー（入管区分。企業規模等で決まる共通属性）
   "industry", "category",
+  // 業種（別紙「業種一覧」番号ベース。申請書へ正確に連想させるための主・その他コード）
+  "businessTypeCode", "businessTypeOtherCodes",
   // 資本金又は出資金の額 / 直近の年間売上高 / 従業員数 / うち外国人 / うち技能実習生 / 決算期
   "capital", "annualSales", "employeeCount", "foreignEmployeeCount", "technicalInternCount", "fiscalYearEnd",
   // 雇用保険適用事業所番号 / 健康保険・厚生年金保険事業所整理記号等 / 労働保険番号
@@ -85,6 +87,8 @@ export interface OrgMasterRecord {
   email?: string | null;
   industry?: string | null;
   category?: string | null;
+  businessTypeCode?: string | null;
+  businessTypeOtherCodes?: unknown;
   capital?: number | null;
   annualSales?: number | null;
   employeeCount?: number | null;
@@ -122,7 +126,12 @@ export function mapOrganizationToFormData(
   if (!org) return {};
 
   const address = [org.prefecture, org.city, org.addressLine].filter(Boolean).join("");
-  const businessTypeCode = industryToBusinessTypeCode(org.industry);
+  // 主たる業種: マスターに正確なコード（businessTypeCode）があればそれを優先し、
+  // なければ自由記載の industry からのあいまい一致にフォールバックする
+  const businessTypeCode = org.businessTypeCode || industryToBusinessTypeCode(org.industry);
+  const businessTypeOtherCode = Array.isArray(org.businessTypeOtherCodes)
+    ? (org.businessTypeOtherCodes as unknown[]).filter(Boolean).join(", ")
+    : "";
 
   const mapped: Partial<ApplicationFormData> = {
     // 氏名又は名称
@@ -133,8 +142,10 @@ export function mapOrganizationToFormData(
     ...(address ? { orgAddress: address, employerAddress: address } : {}),
     // 電話番号
     ...(org.phone ? { orgPhone: org.phone, employerPhone: org.phone } : {}),
-    // 業種（BUSINESS_TYPES コードに一致した場合のみ）
+    // 業種（主）
     ...(businessTypeCode ? { orgBusinessTypeCode: businessTypeCode } : {}),
+    // 業種（他・複数可）
+    ...(businessTypeOtherCode ? { orgBusinessTypeOtherCode: businessTypeOtherCode } : {}),
     // 資本金又は出資金の額
     ...(org.capital != null ? { orgCapital: String(org.capital) } : {}),
     // 直近の年間売上高

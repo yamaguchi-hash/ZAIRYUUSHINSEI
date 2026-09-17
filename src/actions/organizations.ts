@@ -60,6 +60,8 @@ export async function createOrganization(data: {
   fiscalYearEnd?: string;
   category?: string;
   industry?: string;
+  businessTypeCode?: string;
+  businessTypeOtherCodes?: string[];
   employmentInsuranceNo?: string;
   laborInsuranceNo?: string;
   socialInsuranceSymbol?: string;
@@ -111,6 +113,8 @@ export async function updateOrganization(
     fiscalYearEnd: string;
     category: string;
     industry: string;
+    businessTypeCode: string;
+    businessTypeOtherCodes: string[];
     employmentInsuranceNo: string;
     laborInsuranceNo: string;
     socialInsuranceSymbol: string;

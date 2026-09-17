@@ -90,6 +90,10 @@ export const organizationMaster = pgTable("organization_master", {
   fiscalYearEnd: text("fiscal_year_end"),
   category: text("category"),
   industry: text("industry"),
+  // 業種（別紙「業種一覧」番号ベース。申請書作成の orgBusinessTypeCode/orgBusinessTypeOtherCode と
+  // 同じ体系。自由記載の industry と異なり、申請書へそのまま正確に連想させるために保持する）
+  businessTypeCode: text("business_type_code"),               // 主たる業種（1つのみ）
+  businessTypeOtherCodes: jsonb("business_type_other_codes"), // 他の業種（複数可、コードの配列）
   // ── 追加フィールド ────────────────────────────────────────────────────────
   employmentInsuranceNo: text("employment_insurance_no"),              // 雇用保険事業者番号
   laborInsuranceNo: text("labor_insurance_no"),                        // 労働保険番号（14桁）

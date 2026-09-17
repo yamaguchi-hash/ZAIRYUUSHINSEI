@@ -2264,7 +2264,7 @@ export function ShinseiFormEditor({ applicationId, initialForm, applicationType,
                         <textarea className={textareaCls} rows={2} value={form.orgAllowancesDetail} onChange={e => set("orgAllowancesDetail", e.target.value)} placeholder="例：役職手当 10000円、技能手当 5000円" />
                       </Field>
                       <Field label="1か月当たりの支払概算額（合計・円）【任意】">
-                        <input className={inputCls} type="number" value={form.orgMonthlyTotalEstimate} onChange={e => set("orgMonthlyTotalEstimate", e.target.value)} />
+                        <MoneyInput className={inputCls} value={form.orgMonthlyTotalEstimate} onChange={v => set("orgMonthlyTotalEstimate", v)} />
                       </Field>
                       <Field label="報酬が日本人と同等以上であることの説明・支給要件【任意】">
                         <textarea className={textareaCls} rows={2} value={form.orgSalaryEqualityExplanation} onChange={e => set("orgSalaryEqualityExplanation", e.target.value)} placeholder="例：経験・能力を考慮して決定。資格手当は〇〇資格保持者に支給" />

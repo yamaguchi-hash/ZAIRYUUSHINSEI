@@ -53,8 +53,9 @@ function toApplicationFormType(t: string): ApplicationFormData["applicationFormT
  * 申請書フォームの「実効値」を構築する。
  * 優先順位: 保存済みformData ＞ マスター（申請人・所属機関）由来の値 ＞ EMPTY_FORM_DATA。
  * 「8. 日本における連絡先」「現在の在留資格・期限・カード番号」「出生地・本国住所・婚姻の有無」
- * 「最終学歴・専攻分野・職歴」は savedForm の有無に関わらず、マスターに値があれば
- * 常にその最新値で上書きする（shinsei-form/page.tsx の既存仕様を踏襲）。
+ * 「最終学歴・専攻分野・職歴」「所属機関マスターの共通項目（業種・資本金・売上高・従業員数等）」
+ * は savedForm の有無に関わらず、マスターに値があれば常にその最新値で上書きする
+ * （shinsei-form/page.tsx の既存仕様を踏襲）。
  */
 export function buildEffectiveFormData(
   application: ApplicationMasterLike,
@@ -90,8 +91,6 @@ export function buildEffectiveFormData(
     currentPeriodExpiry:        applicant.currentVisaExpiry ?? '',
     residenceCardNumber:        applicant.residenceCardNumber ?? '',
     desiredStatusOfResidence:   VISA_TYPE_LABELS[application.visaType] ?? application.visaType ?? '',
-    // 所属機関マスター（全申請書共通の企業基本情報のみを自動反映）
-    ...mapOrganizationToFormData(organization),
   };
 
   // 日本における連絡先（申請人マスターから常に取得）
@@ -149,6 +148,11 @@ export function buildEffectiveFormData(
       ? { workHistory: masterWork as ApplicationFormData["workHistory"] }
       : {};
 
+  // 所属機関マスター（全申請書共通の企業基本情報。業種・資本金・売上高・従業員数等）
+  // は savedForm の有無に関わらず、マスターに値がある項目を常に上書きする＝
+  // 所属機関マスターを更新した際に既存の申請案件にも確実に反映されるようにする
+  const orgOverrides = mapOrganizationToFormData(organization);
+
   return {
     ...EMPTY_FORM_DATA,
     ...(savedForm ?? masterData),
@@ -157,5 +161,6 @@ export function buildEffectiveFormData(
     ...masterProfileFallbacks,
     ...educationOverrides,
     ...workHistoryOverride,
+    ...orgOverrides,
   } as ApplicationFormData;
 }

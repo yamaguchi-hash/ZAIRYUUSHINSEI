@@ -49,7 +49,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
         <title>{fileNameBase}</title>
         <style>{PRINT_STYLES}</style>
         <ShinseiPrintToolbar applicationId={id} label="申請人等作成用（3ページ）" disableAutoPrint fileNameBase={fileNameBase} />
-        <ShinseiMarginControls initialTopMm={7} initialBottomMm={7} sideMm={9} />
+        <ShinseiMarginControls initialTopMm={5} initialBottomMm={5} sideMm={9} />
         <PageNumberStamp kind="申請人用" />
 
         {/* ══════════════════════════════════════════════════════════════════════

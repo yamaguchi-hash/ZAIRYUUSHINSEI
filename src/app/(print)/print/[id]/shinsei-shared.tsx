@@ -279,7 +279,7 @@ export const PRINT_STYLES = `
   /* PDFの実際の用紙幅も --pdf-print-width に連動させる。
      ※ @page の size は CSS変数(var())を解釈できないため、PDF_PRINT_WIDTH の値を
         直接埋め込んでいる。PDF_PRINT_WIDTH は "210mm" のような長さ単位で指定すること。 */
-  @page{size:${PDF_PRINT_WIDTH} 297mm;margin:7mm 9mm;}
+  @page{size:${PDF_PRINT_WIDTH} 297mm;margin:5mm 9mm;}
 
   /* ── 画面表示: A4カードとしてプレビュー ── */
   .page{
@@ -292,7 +292,7 @@ export const PRINT_STYLES = `
 
   /* ── 印刷: 連続フローで枚数最小化 ── */
   @media print{
-    body{background:#fff;font-size:8.5px;line-height:1.25;}
+    body{background:#fff;font-size:8px;line-height:1.18;}
     *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
     .no-print{display:none!important;}
     /* A4固定・強制改ページを解除し、内容量に応じて自然に流す（印刷枚数の最小化）。
@@ -302,7 +302,10 @@ export const PRINT_STYLES = `
        （beforeprint）に物理シート数を計測して .print-sheet-stamp として付与する。 */
     .page{
       width:100%;max-width:100%;min-height:0;
-      padding:0;margin:0 auto;box-shadow:none;border-radius:0;
+      /* !important: Page1 の paddingTop（画面用のツールバー避け・インラインstyle）を
+         印刷時は必ず打ち消す。インラインstyleは非!importantのメディアクエリでは
+         上書きできないため、ここだけ!importantを使う。 */
+      padding:0!important;margin:0 auto;box-shadow:none;border-radius:0;
       page-break-after:auto;break-after:auto;
     }
     .page + .page{margin-top:5mm;}
@@ -312,16 +315,21 @@ export const PRINT_STYLES = `
     .sign-section,.form-header,.item-title{break-inside:avoid;page-break-inside:avoid;}
     .item-title{break-after:avoid;page-break-after:avoid;}
     /* 余白・行間・フォントを圧縮 */
-    td,th{padding:1.5px 4px;font-size:8.5px;line-height:1.22;}
-    table{margin-bottom:3px;}
-    .form-header{margin-bottom:4px;}
-    .bilingual,.bilingual-block{font-size:6.8px;line-height:1.1;}
+    td,th{padding:1px 3px;font-size:8px;line-height:1.15;}
+    table{margin-bottom:2px;}
+    .form-header{margin-bottom:3px;}
+    .bilingual,.bilingual-block{font-size:6.5px;line-height:1.05;}
     /* 見出し・署名欄の余白も圧縮し、最後がわずかに次ページへあふれるのを防ぐ */
-    .section{margin:6px 0 3px;}
-    .section2{margin:5px 0 2px;}
-    .section3{margin:3px 0 2px;}
-    .item-title{margin:2px 0 1px;}
-    .sign-section{margin-top:4px;}
+    .section{margin:4px 0 2px;padding:3px 7px;}
+    .section2{margin:3px 0 2px;padding:2px 6px;}
+    .section3{margin:2px 0 1px;padding:2px 6px;}
+    .item-title{margin:1px 0;}
+    .sign-section{margin-top:3px;}
+    .sign-role-label{padding:2px 8px;font-size:10px;}
+    .sign-declaration{padding:2px 5px;}
+    .sign-area-cell{min-height:40px;padding:3px 8px;}
+    .sign-line{height:24px;}
+    .sign-date-cell .sign-date-head{padding:1.5px;}
   }
 
   /* ── 印刷枚数の計測モード（body.print-measure） ──────────────────────────
@@ -330,7 +338,7 @@ export const PRINT_STYLES = `
      上の @media print と同じコンパクトレイアウトを画面上で再現する。
      ※ @media print のレイアウトに影響する値を変更した場合は、ここも必ず同期させること */
   body.print-measure{
-    background:#fff;font-size:8.5px;line-height:1.25;
+    background:#fff;font-size:8px;line-height:1.18;
     width:calc(var(--pdf-print-width) - var(--print-margin-side, 9mm)*2);
     margin:0;
   }
@@ -340,10 +348,20 @@ export const PRINT_STYLES = `
     padding:0!important;margin:0 auto!important;box-shadow:none!important;border-radius:0!important;
   }
   body.print-measure .page + .page{margin-top:5mm!important;}
-  body.print-measure td,body.print-measure th{padding:1.5px 4px;font-size:8.5px;line-height:1.22;}
-  body.print-measure table{margin-bottom:3px;}
-  body.print-measure .form-header{margin-bottom:4px;}
-  body.print-measure .bilingual,body.print-measure .bilingual-block{font-size:6.8px;line-height:1.1;}
+  body.print-measure td,body.print-measure th{padding:1px 3px;font-size:8px;line-height:1.15;}
+  body.print-measure table{margin-bottom:2px;}
+  body.print-measure .form-header{margin-bottom:3px;}
+  body.print-measure .bilingual,body.print-measure .bilingual-block{font-size:6.5px;line-height:1.05;}
+  body.print-measure .section{margin:4px 0 2px;padding:3px 7px;}
+  body.print-measure .section2{margin:3px 0 2px;padding:2px 6px;}
+  body.print-measure .section3{margin:2px 0 1px;padding:2px 6px;}
+  body.print-measure .item-title{margin:1px 0;}
+  body.print-measure .sign-section{margin-top:3px;}
+  body.print-measure .sign-role-label{padding:2px 8px;font-size:10px;}
+  body.print-measure .sign-declaration{padding:2px 5px;}
+  body.print-measure .sign-area-cell{min-height:40px;padding:3px 8px;}
+  body.print-measure .sign-line{height:24px;}
+  body.print-measure .sign-date-cell .sign-date-head{padding:1.5px;}
 
   /* ── 申請書ヘッダー（全様式共通） ── */
   .form-header{text-align:center;margin-bottom:6px;}

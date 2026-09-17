@@ -49,7 +49,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
         <title>{fileNameBase}</title>
         <style>{PRINT_STYLES}</style>
         <ShinseiPrintToolbar applicationId={id} label="所属機関等作成用（5ページ）" disableAutoPrint fileNameBase={fileNameBase} />
-        <ShinseiMarginControls initialTopMm={7} initialBottomMm={7} sideMm={9} />
+        <ShinseiMarginControls initialTopMm={5} initialBottomMm={5} sideMm={9} />
         {/* R型（家族滞在）・T型（定住者等）はこの書類が扶養者作成用のため「扶養者用」と表示する */}
         <PageNumberStamp kind={(isRtype || isTtype) ? "扶養者用" : "所属機関用"} />
 

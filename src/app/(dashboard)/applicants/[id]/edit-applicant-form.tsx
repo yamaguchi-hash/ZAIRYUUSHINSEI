@@ -5,9 +5,37 @@ import { updateApplicant } from "@/actions/applicants";
 import { VISA_TYPE_LABELS, isWorkVisaType } from "@/lib/utils";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { AddressSplitInput } from "@/components/ui/postal-code-input";
+import { PREFECTURES } from "@/lib/prefectures";
+import { Plus, Trash2 } from "lucide-react";
+
+/** 最終学歴（申請書作成の教育欄と同じキー構成。src/lib/effective-form-data.ts の EDUCATION_KEYS と揃える） */
+interface EducationHistoryData {
+  educationCountry: string;
+  educationDegree: string;
+  educationSchoolName: string;
+  educationGraduationDate: string;
+  majorCategory: string;
+  majorCategoryOther: string;
+  itQualificationExists: string;
+  itQualificationName: string;
+}
+
+/** 職歴の1件（申請書作成の WorkHistoryEntry と同じ形） */
+interface WorkHistoryEntry {
+  joinDate: string;
+  leaveDate: string;
+  employer: string;
+}
+
+const EMPTY_EDUCATION: EducationHistoryData = {
+  educationCountry: "", educationDegree: "", educationSchoolName: "", educationGraduationDate: "",
+  majorCategory: "", majorCategoryOther: "", itQualificationExists: "", itQualificationName: "",
+};
 
 interface EditApplicantFormProps {
   applicant: {
+    educationHistory?: unknown;
+    workHistory?: unknown;
     id: string;
     familyNameEn: string;
     givenNameEn: string;
@@ -16,12 +44,14 @@ interface EditApplicantFormProps {
     nationality: string;
     dateOfBirth: string | null;
     gender: string | null;
+    maritalStatus?: string | null;
     passportNumber: string | null;
     passportExpiry: string | null;
     residenceCardNumber: string | null;
     currentVisaType: string | null;
     currentVisaExpiry: string | null;
     organizationId: string | null;
+    supporterId?: string | null;
     phone: string | null;
     mobilePhone: string | null;
     emailAddress: string | null;
@@ -30,11 +60,14 @@ interface EditApplicantFormProps {
     japanCity?: string | null;
     japanAddressLine?: string | null;
     japanAddress: string | null;
+    placeOfBirth?: string | null;
+    homeCountryAddress?: string | null;
   };
   organizations: { id: string; nameJa: string }[];
+  supporters: { id: string; familyNameEn: string; givenNameEn: string; nationality: string }[];
 }
 
-export function EditApplicantForm({ applicant, organizations }: EditApplicantFormProps) {
+export function EditApplicantForm({ applicant, organizations, supporters }: EditApplicantFormProps) {
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -45,11 +78,6 @@ export function EditApplicantForm({ applicant, organizations }: EditApplicantFor
 
     if (hasSplitFields) {
       // 既に分割されているデータを使用
-      console.log("[EditApplicantForm] Using split fields:", {
-        prefix: applicant.japanPrefecture,
-        city: applicant.japanCity,
-        addressLine: applicant.japanAddressLine
-      });
       return {
         prefix: applicant.japanPrefecture ?? "",
         city: applicant.japanCity ?? "",
@@ -58,28 +86,15 @@ export function EditApplicantForm({ applicant, organizations }: EditApplicantFor
     }
 
     // japanAddress から自動分割（古いデータ形式）
-    const PREFECTURES = [
-      "北海道","青森県","青森県","岩手県","宮城県","秋田県","山形県","福島県",
-      "茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県",
-      "新潟県","富山県","石川県","福井県","山梨県","長野県","岐阜県",
-      "静岡県","愛知県","三重県","滋賀県","京都府","大阪府","兵庫県",
-      "奈良県","和歌山県","鳥取県","島根県","岡山県","広島県","山口県",
-      "徳島県","香川県","愛媛県","高知県","福岡県","佐賀県","長崎県",
-      "熊本県","大分県","宮崎県","鹿児島県","沖縄県",
-    ];
-
     const address = applicant.japanAddress ?? "";
-    console.log("[EditApplicantForm] Extracting from japanAddress:", address);
 
     if (!address) {
-      console.log("[EditApplicantForm] Empty address");
       return { prefix: "", city: "", addressLine: "" };
     }
 
     const prefMatch = PREFECTURES.find(p => address.startsWith(p));
 
     if (!prefMatch) {
-      console.log("[EditApplicantForm] No prefecture match found");
       return { prefix: "", city: "", addressLine: address };
     }
 
@@ -89,11 +104,38 @@ export function EditApplicantForm({ applicant, organizations }: EditApplicantFor
     const city = cityMatch ? cityMatch[0] : rest.substring(0, 3);
     const addressLine = rest.substring(city.length);
 
-    console.log("[EditApplicantForm] Extracted:", { prefix: prefMatch, city, addressLine });
     return { prefix: prefMatch, city, addressLine };
   };
 
   const { prefix, city, addressLine } = extractAddressComponents();
+
+  const initialEducation: EducationHistoryData = {
+    ...EMPTY_EDUCATION,
+    ...(applicant.educationHistory && typeof applicant.educationHistory === "object" && !Array.isArray(applicant.educationHistory)
+      ? (applicant.educationHistory as Partial<EducationHistoryData>)
+      : {}),
+  };
+  const initialWorkHistory: WorkHistoryEntry[] = Array.isArray(applicant.workHistory)
+    ? (applicant.workHistory as WorkHistoryEntry[])
+    : [];
+
+  const [education, setEducation] = useState<EducationHistoryData>(initialEducation);
+  const [workHistory, setWorkHistory] = useState<WorkHistoryEntry[]>(initialWorkHistory);
+
+  function handleEducationChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    setEducation((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setStatus("idle");
+  }
+  function updateWorkHistoryRow(idx: number, key: keyof WorkHistoryEntry, value: string) {
+    setWorkHistory((prev) => prev.map((w, i) => (i === idx ? { ...w, [key]: value } : w)));
+    setStatus("idle");
+  }
+  function addWorkHistoryRow() {
+    setWorkHistory((prev) => [...prev, { joinDate: "", leaveDate: "", employer: "" }]);
+  }
+  function removeWorkHistoryRow(idx: number) {
+    setWorkHistory((prev) => prev.filter((_, i) => i !== idx));
+  }
 
   const [form, setForm] = useState({
     familyNameEn: applicant.familyNameEn,
@@ -103,6 +145,7 @@ export function EditApplicantForm({ applicant, organizations }: EditApplicantFor
     nationality: applicant.nationality,
     dateOfBirth: applicant.dateOfBirth ?? "",
     gender: applicant.gender ?? "",
+    maritalStatus: applicant.maritalStatus ?? "",
     passportNumber: applicant.passportNumber ?? "",
     passportExpiry: applicant.passportExpiry ?? "",
     residenceCardNumber: applicant.residenceCardNumber ?? "",
@@ -117,6 +160,9 @@ export function EditApplicantForm({ applicant, organizations }: EditApplicantFor
     japanCity: city,
     japanAddressLine: addressLine,
     japanAddress: applicant.japanAddress ?? "",
+    placeOfBirth: applicant.placeOfBirth ?? "",
+    homeCountryAddress: applicant.homeCountryAddress ?? "",
+    supporterId: applicant.supporterId ?? "",
   });
 
   // 在留カード更新パネルでのマスター上書き（router.refresh()）後、
@@ -149,6 +195,10 @@ export function EditApplicantForm({ applicant, organizations }: EditApplicantFor
           japanAddressLine: form.japanAddressLine,
           // 非就労資格の場合は所属機関の紐付けを残さない（データの汚染防止）
           organizationId: isWorkVisa ? (form.organizationId || null) : null,
+          supporterId: form.currentVisaType === "dependent" ? (form.supporterId || null) : null,
+          educationHistory: education,
+          // 完全に空の行は保存しない（申請書作成側のsaveApplicationFormDataと同じ絞り込み）
+          workHistory: workHistory.filter((w) => w.joinDate || w.leaveDate || w.employer),
         });
         setStatus("success");
         setMessage("保存しました");
@@ -227,6 +277,16 @@ export function EditApplicantForm({ applicant, organizations }: EditApplicantFor
           </select>
         </div>
         <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">婚姻の有無（配偶者の有無）</label>
+          <select name="maritalStatus" value={form.maritalStatus} onChange={handleChange} className="input-field text-sm py-1.5">
+            <option value="">—</option>
+            <option value="有">有（既婚）</option>
+            <option value="無">無（未婚）</option>
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">電話番号</label>
           <input name="phone" value={form.phone} onChange={handleChange} placeholder="03-0000-0000" className="input-field text-sm py-1.5" />
         </div>
@@ -297,6 +357,127 @@ export function EditApplicantForm({ applicant, organizations }: EditApplicantFor
         inputClassName="input-field text-sm py-1.5 w-full"
         labelClassName="block text-xs font-medium text-gray-600 mb-1"
       />
+      {form.currentVisaType === "dependent" && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5">
+          <label className="block text-xs font-medium text-purple-700 mb-1">
+            扶養者（スポンサー）
+          </label>
+          <select name="supporterId" value={form.supporterId} onChange={handleChange} className="input-field text-sm py-1.5 bg-white">
+            <option value="">— 選択してください —</option>
+            {supporters.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.familyNameEn} {s.givenNameEn}（{s.nationality}）
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-purple-600 mt-1">家族滞在のため、スポンサーとなる扶養者を登録できます。</p>
+        </div>
+      )}
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">出生地</label>
+        <input name="placeOfBirth" value={form.placeOfBirth} onChange={handleChange} placeholder="北京市" className="input-field text-sm py-1.5" />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">本国における居住地</label>
+        <input name="homeCountryAddress" value={form.homeCountryAddress} onChange={handleChange} placeholder="中国北京市朝陽区〇〇路1番" className="input-field text-sm py-1.5" />
+      </div>
+
+      {/* 最終学歴・職歴（申請書作成画面と共有される） */}
+      <div className="border-t border-gray-200 pt-3 mt-1">
+        <p className="text-xs font-semibold text-gray-500 mb-2">
+          最終学歴・職歴
+          <span className="text-gray-400 font-normal ml-1">（申請書作成画面に自動反映されます）</span>
+        </p>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">学校の所在国</label>
+            <select name="educationCountry" value={education.educationCountry} onChange={handleEducationChange} className="input-field text-sm py-1.5">
+              <option value="">—</option>
+              <option value="本邦（日本）">本邦（日本）</option>
+              <option value="外国">外国</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">学位・区分</label>
+            <select name="educationDegree" value={education.educationDegree} onChange={handleEducationChange} className="input-field text-sm py-1.5">
+              <option value="">—</option>
+              <option value="大学院（博士）">大学院（博士）</option>
+              <option value="大学院（修士）">大学院（修士）</option>
+              <option value="大学">大学</option>
+              <option value="短期大学">短期大学</option>
+              <option value="専門学校">専門学校</option>
+              <option value="高等学校">高等学校</option>
+              <option value="中学校">中学校</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">学校名</label>
+            <input name="educationSchoolName" value={education.educationSchoolName} onChange={handleEducationChange} className="input-field text-sm py-1.5" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">卒業年月日</label>
+            <input name="educationGraduationDate" type="date" value={education.educationGraduationDate} onChange={handleEducationChange} className="input-field text-sm py-1.5" />
+          </div>
+        </div>
+        <div className="mt-2">
+          <label className="block text-xs font-medium text-gray-600 mb-1">専攻・専門分野</label>
+          <input name="majorCategory" value={education.majorCategory} onChange={handleEducationChange} placeholder="例: 情報工学" className="input-field text-sm py-1.5" />
+        </div>
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">情報処理技術者資格又は試験合格の有無</label>
+            <select name="itQualificationExists" value={education.itQualificationExists} onChange={handleEducationChange} className="input-field text-sm py-1.5">
+              <option value="">—</option>
+              <option value="有">有</option>
+              <option value="無">無</option>
+            </select>
+          </div>
+          {education.itQualificationExists === "有" && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">資格名又は試験名</label>
+              <input name="itQualificationName" value={education.itQualificationName} onChange={handleEducationChange} placeholder="例: 基本情報技術者試験" className="input-field text-sm py-1.5" />
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between mt-4 mb-1">
+          <label className="block text-xs font-medium text-gray-600">職歴（外国におけるものを含む）</label>
+          <button type="button" onClick={addWorkHistoryRow} className="inline-flex items-center gap-1 text-xs text-blue-600 border border-blue-200 rounded px-2 py-1 hover:bg-blue-50">
+            <Plus className="w-3 h-3" />追加
+          </button>
+        </div>
+        {workHistory.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-2">「追加」で職歴を入力してください</p>
+        ) : (
+          <div className="space-y-2">
+            {workHistory.map((w, idx) => (
+              <div key={idx} className="grid grid-cols-3 gap-2 items-end">
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-1">入社年月</label>
+                  <input type="month" value={w.joinDate} onChange={(e) => updateWorkHistoryRow(idx, "joinDate", e.target.value)} className="input-field text-sm py-1.5" />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-1">退社年月</label>
+                  <input type="month" value={w.leaveDate} onChange={(e) => updateWorkHistoryRow(idx, "leaveDate", e.target.value)} className="input-field text-sm py-1.5" />
+                </div>
+                <div className="flex gap-1">
+                  <div className="flex-1">
+                    <label className="block text-[11px] text-gray-500 mb-1">勤務先名称</label>
+                    <input value={w.employer} onChange={(e) => updateWorkHistoryRow(idx, "employer", e.target.value)} className="input-field text-sm py-1.5" />
+                  </div>
+                  <button type="button" onClick={() => removeWorkHistoryRow(idx)} className="mb-1.5 text-gray-300 hover:text-red-500 self-end">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <button
         type="submit"

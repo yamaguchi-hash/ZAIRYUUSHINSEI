@@ -56,6 +56,49 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** 元号・元号年を表す */
+interface EraInfo {
+  name: string;
+  year: number;
+}
+
+/** 日付文字列（YYYY-MM-DD等）から元号・元号年を算出する（改元日を考慮） */
+function toJapaneseEra(dateStr: string): EraInfo {
+  const d = new Date(dateStr);
+  const y = isNaN(d.getTime()) ? new Date().getFullYear() : d.getFullYear();
+  const ymd = isNaN(d.getTime())
+    ? y * 10000 + 101
+    : y * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  if (ymd >= 20190501) return { name: "令和", year: y - 2018 };
+  if (ymd >= 19890108) return { name: "平成", year: y - 1988 };
+  return { name: "昭和", year: y - 1925 };
+}
+
+/** 事件番号の元号年プレフィックス（例: 「令和7年第」） */
+function caseNumberPrefix(era: EraInfo): string {
+  return `${era.name}${era.year}年第`;
+}
+
+/**
+ * 指定の元号年における次の事件番号を採番する（テナント内で「元号年第N号」形式の
+ * 既存番号を走査し、最大の連番+1を返す）。行政書士法第11条の事件簿は元号年ごとに
+ * 1番から通し番号を振るのが慣例のため、この形式に合わせている。
+ */
+async function nextCaseNumberForEraYear(tenantId: string, era: EraInfo): Promise<string> {
+  const prefix = caseNumberPrefix(era);
+  const rows = await db
+    .select({ caseNumber: legalCaseLedger.caseNumber })
+    .from(legalCaseLedger)
+    .where(eq(legalCaseLedger.tenantId, tenantId));
+  const re = new RegExp(`^${prefix}(\\d+)号$`);
+  let max = 0;
+  for (const r of rows) {
+    const m = r.caseNumber?.match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `${prefix}${max + 1}号`;
+}
+
 /** 受任事項の表示文字列を組み立てる（業務カテゴリ＋手続き＋在留資格 等） */
 function buildSubject(app: { businessCategory: string; applicationType: string; visaType: string | null }): string {
   const cat = BUSINESS_CATEGORY_LABELS[app.businessCategory] ?? app.businessCategory;
@@ -265,11 +308,19 @@ export async function upsertLegalLedger(
       .limit(1);
 
     if (existing) {
+      const acceptedAtVal = data.acceptedAt?.trim() || existing.acceptedAt || todayIso();
+      // 事件番号が未設定（新規発行）の場合のみ、受任日の元号年に基づき自動採番する。
+      // 既に番号が振られている事件を、受任日の修正だけで勝手に採番し直さないようにする。
+      const caseNumber =
+        data.caseNumber?.trim() ||
+        existing.caseNumber ||
+        (await nextCaseNumberForEraYear(tenantId, toJapaneseEra(acceptedAtVal)));
+
       const [updated] = await db
         .update(legalCaseLedger)
         .set({
-          caseNumber: data.caseNumber?.trim() || app.caseNumber || null,
-          acceptedAt: data.acceptedAt?.trim() || existing.acceptedAt || null,
+          caseNumber,
+          acceptedAt: acceptedAtVal || null,
           completedAt: completedAt || existing.completedAt || null,
           feeAmount: feeVal,
           status: data.status?.trim() || existing.status || null,
@@ -282,15 +333,20 @@ export async function upsertLegalLedger(
       return { success: true, row: updated };
     }
 
+    const acceptedAtVal = data.acceptedAt?.trim() || todayIso();
+    const caseNumber =
+      data.caseNumber?.trim() ||
+      (await nextCaseNumberForEraYear(tenantId, toJapaneseEra(acceptedAtVal)));
+
     const [inserted] = await db
       .insert(legalCaseLedger)
       .values({
         tenantId,
         applicationId,
-        caseNumber: data.caseNumber?.trim() || app.caseNumber || null,
+        caseNumber,
         applicantId: app.applicantId ?? null,
         organizationId: app.organizationId ?? null,
-        acceptedAt: data.acceptedAt?.trim() || todayIso(),
+        acceptedAt: acceptedAtVal,
         completedAt: completedAt,
         feeAmount: feeVal,
         status: data.status?.trim() || null,

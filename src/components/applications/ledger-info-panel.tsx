@@ -72,7 +72,7 @@ export function LedgerInfoPanel({ applicationId }: { applicationId: string }) {
               <label className="text-[11px] text-gray-500 flex flex-col gap-1">
                 事件番号
                 <input value={caseNumber} onChange={(e) => setCaseNumber(e.target.value)}
-                  placeholder="（案件番号を流用可）"
+                  placeholder="空欄で保存すると自動採番されます"
                   className="text-sm font-mono border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-indigo-400" />
               </label>
               <label className="text-[11px] text-gray-500 flex flex-col gap-1">

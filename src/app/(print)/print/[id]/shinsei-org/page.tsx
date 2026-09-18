@@ -181,7 +181,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             role="organization"
             orgName={fmt(org?.nameJa) || fmt(form.orgName)}
             representativeTitle={fmt(org?.representativeTitle)}
-            representativeName={fmt(org?.representativeName) || fmt(form.position)}
+            representativeName={fmt(org?.representativeName)}
           />
 
           {/* 所属機関 Part 2（派遣先等） */}
@@ -218,7 +218,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
                 role="organization"
                 orgName={fmt(org?.nameJa) || fmt(form.orgName)}
                 representativeTitle={fmt(org?.representativeTitle)}
-                representativeName={fmt(org?.representativeName) || fmt(form.position)}
+                representativeName={fmt(org?.representativeName)}
               />
             </>
           )}
@@ -362,7 +362,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
           <SignatureSection role="organization"
             orgName={fmt(org?.nameJa) || fmt(form.orgName)}
             representativeTitle={fmt(org?.representativeTitle)}
-            representativeName={fmt(org?.representativeName) || fmt(form.position)}
+            representativeName={fmt(org?.representativeName)}
           />
         </div>
         )}
@@ -567,7 +567,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
               <td className="lbl">(8) 常勤職員数<br /><span className="bilingual">Number of employees</span></td>
               <td>{(org?.employeeCount ?? form.orgEmployeeCount) ? `${org?.employeeCount ?? form.orgEmployeeCount}名` : '　'}</td>
               <td className="lbl">(9) 代表者の氏名<br /><span className="bilingual">Representative</span></td>
-              <td>{fmt(org?.representativeName) || fmt(form.position)}</td>
+              <td>{fmt(org?.representativeName)}</td>
             </tr>
             {form.orgBranchName && (
               <tr>
@@ -982,7 +982,7 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
             role="organization"
             orgName={fmt(org?.nameJa) || fmt(form.orgName)}
             representativeTitle={fmt(org?.representativeTitle)}
-            representativeName={fmt(org?.representativeName) || fmt(form.position)}
+            representativeName={fmt(org?.representativeName)}
           />
         </div>
         </>

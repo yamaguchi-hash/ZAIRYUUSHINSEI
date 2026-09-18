@@ -316,7 +316,7 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
               </thead>
               <tbody>
                 {workHistory.map((w, i) => (
-                  <tr key={i}><td>{fmt(w.joinDate)}</td><td>{fmt(w.leaveDate)}</td><td>{fmt(w.employer)}</td></tr>
+                  <tr key={i}><td>{fmt(w.joinDate)}</td><td>{fmt(w.leaveDate)}</td><td>{fmt(w.employerNameKanji || w.employerNameEn || w.employer)}</td></tr>
                 ))}
               </tbody>
             </table>
@@ -845,15 +845,15 @@ export default async function ShinseiApplicantPage({ params }: { params: Promise
             28 職歴（外国におけるものを含む。）
             <span className="bilingual">　Employment history (including work experience in foreign countries)</span>
           </div>
-          {workHistory.length > 0 && workHistory.some(w => w.employer) ? (
+          {workHistory.length > 0 && workHistory.some(w => w.employerNameKanji || w.employerNameEn || w.employer) ? (
             <table className="v-tbl" style={{ fontSize: "9px" }}><tbody>
               <tr>
                 <th style={{ width: "20%" }}>入社年月<br /><span className="bilingual">Date(from)</span></th>
                 <th style={{ width: "20%" }}>退社年月<br /><span className="bilingual">Date(to)</span></th>
                 <th>勤務先名称<br /><span className="bilingual">Place of employment</span></th>
               </tr>
-              {workHistory.filter(w => w.employer).map((w, i) => (
-                <tr key={i}><td>{fmt(w.joinDate)}</td><td>{fmt(w.leaveDate)}</td><td>{fmt(w.employer)}</td></tr>
+              {workHistory.filter(w => w.employerNameKanji || w.employerNameEn || w.employer).map((w, i) => (
+                <tr key={i}><td>{fmt(w.joinDate)}</td><td>{fmt(w.leaveDate)}</td><td>{fmt(w.employerNameKanji || w.employerNameEn || w.employer)}</td></tr>
               ))}
             </tbody></table>
           ) : (

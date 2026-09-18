@@ -2,7 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, applications, applicationDocumentChecklist, documentRequirementMaster } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
+import fs from "fs";
+import path from "path";
+
+// StandardFonts（Helvetica等）はWinAnsiのみ対応で日本語（書類名）を描画できずクラッシュ
+// していたため、日本語を含むフォントを埋め込んで使用する。
+const JP_FONT_PATH = path.join(process.cwd(), "src/lib/fonts/NotoSansJP-Regular.woff");
+let cachedJpFontBytes: Buffer | null = null;
+function loadJpFontBytes(): Buffer {
+  if (!cachedJpFontBytes) cachedJpFontBytes = fs.readFileSync(JP_FONT_PATH);
+  return cachedJpFontBytes;
+}
 
 // ─── 写真・不要書類の除外キーワード ─────────────────────────────────────────────
 const PHOTO_KEYWORDS = ["写真", "photo", "portrait", "顔写真"];
@@ -69,12 +81,12 @@ async function fetchFileAsBytes(fileUrl: string): Promise<Uint8Array | null> {
 // ─── セパレーターページを追加 ────────────────────────────────────────────────
 async function addSeparatorPage(
   mergedPdf: PDFDocument,
+  font: Awaited<ReturnType<PDFDocument["embedFont"]>>,
   docName: string,
   pageNo: number,
   totalDocs: number
 ): Promise<void> {
   const page = mergedPdf.addPage([595, 842]); // A4
-  const font = await mergedPdf.embedFont(StandardFonts.Helvetica);
 
   // 背景グレー
   page.drawRectangle({
@@ -193,6 +205,8 @@ export async function GET(
 
   // ─── PDF マージ ───────────────────────────────────────────────────────────
   const mergedPdf = await PDFDocument.create();
+  mergedPdf.registerFontkit(fontkit);
+  const font = await mergedPdf.embedFont(loadJpFontBytes(), { subset: true });
   mergedPdf.setTitle(`入管オンライン申請 添付書類 — ${app.caseNumber ?? id}`);
   mergedPdf.setAuthor("行政書士法人 JLS 山口忠士");
   mergedPdf.setCreationDate(new Date());
@@ -216,7 +230,7 @@ export async function GET(
 
     // セパレーターページを挿入
     docCount++;
-    await addSeparatorPage(mergedPdf, row.documentName, docCount, submitted.length);
+    await addSeparatorPage(mergedPdf, font, row.documentName, docCount, submitted.length);
 
     try {
       if (isPdf) {
@@ -271,7 +285,6 @@ export async function GET(
 
   // 最終ページ（書類一覧）
   const summaryPage = mergedPdf.addPage([595, 842]);
-  const font = await mergedPdf.embedFont(StandardFonts.Helvetica);
   summaryPage.drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(0.97, 0.97, 0.99) });
   summaryPage.drawRectangle({ x: 0, y: 742, width: 595, height: 100, color: rgb(0.13, 0.24, 0.42) });
   summaryPage.drawText("DOCUMENT INDEX", { x: 40, y: 800, size: 13, font, color: rgb(0.9, 0.9, 1) });

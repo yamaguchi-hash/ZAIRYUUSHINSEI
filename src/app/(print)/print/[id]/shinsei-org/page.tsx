@@ -72,6 +72,14 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
 
           <div className="section">所属機関等作成用　Part 1 N　— 機関情報・雇用条件</div>
 
+          <div className="item-title">
+            雇用している外国人の氏名
+            <span className="bilingual">　Name of the foreign national employed</span>
+          </div>
+          <table><tbody>
+            <tr><td colSpan={4}>{fmt(form.familyNameEn)} {fmt(form.givenNameEn)}</td></tr>
+          </tbody></table>
+
           <div className="section3">2. 契約形態　／　3. 所属機関等</div>
           <table>
             <tbody>
@@ -332,6 +340,15 @@ export default async function ShinseiOrgPage({ params }: { params: Promise<{ id:
           />
 
           <div className="section">所属機関等作成用</div>
+
+          <div className="item-title">
+            雇用している外国人の氏名
+            <span className="bilingual">　Name of the foreign national employed</span>
+          </div>
+          <table><tbody>
+            <tr><td colSpan={4}>{fmt(form.familyNameEn)} {fmt(form.givenNameEn)}</td></tr>
+          </tbody></table>
+
           <table>
             <tbody>
               <tr>

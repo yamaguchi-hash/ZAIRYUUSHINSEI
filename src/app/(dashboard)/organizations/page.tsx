@@ -11,8 +11,8 @@ export default async function OrganizationsPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">所属機関マスター</h1>
-          <p className="text-gray-500 text-sm mt-1">全 {organizations.length} 件</p>
+          <h1 className="text-2xl font-bold text-gray-900">顧客名簿（法人）<span className="text-base font-normal text-gray-400 ml-2">／ 所属機関マスター</span></h1>
+          <p className="text-gray-500 text-sm mt-1">法人のお客様（受入企業・所属機関を含む）　全 {organizations.length} 件</p>
         </div>
       </div>
 

@@ -164,7 +164,7 @@ export function AddressWithZip({
     if (zip) {
       onPostalChange(zip);
     } else {
-      setZipError("郵便番号が見つかりませんでした（都道府県・市区町村まで入力してください）");
+      setZipError("郵便番号を特定できませんでした（町名まで入力して再検索してください）");
     }
     setZipLoading(false);
   }
@@ -293,7 +293,7 @@ export function AddressSplitInput({
     if (zip) {
       onChange({ postalCode: zip });
     } else {
-      setZipError("郵便番号が見つかりませんでした（都道府県・市区町村まで入力後に検索してください）");
+      setZipError("郵便番号を特定できませんでした（町名まで入力して再検索してください）");
     }
     setReverseLoading(false);
   }

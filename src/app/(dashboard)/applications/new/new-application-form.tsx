@@ -176,6 +176,14 @@ function SearchableSelect<T extends { id: string }>({
   );
 }
 
+// 業務カテゴリ（総合プラットフォーム）。immigration 以外は入管向け項目をバイパスする。
+const BUSINESS_CATEGORIES: { value: string; label: string }[] = [
+  { value: "immigration", label: "入管業務" },
+  { value: "transportation", label: "運送業" },
+  { value: "construction", label: "建設業" },
+  { value: "other", label: "その他" },
+];
+
 // ── メインフォーム ────────────────────────────────────────────────────────────
 export function NewApplicationForm({ applicants, organizations }: Props) {
   const router = useRouter();
@@ -183,11 +191,15 @@ export function NewApplicationForm({ applicants, organizations }: Props) {
   const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
+    businessCategory: "immigration",
     applicantId: "",
     organizationId: "",
     applicationType: "renewal",
     visaType: "engineer_humanities",
+    title: "",
   });
+
+  const isImmigration = formData.businessCategory === "immigration";
 
   function handleSelectChange(field: string) {
     return (value: string) => setFormData((prev) => ({ ...prev, [field]: value }));
@@ -200,17 +212,31 @@ export function NewApplicationForm({ applicants, organizations }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!formData.applicantId) {
-      setError("申請人を選択してください");
+      setError("顧客（申請人）を選択してください");
       return;
     }
     setError("");
     startTransition(async () => {
-      const result = await createApplication({
-        applicantId: formData.applicantId,
-        organizationId: formData.organizationId || undefined,
-        applicationType: formData.applicationType,
-        visaType: formData.visaType,
-      });
+      // 非入管カテゴリは在留資格等の入管向け項目をバイパスし、タイトル＋顧客紐付けのみで作成。
+      // applicationType は notNull enum のためプレースホルダ値を送り、visaType は空にする。
+      const result = await createApplication(
+        isImmigration
+          ? {
+              businessCategory: "immigration",
+              applicantId: formData.applicantId,
+              organizationId: formData.organizationId || undefined,
+              applicationType: formData.applicationType,
+              visaType: formData.visaType,
+            }
+          : {
+              businessCategory: formData.businessCategory,
+              applicantId: formData.applicantId,
+              organizationId: formData.organizationId || undefined,
+              applicationType: formData.applicationType, // プレースホルダ（既定 renewal）
+              visaType: "",
+              customData: formData.title.trim() ? { title: formData.title.trim() } : null,
+            }
+      );
       if (!result.success || !result.data) {
         setError(result.error ?? "申請の作成に失敗しました");
         return;
@@ -233,10 +259,33 @@ export function NewApplicationForm({ applicants, organizations }: Props) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* 申請人 */}
+          {/* 業務カテゴリ */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              申請人 <span className="text-red-500">*</span>
+              業務カテゴリ <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="businessCategory"
+              value={formData.businessCategory}
+              onChange={handleChange}
+              required
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {BUSINESS_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            {!isImmigration && (
+              <p className="text-xs text-amber-600 mt-1">
+                入管以外のカテゴリです。在留資格等の入管向け項目は省略し、タイトルと顧客紐付けのみで作成します。
+              </p>
+            )}
+          </div>
+
+          {/* 申請人（顧客） */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {isImmigration ? "申請人" : "顧客（申請人マスター）"} <span className="text-red-500">*</span>
             </label>
             <SearchableSelect<Applicant>
               items={applicants}
@@ -297,41 +346,63 @@ export function NewApplicationForm({ applicants, organizations }: Props) {
             />
           </div>
 
-          {/* 申請種別 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              申請種別 <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="applicationType"
-              value={formData.applicationType}
-              onChange={handleChange}
-              required
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {Object.entries(APPLICATION_TYPE_LABELS).map(([v, l]) => (
-                <option key={v} value={v}>{l}</option>
-              ))}
-            </select>
-          </div>
+          {isImmigration ? (
+            <>
+              {/* 申請種別（入管業務のみ） */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  申請種別 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="applicationType"
+                  value={formData.applicationType}
+                  onChange={handleChange}
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {Object.entries(APPLICATION_TYPE_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </div>
 
-          {/* 在留資格 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              在留資格種別 <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="visaType"
-              value={formData.visaType}
-              onChange={handleChange}
-              required
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {Object.entries(VISA_TYPE_LABELS).map(([v, l]) => (
-                <option key={v} value={v}>{l}</option>
-              ))}
-            </select>
-          </div>
+              {/* 在留資格（入管業務のみ） */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  在留資格種別 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="visaType"
+                  value={formData.visaType}
+                  onChange={handleChange}
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {Object.entries(VISA_TYPE_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            /* 非入管カテゴリ: シンプルなタイトルのみ（詳細なカスタム入力は次フェーズ） */
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                案件タイトル
+              </label>
+              <input
+                type="text"
+                name="title"
+                value={formData.title}
+                onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="例: 一般貨物自動車運送事業 許可申請"
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                タイトルは案件の customData に保存されます（詳細な入力画面は次フェーズで追加予定）。
+              </p>
+            </div>
+          )}
 
           <div className="pt-2 flex gap-3">
             <button

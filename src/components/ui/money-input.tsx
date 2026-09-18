@@ -21,7 +21,8 @@ export function MoneyInput({
   disabled,
   name,
 }: {
-  value: string;
+  /** 文字列を想定しているが、AI自動入力等で数値がそのまま保存されているケースもあるため許容する */
+  value: string | number | null | undefined;
   onChange: (next: string) => void;
   className?: string;
   placeholder?: string;
@@ -29,7 +30,7 @@ export function MoneyInput({
   name?: string;
 }) {
   const [focused, setFocused] = useState(false);
-  const digits = (value ?? "").replace(/[^\d]/g, "");
+  const digits = String(value ?? "").replace(/[^\d]/g, "");
 
   return (
     <input

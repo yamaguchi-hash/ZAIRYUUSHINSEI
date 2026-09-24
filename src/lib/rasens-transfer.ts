@@ -146,6 +146,10 @@ function isKeyOnForm(key: string, f: Partial<ApplicationFormData>): boolean {
     if (key === "reasonForApplication") return ft === "change" || ft === "extension" || ft === "permanent";
     // 出生地は認定・変更のみ（更新様式では項目5=配偶者の有無）
     if (key === "placeOfBirth") return ft === "coe" || ft === "change";
+    // 申請人等作成用 ３Ｖ（項目22〜27）は更新申請では不要
+    if (/^(depositContractExists|overseasExpenses|homeCountryProcedureComplied|regularExpensesUnderstood|technologyTransferEffortV|ssfSpecificFieldCriteriaMet)/.test(key)) {
+      return ft !== "extension";
+    }
     // 受領方法等（オンライン申請システム転記用）は認定申請のみ
     if (/^(coeReceiptMethod|notificationEmail|portalPhotoFileName|portalAttachmentFileName)/.test(key)) {
       return ft === "coe";
@@ -927,9 +931,18 @@ function buildWorkHistoryFields(f: Partial<ApplicationFormData>): RasensField[] 
   return list.flatMap((w, idx) => {
     const prefix = `職歴${idx + 1}`;
     const fields: RasensField[] = [];
-    if (w.joinDate)  fields.push({ key: "workHistory", label: `${prefix}　入社年月`,   value: formatDate(w.joinDate),  note: "YYYYMMDD" });
-    if (w.leaveDate) fields.push({ key: "workHistory", label: `${prefix}　退社年月`,   value: formatDate(w.leaveDate), note: "YYYYMMDD" });
-    if (w.employer)  fields.push({ key: "workHistory", label: `${prefix}　勤務先名称`, value: w.employer });
+    const dateNote = (v: string) => (formatDate(v).length <= 6 ? "YYYYMM" : "YYYYMMDD");
+    if (w.joinDate)  fields.push({ key: "workHistory", label: `${prefix}　入社年月`,   value: formatDate(w.joinDate),  note: dateNote(w.joinDate) });
+    if (w.leaveDate) fields.push({ key: "workHistory", label: `${prefix}　退社年月`,   value: formatDate(w.leaveDate), note: dateNote(w.leaveDate) });
+    if (w.country)   fields.push({ key: "workHistory", label: `${prefix}　国・地域`,   value: w.country });
+    const companyName = w.employer || w.employerNameKanji || w.employerNameEn || "";
+    if (companyName) fields.push({ key: "workHistory", label: `${prefix}　会社名（勤務先名称）`, value: companyName });
+    if (w.employerNameEn && w.employerNameEn !== companyName) {
+      fields.push({ key: "workHistory", label: `${prefix}　機関名（英語表記）`, value: w.employerNameEn });
+    }
+    if (w.employerNameKanji && w.employerNameKanji !== companyName) {
+      fields.push({ key: "workHistory", label: `${prefix}　機関名（漢字表記等）`, value: w.employerNameKanji });
+    }
     return fields;
   });
 }

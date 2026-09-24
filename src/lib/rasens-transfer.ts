@@ -11,7 +11,7 @@
  */
 
 import type { ApplicationFormData, FamilyMember, WorkHistoryEntry, Part2Type } from "@/lib/form-types";
-import { VISA_CATEGORY_PART2 } from "@/lib/form-types";
+import { VISA_CATEGORY_PART2, BUSINESS_TYPES } from "@/lib/form-types";
 import { normalizeRomajiName } from "@/lib/utils";
 import { ALL_QUESTIONS, isEmpty } from "@/lib/questionnaire-questions";
 import { STAGE1_RESPONSE_SCHEMA } from "@/lib/shinsei-ai-schemas";
@@ -861,6 +861,56 @@ function cleanupSchemaLabel(desc: string): string {
     .trim();
 }
 
+/** 業種コード（カンマ区切り可）を、番号ではなく業種名（「、」区切り）に変換する。未知のコードはそのまま残す */
+function businessTypeNames(codes: string): string {
+  return codes
+    .split(/[,、]/)
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .map((c) => BUSINESS_TYPES.find((b) => b.code === Number(c))?.label ?? c)
+    .join("、");
+}
+
+const BUSINESS_TYPE_KEYS = new Set(["orgBusinessTypeCode", "orgBusinessTypeOtherCode", "dispatchOrgBusinessTypeCode"]);
+
+/**
+ * 所属機関所在地を「郵便番号（ハイフンなし）／都道府県・市区町村（全角）／番地以降（全角）」の
+ * 3欄に分ける（RASENS入力欄に合わせ、申請人の住居地と同じ規則）。郵便番号が無い場合は郵便番号欄を出さない。
+ */
+function splitOrgAddress(key: string, label: string, raw: string): RasensField[] {
+  const str = raw.trim();
+  let zip = extractZipFromValue(str);
+  let body = stripZipPrefix(str);
+  if (!zip) {
+    const m = str.match(/^〒?\s*(\d{3})-?(\d{4})[\s　|]*(.*)$/);
+    if (m) {
+      zip = `${m[1]}${m[2]}`;
+      body = m[3];
+    }
+  }
+  const digitAt = body.search(/[0-9０-９]/);
+  const prefCity = toFullWidthAddress(digitAt > 0 ? body.slice(0, digitAt) : body).trim();
+  // 番地の区切りは全角ハイフン「－」にする（toFullWidthAddress の「ー」はカタカナ名と区別できないため先に置換）
+  const line = digitAt > 0 ? toFullWidthAddress(body.slice(digitAt).replace(/-/g, "－")).trim() : "";
+  const out: RasensField[] = [];
+  if (zip) out.push({ key, label: `${label}（郵便番号）`, value: zip, note: "ハイフンなし" });
+  if (prefCity) out.push({ key, label: `${label}（都道府県・市区町村）`, value: prefCity });
+  if (line) out.push({ key, label: `${label}（番地以降）`, value: line });
+  return out;
+}
+
+/** 転記シート用の特別整形（業種は名称、所属機関所在地は3欄分割）。該当しなければ null */
+function specialFields(key: string, label: string, raw: unknown): RasensField[] | null {
+  const str = String(raw).trim();
+  if (BUSINESS_TYPE_KEYS.has(key)) {
+    const value = businessTypeNames(str);
+    const shown = label.replace("業種コード（その他の場合の詳細コード）", "業種（その他）").replace("業種コード", "業種");
+    return value ? [{ key, label: shown, value }] : [];
+  }
+  if (key === "orgAddress") return splitOrgAddress(key, label, str);
+  return null;
+}
+
 /** 値をRASENSフォーマット規則（日付YYYYMMDD・電話/郵便番号ハイフンなし）で整形 */
 function formatGenericValue(key: string, raw: unknown): { value: string; note?: string } {
   const str = String(raw).trim();
@@ -904,6 +954,12 @@ function buildRemainingFormFields(f: Partial<ApplicationFormData>): RasensField[
     if (q.condition && !q.condition(f)) continue;
     const raw = (f as Record<string, unknown>)[key];
     if (isEmpty(raw) || typeof raw === "object") continue;
+    const special = specialFields(key, q.label, raw);
+    if (special) {
+      out.push(...special);
+      handled.add(key);
+      continue;
+    }
     const { value, note } = formatGenericValue(key, raw);
     if (value.trim()) out.push({ key, label: q.label, value, note });
     handled.add(key);
@@ -917,6 +973,12 @@ function buildRemainingFormFields(f: Partial<ApplicationFormData>): RasensField[
     const raw = (f as Record<string, unknown>)[key];
     if (isEmpty(raw) || typeof raw === "object") continue;
     const label = EXTRA_KEY_LABELS[key] ?? cleanupSchemaLabel(schema?.description || key);
+    const special = specialFields(key, label, raw);
+    if (special) {
+      out.push(...special);
+      handled.add(key);
+      continue;
+    }
     const { value, note } = formatGenericValue(key, raw);
     if (value.trim()) out.push({ key, label, value, note });
     handled.add(key);
@@ -939,6 +1001,11 @@ function buildRemainingFormFields(f: Partial<ApplicationFormData>): RasensField[
     }
     if (!rendered.trim()) continue;
     const label = EXTRA_KEY_LABELS[key] ?? key;
+    const special = specialFields(key, label, rendered);
+    if (special) {
+      out.push(...special);
+      continue;
+    }
     const { value, note } = formatGenericValue(key, rendered);
     if (value.trim()) out.push({ key, label, value, note });
   }

@@ -11,7 +11,7 @@
  */
 
 import type { ApplicationFormData, FamilyMember, WorkHistoryEntry, Part2Type } from "@/lib/form-types";
-import { VISA_CATEGORY_PART2, BUSINESS_TYPES } from "@/lib/form-types";
+import { VISA_CATEGORY_PART2, BUSINESS_TYPES, OCCUPATION_TYPES } from "@/lib/form-types";
 import { normalizeRomajiName } from "@/lib/utils";
 import { ALL_QUESTIONS, isEmpty } from "@/lib/questionnaire-questions";
 import { STAGE1_RESPONSE_SCHEMA } from "@/lib/shinsei-ai-schemas";
@@ -25,6 +25,8 @@ export interface RasensField {
   note?: string;
   /** セクション名（指定時はbuildTransferSectionsでこの名前のセクションに分類される） */
   section?: string;
+  /** true のとき、オンライン申請書に項目番号が無い項目として、ラベル先頭に番号を付けない */
+  noNo?: boolean;
   /**
    * このフィールドの由来となるフォームキー。申請書作成画面（shinsei-form-editor）と
    * 同じ並び順で転記シートを組み立てるためのソート・セクション判定に使う。
@@ -110,6 +112,11 @@ function formatStandardAddress(value: string | null | undefined): string {
   return value;
 }
 
+/** 在留期間更新許可申請・区分N（技術・人文知識・国際業務等）か。オンライン申請書の項目番号・並びをこの様式に合わせる。 */
+function isNExtension(f: Partial<ApplicationFormData>): boolean {
+  return f.applicationFormType === "extension" && formPart2Of(f) === "N";
+}
+
 /**
  * 申請書のPart2種別（N/T/R/P/V/none）を判定する。
  * visaFormCategory未設定の古いデータは null（＝カテゴリでの絞り込みをしない）を返す。
@@ -151,8 +158,9 @@ function isKeyOnForm(key: string, f: Partial<ApplicationFormData>): boolean {
       return ft !== "extension";
     }
     // 受領方法等（オンライン申請システム転記用）は認定申請のみ
+    // （更新・区分N は在留カードの受領方法・通知用メール・添付ファイル名も入力するため対象）
     if (/^(coeReceiptMethod|notificationEmail|portalPhotoFileName|portalAttachmentFileName)/.test(key)) {
-      return ft === "coe";
+      return ft === "coe" || isNExtension(f);
     }
   }
 
@@ -547,6 +555,90 @@ const FORM_NO_V_ORG: Record<string, string> = {
   orgMissingPerson: "3.23", orgCriminalPunishment: "3.24",
 };
 
+// ── 在留期間更新許可申請（区分N）専用: オンライン申請書「申込詳細」の項目番号・名称・並び ──
+// 実際に提出した申込内容（在留期間更新許可申請（区分N））の印刷物と突き合わせて定めたもの。
+// 項目番号は様式ごとに異なる（例: 更新は「13 希望する在留期間」、変更は 13.1/13.2）ため、
+// 検証済みの更新・区分N のときだけ適用する（他の様式には影響しない）。
+const N_EXT_LABELS: Record<string, string> = {
+  desiredPeriodOfStay: "13　希望する在留期間",
+  // 申請人に関する情報等（区分N）
+  educationCountry: "18.1　最終学歴(1)　学校所在国・地域",
+  educationDegree: "18.2　最終学歴(2)　学位・区分",
+  educationSchoolName: "18.4　最終学歴(3)　学校名",
+  educationGraduationDate: "18.5　最終学歴(4)　卒業年月日",
+  majorCategory: "19.1　専攻・専門分野",
+  itQualificationExists: "20.1　情報処理技術者資格又は試験合格の有無",
+  // 代理人（法定代理人による申請の場合に記入）
+  representativeName: "22.1　代理人 (1)氏名",
+  representativeRelationship: "22.2　代理人 (2)本人との関係",
+  representativeAddress: "22.4　代理人 (3)住所",
+  representativePhone: "22.5　代理人 (3)電話番号",
+  representativeCellular: "22.6　代理人 (3)携帯電話番号",
+  // 所属機関に関する情報等
+  contractType: "2　契約の形態",
+  orgName: "3.1　所属機関等契約先 (1)名称",
+  orgCorporateNumber: "3.2　所属機関等契約先 (2)法人番号",
+  orgBranchName: "3.3　所属機関等契約先 (3)支店・事業所名",
+  orgEmploymentInsuranceNo: "3.4　所属機関等契約先 (4)雇用保険適用事業所番号",
+  orgPhone: "3.11　所属機関等契約先 (6)電話番号",
+  orgCapital: "3.12　所属機関等契約先 (7)資本金",
+  orgAnnualSales: "3.13　所属機関等契約先 (8)年間売上高(直近年度)",
+  orgEmployeeCount: "3.14　所属機関等契約先 (9)従業員数",
+  orgForeignEmployeeCount: "3.15　所属機関等契約先 (9)うち外国人職員数",
+  orgTechInternCount: "3.16　所属機関等契約先 (9)(このうち技能実習生)",
+  workPeriodFixed: "4.1　就労予定期間",
+  employmentStartDate: "5　雇用開始(入社)年月日",
+  salary: "6　月額給与・月額報酬(税引き前の支払額)",
+  businessExperienceYears: "7　実務経験月数",
+  positionExists: "8.1　職務上の地位(役職名)　有無",
+  position: "8.2　職務上の地位(役職名)",
+  activityDetails: "10　活動内容詳細",
+  // 受領方法等・入力情報確認
+  coeReceiptMethod: "在留カードの受領方法",
+  notificationEmail: "通知送信用メールアドレス",
+  notificationEmailConfirm: "通知送信用メールアドレス再入力",
+  portalPhotoFileName: "顔写真",
+  portalAttachmentFileName: "資料添付",
+};
+
+/** 所属機関の後ろ（受領方法等 → 入力情報確認）に置く項目の並び順 */
+const N_EXT_TAIL_RANK: Record<string, number> = {
+  coeReceiptMethod: UNKNOWN_ORDER - 0.5, notificationEmail: UNKNOWN_ORDER - 0.5, notificationEmailConfirm: UNKNOWN_ORDER - 0.5,
+  __confirm1: UNKNOWN_ORDER - 0.4, __confirm2: UNKNOWN_ORDER - 0.4,
+  portalPhotoFileName: UNKNOWN_ORDER - 0.3, portalAttachmentFileName: UNKNOWN_ORDER - 0.3,
+};
+const N_EXT_TAIL_SECTION: Record<string, string> = {
+  __confirm1: "入力情報確認", __confirm2: "入力情報確認",
+  portalPhotoFileName: "入力情報確認", portalAttachmentFileName: "入力情報確認",
+};
+
+/** 更新・区分N の「希望する在留期間」は、オンライン申請書の選択肢表記（例: 技術・人文・国際（５年））で示す */
+function nExtensionDesiredPeriod(f: Partial<ApplicationFormData>): string {
+  const raw = (f.desiredPeriodOfStay || "").trim();
+  if (!raw) return "";
+  const isGijinkoku = /技術・人文知識・国際業務/.test(f.currentStatusOfResidence || f.desiredStatusOfResidence || "");
+  const m = raw.match(/^(\d+)\s*(年|月|か月|ヶ月|ヵ月)/);
+  if (!isGijinkoku || !m) return raw;
+  const n = toFullWidthDigits(m[1]);
+  return `技術・人文・国際（${n}${m[2] === "年" ? "年" : "月"}）`;
+}
+
+/** 更新・区分N 専用の補助項目（法人番号の有無・支店の該当なし・入力情報確認の固定項目） */
+function nExtensionExtras(f: Partial<ApplicationFormData>): RasensField[] {
+  const out: RasensField[] = [];
+  if (f.orgName || f.orgCorporateNumber) {
+    out.push({ key: "orgCorporateNumber", label: "3.2　所属機関等契約先 (2)法人番号の有無", value: f.orgCorporateNumber ? "有" : "無" });
+  }
+  if (f.orgName && !f.orgBranchName) {
+    out.push({ key: "orgBranchName", label: "3.3　所属機関等契約先 (3)支店・事業所名", value: "該当なし" });
+  }
+  out.push(
+    { key: "__confirm1", label: "申請に先立ち、申請者本人に申請の意思を確認してください。", value: "確認しました（チェックを入れる）", section: "入力情報確認" },
+    { key: "__confirm2", label: "申請内容の確認", value: "申請内容が事実に相違ないことを確認しました（チェックを入れる）", section: "入力情報確認" },
+  );
+  return out;
+}
+
 /** キーに対応するオンライン申請書の項目番号を返す（V型は所属機関番号も適用）。 */
 function formNoFor(key: string | undefined, useV: boolean): string | undefined {
   if (!key) return undefined;
@@ -571,6 +663,7 @@ export function buildRasensFields(
   }
 ): RasensField[] {
   const f = form;
+  const nx = isNExtension(f);
 
   const nationality   = f.nationality   || applicant?.nationality   || "";
   const familyNameEn  = normalizeRomajiName(f.familyNameEn  || applicant?.familyNameEn  || "");
@@ -630,18 +723,20 @@ export function buildRasensFields(
     { key: "telephoneNo",  label: "電話番号",          value: formatPhone(phone),     note: "ハイフンなし" },
     ...(cellPhone ? [{ key: "cellularPhoneNo", label: "携帯電話番号", value: formatPhone(cellPhone), note: "ハイフンなし" }] : []),
     { key: "emailAddress", label: "メールアドレス",    value: email },
+    ...(nx && email ? [{ key: "emailAddress", label: "メールアドレス再入力", value: email }] : []),
 
     // ── 旅券・在留情報 ───────────────────────────────────────────────
     { key: "passportNumber",           label: "旅券番号",          value: passportNum },
     { key: "passportExpiry",           label: "旅券有効期限",      value: formatDate(f.passportExpiry || ""), note: "YYYYMMDD" },
-    { key: "currentStatusOfResidence", label: "現在の在留資格",    value: f.currentStatusOfResidence || "" },
+    { key: "currentStatusOfResidence", label: "現に有する在留資格", value: f.currentStatusOfResidence || "" },
     { key: "currentPeriodOfStay",      label: "在留期間",          value: f.currentPeriodOfStay || "" },
     { key: "currentPeriodExpiry",      label: "在留期間の満了日",  value: formatDate(f.currentPeriodExpiry || ""), note: "YYYYMMDD" },
+    ...(nx ? [{ key: "currentPeriodExpiry", label: "在留カードの有無", value: residenceCard ? "有" : "無", noNo: true }] : []),
     { key: "residenceCardNumber",      label: "在留カード番号",    value: residenceCard },
 
     // ── 申請内容 ─────────────────────────────────────────────────────
     { key: "desiredStatusOfResidence", label: "希望する在留資格",  value: f.desiredStatusOfResidence || "" },
-    { key: "desiredPeriodOfStay",      label: "希望する在留期間",  value: f.desiredPeriodOfStay || "" },
+    { key: "desiredPeriodOfStay",      label: "希望する在留期間",  value: nx ? nExtensionDesiredPeriod(f) : (f.desiredPeriodOfStay || ""), note: nx ? "選択肢の表記" : undefined },
     ...(f.reasonForApplication
       ? [{
           key: "reasonForApplication",
@@ -651,7 +746,7 @@ export function buildRasensFields(
           value: f.reasonForApplication,
         }]
       : []),
-    { key: "criminalRecord",     label: "犯罪記録の有無",    value: f.criminalRecord || "無" },
+    { key: "criminalRecord",     label: "犯罪を理由とする処分を受けたことの有無", value: f.criminalRecord || "無" },
     { key: "deportationHistory", label: "退去強制歴の有無",  value: f.deportationHistory || "無" },
 
     // ── 在日親族及び同居者 ────────────────────────────────────────────
@@ -695,18 +790,21 @@ export function buildRasensFields(
     // ── 職歴 ─────────────────────────────────────────────────────────
     ...buildWorkHistoryFields(f),
 
+    // ── 更新・区分N: 法人番号の有無・支店該当なし・入力情報確認 ────────────
+    ...(nx ? nExtensionExtras(f) : []),
+
     // ── 上記以外の申請書記載項目（全項目網羅） ─────────────────────────
     ...buildRemainingFormFields(f),
 
-    // ── 取次者情報（固定） ────────────────────────────────────────────
+    // ── 取次者情報（固定。オンライン申請書の並び: 氏名→郵便番号→住所→所属機関等→電話番号） ──
     { key: "__agent1", label: "取次者　氏名",      value: "山口忠士" },
-    { key: "__agent2", label: "取次者　電話番号",  value: "09025960128", note: "ハイフンなし" },
-    { key: "__agent3", label: "取次者　所属機関等", value: "兵庫県行政書士会" },
-    { key: "__agent4", label: "取次者　郵便番号",  value: "6650864", note: "ハイフンなし" },
-    { key: "__agent5", label: "取次者　住所（都道府県・市区町村）",
+    { key: "__agent2", label: "取次者　郵便番号",  value: "6650864", note: "ハイフンなし" },
+    { key: "__agent3", label: "取次者　住所（都道府県・市区町村）",
       value: "兵庫県宝塚市" },
-    { key: "__agent6", label: "取次者　住所（番地以降）",
+    { key: "__agent4", label: "取次者　住所（番地以降）",
       value: "泉町２２ー２５　島上マンション南棟１ーＢ" },
+    { key: "__agent5", label: "取次者　所属機関等", value: "兵庫県行政書士会" },
+    { key: "__agent6", label: "取次者　電話番号",  value: "09025960128", note: "ハイフンなし" },
   ];
 
   // 空値を除き、申請種別・在留資格カテゴリの様式に存在する項目のみに絞り込む。
@@ -715,15 +813,30 @@ export function buildRasensFields(
   // JSのsortは安定ソートのため、同一orderのフィールドは元の出現順を保つ。
   // 特定技能（V型）は所属機関領域の並び順が申請書と異なる（雇用契約→機関基本情報）ため専用順を使う
   const useV = formPart2Of(f) === "V";
+  // 更新・区分N はオンライン申請書の並び（…代理人→取次者→所属機関→受領方法等→入力情報確認）に合わせる
+  const rankOf = (x: RasensField): number => {
+    if (nx) {
+      if (x.key?.startsWith("__agent")) return orderOf("contractType") - 0.5;
+      if (x.key && N_EXT_TAIL_RANK[x.key] !== undefined) return N_EXT_TAIL_RANK[x.key];
+    }
+    return orderOf(x.key, useV);
+  };
   return fields
     .filter((x) => x.value.trim() !== "")
     .filter((x) => !x.key || x.key.startsWith("__agent") || isKeyOnForm(x.key, f))
     .map((x, i) => ({ x, i }))
-    .sort((a, b) => (orderOf(a.x.key, useV) - orderOf(b.x.key, useV)) || (a.i - b.i))
+    .sort((a, b) => (rankOf(a.x) - rankOf(b.x)) || (a.i - b.i))
     .map(({ x }) => {
+      let out = x;
+      if (nx) {
+        const mapped = N_EXT_LABELS[x.key ?? ""];
+        if (mapped && !/^\d/.test(x.label)) out = { ...out, label: mapped };
+        const tail = x.key ? N_EXT_TAIL_SECTION[x.key] : undefined;
+        if (tail) out = { ...out, section: tail };
+      }
       // ラベル先頭にオンライン申請書の項目番号を付す（既に番号がある場合は付けない）
-      const no = formNoFor(x.key, useV);
-      return no && !/^\d/.test(x.label) ? { ...x, label: `${no}　${x.label}` } : x;
+      const no = out.noNo ? undefined : formNoFor(out.key, useV);
+      return no && !/^\d/.test(out.label) ? { ...out, label: `${no}　${out.label}` } : out;
     });
 }
 
@@ -881,7 +994,7 @@ const BUSINESS_TYPE_KEYS = new Set(["orgBusinessTypeCode", "orgBusinessTypeOther
  * 所属機関所在地を「郵便番号（ハイフンなし）／都道府県・市区町村（全角）／番地以降（全角）」の
  * 3欄に分ける（RASENS入力欄に合わせ、申請人の住居地と同じ規則）。郵便番号が無い場合は郵便番号欄を出さない。
  */
-function splitOrgAddress(key: string, label: string, raw: string): RasensField[] {
+function splitOrgAddress(key: string, label: string, raw: string, zipLabel?: string): RasensField[] {
   const str = raw.trim();
   let zip = extractZipFromValue(str);
   let body = stripZipPrefix(str);
@@ -897,15 +1010,69 @@ function splitOrgAddress(key: string, label: string, raw: string): RasensField[]
   // 番地の区切りは全角ハイフン「－」にする（toFullWidthAddress の「ー」はカタカナ名と区別できないため先に置換）
   const line = digitAt > 0 ? toFullWidthAddress(body.slice(digitAt).replace(/-/g, "－")).trim() : "";
   const out: RasensField[] = [];
-  if (zip) out.push({ key, label: `${label}（郵便番号）`, value: zip, note: "ハイフンなし" });
+  if (zip) out.push({ key, label: zipLabel ?? `${label}（郵便番号）`, value: zip, note: "ハイフンなし" });
   if (prefCity) out.push({ key, label: `${label}（都道府県・市区町村）`, value: prefCity });
   if (line) out.push({ key, label: `${label}（番地以降）`, value: line });
   return out;
 }
 
+// オンライン申請書での業種表記が業種一覧（別紙）の表記と異なるもの（申込内容の印刷物で確認できた分）
+const RASENS_BUSINESS_TYPE_NAMES: Record<number, string> = { 16: "各種商品卸売業（総合商社等）" };
+
+function rasensBusinessTypeName(code: string): string {
+  const n = Number(code);
+  return RASENS_BUSINESS_TYPE_NAMES[n] ?? BUSINESS_TYPES.find((b) => b.code === n)?.label ?? code;
+}
+function rasensOccupationName(code: string): string {
+  return OCCUPATION_TYPES.find((o) => o.code === Number(code))?.label ?? code;
+}
+const splitCodes = (s: string) => s.split(/[,、]/).map((c) => c.trim()).filter(Boolean);
+
+/** 更新・区分N の所属機関・就労条件まわりの項目（単位・名称・有無をオンライン申請書の入力に合わせる）。該当しなければ null */
+function nExtensionOrgFields(key: string, raw: string): RasensField[] | null {
+  const one = (label: string, value: string, note?: string): RasensField[] => (value ? [{ key, label, value, note }] : []);
+  switch (key) {
+    case "orgBusinessTypeCode":
+      return one("3.5　所属機関等契約先 (5)業種 主たる業種", rasensBusinessTypeName(raw));
+    case "orgBusinessTypeOtherCode":
+      return splitCodes(raw).map((c, i) => ({
+        key,
+        label: `${i === 0 ? "3.7" : "3.8"}　所属機関等契約先 (5)他業種${String(i + 1).padStart(2, "0")}`,
+        value: rasensBusinessTypeName(c),
+      }));
+    case "occupationCode":
+      return one("9.1　職種 主たる職種", rasensOccupationName(raw));
+    case "occupationCodeOthers":
+      return splitCodes(raw).map((c, i) => ({
+        key,
+        label: `9.2　職種　他職種${String(i + 1).padStart(2, "0")}`,
+        value: rasensOccupationName(c),
+      }));
+    case "orgEmploymentInsuranceNo":
+      return one("3.4　所属機関等契約先 (4)雇用保険適用事業所番号", raw.replace(/[-ー－\s]/g, ""), "ハイフンなし");
+    case "businessExperienceYears": {
+      // 申請書（紙）は「年」、オンライン申請は「月数」で入力する
+      const years = Number(raw.replace(/[^\d.]/g, ""));
+      if (!raw || Number.isNaN(years)) return one("7　実務経験月数", raw);
+      return one("7　実務経験月数", String(Math.round(years * 12)), `申請書の${raw}年を月数に換算（年×12）`);
+    }
+    case "positionExists":
+      return one("8.1　職務上の地位(役職名)　有無", /^(あり|有)/.test(raw) ? "有" : /^(なし|無)/.test(raw) ? "無" : raw);
+    default:
+      return null;
+  }
+}
+
 /** 転記シート用の特別整形（業種は名称、所属機関所在地は3欄分割）。該当しなければ null */
-function specialFields(key: string, label: string, raw: unknown): RasensField[] | null {
+function specialFields(key: string, label: string, raw: unknown, f?: Partial<ApplicationFormData>): RasensField[] | null {
   const str = String(raw).trim();
+  if (f && isNExtension(f)) {
+    const nx = nExtensionOrgFields(key, str);
+    if (nx) return nx;
+    if (key === "orgAddress") {
+      return splitOrgAddress(key, "3.10　所属機関等契約先 (6)所在地", str, "3.9　所属機関等契約先 (6)郵便番号");
+    }
+  }
   if (BUSINESS_TYPE_KEYS.has(key)) {
     const value = businessTypeNames(str);
     const shown = label.replace("業種コード（その他の場合の詳細コード）", "業種（その他）").replace("業種コード", "業種");
@@ -925,9 +1092,45 @@ function formatGenericValue(key: string, raw: unknown): { value: string; note?: 
   return { value: str };
 }
 
+/**
+ * 更新・区分N の職歴（オンライン申請書 21.1〜21.6）。年のみの場合は「月不詳」を立てて年だけを入力する。
+ * 勤務先名称は英字表記(21.5)と漢字表記(21.6)に分ける（どちらか一方のみの場合は該当欄だけ）。
+ */
+function buildNExtensionWorkHistoryFields(list: WorkHistoryEntry[]): RasensField[] {
+  const rows = list.filter((w) => w && (w.joinDate || w.leaveDate || w.employer || w.country || w.employerNameEn || w.employerNameKanji));
+  const fields: RasensField[] = [{ key: "workHistory", label: "職歴の有無", value: rows.length > 0 ? "有" : "無", noNo: true }];
+  rows.forEach((w, idx) => {
+    const nn = String(idx + 1).padStart(2, "0");
+    const push = (label: string, value: string, note?: string) => {
+      if (value) fields.push({ key: "workHistory", label, value, note, noNo: true });
+    };
+    const ym = (v: string): { value: string; unknownMonth: boolean } => {
+      const d = formatDate(v || "");
+      return { value: d, unknownMonth: /^\d{4}$/.test(d) };
+    };
+    const join = ym(w.joinDate);
+    const leave = ym(w.leaveDate);
+    push(`国・地域名${nn}`, w.country);
+    if (join.unknownMonth) push(`21.1　職歴　入社月不詳${nn}`, "月不詳（チェックを入れる）");
+    push(`21.2　職歴　入社年月${nn}`, join.value, join.unknownMonth ? "年のみ" : "YYYYMM");
+    if (leave.unknownMonth) push(`21.3　職歴　退社月不詳${nn}`, "月不詳（チェックを入れる）");
+    push(`21.4　職歴　退社年月${nn}`, leave.value, leave.unknownMonth ? "年のみ" : "YYYYMM");
+    let en = w.employerNameEnExists === "無" ? "" : (w.employerNameEn || "");
+    let kanji = w.employerNameKanjiExists === "無" ? "" : (w.employerNameKanji || "");
+    if (!en && !kanji && w.employer) {
+      if (/[぀-ヿ㐀-鿿]/.test(w.employer)) kanji = w.employer;
+      else en = w.employer;
+    }
+    push(`21.5　職歴　勤務先名称(英字表記)${nn}`, en);
+    push(`21.6　職歴　勤務先名称(漢字表記)${nn}`, kanji);
+  });
+  return fields;
+}
+
 /** 職歴フィールドを生成 */
 function buildWorkHistoryFields(f: Partial<ApplicationFormData>): RasensField[] {
   const list = (f.workHistory ?? []) as WorkHistoryEntry[];
+  if (isNExtension(f)) return buildNExtensionWorkHistoryFields(list);
   return list.flatMap((w, idx) => {
     const prefix = `職歴${idx + 1}`;
     const fields: RasensField[] = [];
@@ -967,7 +1170,7 @@ function buildRemainingFormFields(f: Partial<ApplicationFormData>): RasensField[
     if (q.condition && !q.condition(f)) continue;
     const raw = (f as Record<string, unknown>)[key];
     if (isEmpty(raw) || typeof raw === "object") continue;
-    const special = specialFields(key, q.label, raw);
+    const special = specialFields(key, q.label, raw, f);
     if (special) {
       out.push(...special);
       handled.add(key);
@@ -986,7 +1189,7 @@ function buildRemainingFormFields(f: Partial<ApplicationFormData>): RasensField[
     const raw = (f as Record<string, unknown>)[key];
     if (isEmpty(raw) || typeof raw === "object") continue;
     const label = EXTRA_KEY_LABELS[key] ?? cleanupSchemaLabel(schema?.description || key);
-    const special = specialFields(key, label, raw);
+    const special = specialFields(key, label, raw, f);
     if (special) {
       out.push(...special);
       handled.add(key);
@@ -1014,7 +1217,7 @@ function buildRemainingFormFields(f: Partial<ApplicationFormData>): RasensField[
     }
     if (!rendered.trim()) continue;
     const label = EXTRA_KEY_LABELS[key] ?? key;
-    const special = specialFields(key, label, rendered);
+    const special = specialFields(key, label, rendered, f);
     if (special) {
       out.push(...special);
       continue;
@@ -1031,15 +1234,34 @@ function buildFamilyInJapanFields(f: Partial<ApplicationFormData>): RasensField[
   const fields: RasensField[] = [];
 
   // 在日親族の有無
+  const nx = isNExtension(f);
   fields.push({
     key: "familyInJapanExists",
-    label: "在日親族及び同居者の有無",
+    label: nx ? "16.1　在日親族及び同居者　有無" : "在日親族及び同居者の有無",
     value: f.familyInJapanExists || "無",
   });
 
   // 親族情報を展開（申請書PDFと同じく「無」の場合は残存データがあっても出さない）
   const family = f.familyInJapanExists === "無" ? [] : (f.familyInJapan || []);
   if (family.length === 0) return fields;
+
+  if (nx) {
+    // オンライン申請書の並び・名称（16.2〜16.8。親族ごとに 01, 02… を付す）
+    family.forEach((member: FamilyMember, idx: number) => {
+      const nn = String(idx + 1).padStart(2, "0");
+      const add = (no: string, name: string, value: string, note?: string) => {
+        if (value) fields.push({ key: "familyInJapanExists", label: `${no}　在日親族及び同居者　${name}${nn}`, value, note });
+      };
+      add("16.2", "続柄", member.relationship);
+      add("16.3", "氏名", member.name);
+      add("16.4", "生年月日", member.dateOfBirth ? formatDate(member.dateOfBirth) : "", "YYYYMMDD");
+      add("16.5", "国籍・地域", member.nationality);
+      add("16.6", "同居の有無", member.residingTogether ? "有" : "無");
+      add("16.7", "勤務先名称・通学先名称", member.placeOfEmployment);
+      add("16.8", "在留カード番号　特別永住者証明書番号", member.residenceCardNumber);
+    });
+    return fields;
+  }
 
   family.forEach((member: FamilyMember, idx: number) => {
     const num = idx + 1;

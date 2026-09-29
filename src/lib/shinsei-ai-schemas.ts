@@ -419,7 +419,12 @@ export const STAGE2_RESPONSE_SCHEMA = {
         properties: {
           joinDate:  S("入社年月（YYYY-MM）"),
           leaveDate: S("退社年月（YYYY-MM。現職は空文字）"),
-          employer:  S("勤務先名称"),
+          employer:  S("勤務先名称（機関名（漢字表記等）があればそれ、無ければ機関名（英語表記）と同じ値を入れる）"),
+          country:   S("国・地域"),
+          employerNameEnExists:    S("機関名（英語表記）の有無（有 または 無）"),
+          employerNameEn:          S("機関名（英語表記）"),
+          employerNameKanjiExists: S("機関名（漢字表記等）の有無（有 または 無）"),
+          employerNameKanji:       S("機関名（漢字表記等）"),
         },
       },
     },

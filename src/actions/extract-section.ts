@@ -215,7 +215,12 @@ const SECTION_CONFIG: Record<
     {
       "joinDate": "入社年月（YYYY-MM形式）",
       "leaveDate": "退社年月（YYYY-MM形式。現職は空文字）",
-      "employer": "勤務先名称"
+      "employer": "勤務先名称（機関名（漢字表記等）があればそれ、無ければ機関名（英語表記）と同じ値）",
+      "country": "国・地域",
+      "employerNameEnExists": "機関名（英語表記）の有無（有 または 無）",
+      "employerNameEn": "機関名（英語表記）",
+      "employerNameKanjiExists": "機関名（漢字表記等）の有無（有 または 無）",
+      "employerNameKanji": "機関名（漢字表記等）"
     }
   ]
 }`,
@@ -230,7 +235,12 @@ const SECTION_CONFIG: Record<
             properties: {
               joinDate:  S("入社年月（YYYY-MM形式）"),
               leaveDate: S("退社年月（YYYY-MM形式。現職は空文字）"),
-              employer:  S("勤務先名称"),
+              employer:  S("勤務先名称（機関名（漢字表記等）があればそれ、無ければ機関名（英語表記）と同じ値）"),
+              country:   S("国・地域"),
+              employerNameEnExists:    S("機関名（英語表記）の有無（有 または 無）"),
+              employerNameEn:          S("機関名（英語表記）"),
+              employerNameKanjiExists: S("機関名（漢字表記等）の有無（有 または 無）"),
+              employerNameKanji:       S("機関名（漢字表記等）"),
             },
           },
         },

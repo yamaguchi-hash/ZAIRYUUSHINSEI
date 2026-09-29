@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { getApplicationById } from "@/actions/applications";
+import { getApplicants } from "@/actions/applicants";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, FileDown, AlertCircle } from "lucide-react";
@@ -7,7 +8,7 @@ import { QuestionnaireDocxButton } from "@/components/applications/questionnaire
 import { VISA_TYPE_LABELS, APPLICATION_TYPE_LABELS } from "@/lib/utils";
 import { ShinseiFormEditor } from "./shinsei-form-editor";
 import type { ApplicationFormData } from "@/lib/form-types";
-import { EMPTY_FORM_DATA } from "@/lib/form-types";
+import { buildEffectiveFormData } from "@/lib/effective-form-data";
 
 export default async function ShinseiFormPage({
   params,
@@ -23,79 +24,21 @@ export default async function ShinseiFormPage({
 
   const { application, applicant, organization } = data;
 
-  // 既存のformDataがあれば使い、なければ空フォームをベースに自動埋め
-  const savedForm = (application.formData ?? null) as Partial<ApplicationFormData> | null;
-
-  // applicationType（DBの値）→ ApplicationFormType（form-types.tsの値）マッピング
-  const toFormType = (t: string): import("@/lib/form-types").ApplicationFormType => {
-    if (t === "coe" || t === "certification") return "coe";
-    if (t === "change") return "change";
-    if (t === "extension" || t === "renewal") return "extension";
-    if (t === "permanent" || t === "permanent_residence") return "permanent";
-    return "extension";
-  };
-
-  // マスターデータからの初期値（savedForm がない場合に使用）
-  const masterData: Partial<ApplicationFormData> = {
-    applicationFormType:        toFormType(application.applicationType),
-    nationality:                applicant.nationality ?? '',
-    dateOfBirth:                applicant.dateOfBirth ?? '',
-    familyNameEn:               applicant.familyNameEn ?? '',
-    givenNameEn:                applicant.givenNameEn ?? '',
-    familyNameJa:               applicant.familyNameJa ?? '',
-    givenNameJa:                applicant.givenNameJa ?? '',
-    sex:                        applicant.gender === 'M' ? '男' : applicant.gender === 'F' ? '女' : '',
-    postalCodeInJapan:          (applicant as any).postalCode ?? '',
-    prefectureInJapan:          (applicant as any).japanPrefecture ?? '',
-    cityInJapan:                (applicant as any).japanCity ?? '',
-    addressLineInJapan:         (applicant as any).japanAddressLine ?? (
-      !(applicant as any).japanPrefecture ? (applicant.japanAddress ?? '') : ''
-    ),
-    addressInJapan:             applicant.japanAddress ?? '',
-    telephoneNo:                applicant.phone ?? '',
-    cellularPhoneNo:            (applicant as any).mobilePhone ?? '',
-    passportNumber:             applicant.passportNumber ?? '',
-    passportExpiry:             applicant.passportExpiry ?? '',
-    currentStatusOfResidence:   VISA_TYPE_LABELS[applicant.currentVisaType ?? ''] ?? applicant.currentVisaType ?? '',
-    currentPeriodExpiry:        applicant.currentVisaExpiry ?? '',
-    residenceCardNumber:        applicant.residenceCardNumber ?? '',
-    desiredStatusOfResidence:   VISA_TYPE_LABELS[application.visaType] ?? application.visaType ?? '',
-    employerName:               organization?.nameJa ?? '',
-    employerAddress:            [organization?.prefecture, organization?.city, organization?.addressLine].filter(Boolean).join(''),
-    employerPhone:              organization?.phone ?? '',
-    orgName:                    organization?.nameJa ?? '',
-    orgCorporateNumber:         organization?.corporateNumber ?? '',
-    orgAddress:                 [organization?.prefecture, organization?.city, organization?.addressLine].filter(Boolean).join(''),
-    orgPhone:                   organization?.phone ?? '',
-    orgCapital:                 organization?.capital ? String(organization.capital) : '',
-    orgEmployeeCount:           organization?.employeeCount ? String(organization.employeeCount) : '',
-  };
-
-  // 8. 日本における連絡先（申請人マスターから常に取得）
-  const masterContactFields = {
-    postalCodeInJapan:  (applicant as any).postalCode      ?? '',
-    prefectureInJapan:  (applicant as any).japanPrefecture ?? '',
-    cityInJapan:        (applicant as any).japanCity        ?? '',
-    addressLineInJapan: (applicant as any).japanAddressLine ?? (
-      !(applicant as any).japanPrefecture ? (applicant.japanAddress ?? '') : ''
-    ),
-    addressInJapan:  applicant.japanAddress ?? '',
-    telephoneNo:     applicant.phone        ?? '',
-    cellularPhoneNo: (applicant as any).mobilePhone ?? '',
-  };
-
-  // 在留資格の英語キー → 日本語ラベル変換
-  const toJaVisaType = (v: string | null | undefined): string => {
-    if (!v) return '';
-    return VISA_TYPE_LABELS[v] ?? v;  // キーが一致すれば日本語、なければ値をそのまま
-  };
-
-  // 現在の在留資格・在留期限・在留カード番号（申請人マスターから常に取得）
-  const masterStatusFields = {
-    currentStatusOfResidence: toJaVisaType(applicant.currentVisaType),
-    currentPeriodExpiry:      applicant.currentVisaExpiry  ?? '',
-    residenceCardNumber:      applicant.residenceCardNumber ?? '',
-  };
+  // 扶養者選択ドロップダウン用の申請人一覧（この申請の申請人本人は除外）
+  const allApplicants = await getApplicants();
+  const supporterCandidates = allApplicants
+    .filter((a) => a.id !== application.applicantId)
+    .map((a) => ({
+      id: a.id,
+      familyNameEn: a.familyNameEn,
+      givenNameEn: a.givenNameEn,
+      nationality: a.nationality,
+      dateOfBirth: a.dateOfBirth,
+      residenceCardNumber: a.residenceCardNumber,
+      currentVisaType: a.currentVisaType,
+      currentVisaExpiry: a.currentVisaExpiry,
+      japanAddress: a.japanAddress,
+    }));
 
   // 取次者情報（固定値）
   const fixedAgentFields = {
@@ -105,15 +48,12 @@ export default async function ShinseiFormPage({
     agentPhone:        '090-2596-0128',
   };
 
-  // EMPTY_FORM_DATA を基底として savedForm（または masterData）を上書きマージしたうえで、
-  // 「8. 日本における連絡先」「現在の在留資格」「取次者」は常にマスター/固定値で上書きする。
+  // 実効値（保存済みformData ＞ マスター由来 ＞ 空フォーム）を構築したうえで、
+  // 取次者は常に固定値で上書きする。
   const initialForm: ApplicationFormData = {
-    ...EMPTY_FORM_DATA,
-    ...(savedForm ?? masterData),
-    ...masterContactFields,   // ← 連絡先は savedForm に関わらずマスターを使用
-    ...masterStatusFields,    // ← 在留資格・期限・カード番号は savedForm に関わらずマスターを使用
-    ...fixedAgentFields,      // ← 取次者は常に固定値
-  } as ApplicationFormData;
+    ...buildEffectiveFormData(application, applicant, organization),
+    ...fixedAgentFields,
+  };
 
   const visaLabel = VISA_TYPE_LABELS[application.visaType] ?? application.visaType;
   const appTypeLabel = APPLICATION_TYPE_LABELS[application.applicationType] ?? application.applicationType;
@@ -121,6 +61,19 @@ export default async function ShinseiFormPage({
   // 理由書PDF表示条件: 家族滞在 かつ（認定 or 変更）
   const showRiyusho = application.visaType === "dependent"
     && (application.applicationType === "certification" || application.applicationType === "change");
+
+  // 資格外活動許可申請書PDF表示条件: 資格外活動の入力があり、必要事項が入力されている場合
+  // isYes()はshinsei-shared.tsxのyes()と同じ判定基準をこのファイル内で再現したもの
+  // （(print)配下と(dashboard)配下をまたぐimportを避けるため、ロジックのみ複製する）
+  const isYes = (v: string | null | undefined) =>
+    !!v && (v === "有" || v.startsWith("有（") || v === "あり" || v.startsWith("あり（"));
+  const isRtypeForm = initialForm.visaFormCategory === 'R';
+  const isPtypeForm = initialForm.visaFormCategory === 'P';
+  // 2つ目のボタンの文言: 家族滞在（R型）の場合のみ「扶養者用」、それ以外は「所属機関用」
+  const secondButtonLabel = isRtypeForm ? "扶養者用PDFダウンロード" : "所属機関用PDFダウンロード";
+  const showGaikatsu =
+    (isYes(initialForm.gaikatsuNeeded) || (isRtypeForm && isYes(initialForm.partTimeWorkExistsR)) || isPtypeForm) &&
+    !!(initialForm.gaikatsuActivityType || initialForm.gaikatsuCurrentActivity || initialForm.gaikatsuEmployerName);
 
   return (
     <div className="p-6 max-w-5xl">
@@ -137,12 +90,20 @@ export default async function ShinseiFormPage({
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <QuestionnaireDocxButton applicationId={id} />
           <Link
-            href={`/print/${id}/shinsei`}
+            href={`/print/${id}/shinsei-applicant`}
             target="_blank"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-300"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
           >
             <FileDown className="w-4 h-4" />
-            申請書PDF出力
+            申請人用PDFダウンロード
+          </Link>
+          <Link
+            href={`/print/${id}/shinsei-org`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            {secondButtonLabel}
           </Link>
           {showRiyusho && (
             <Link
@@ -152,6 +113,16 @@ export default async function ShinseiFormPage({
             >
               <FileDown className="w-4 h-4" />
               理由書PDF
+            </Link>
+          )}
+          {showGaikatsu && (
+            <Link
+              href={`/print/${id}/gaikatsu`}
+              target="_blank"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-300"
+            >
+              <FileDown className="w-4 h-4" />
+              資格外活動許可申請書PDF
             </Link>
           )}
         </div>
@@ -187,6 +158,8 @@ export default async function ShinseiFormPage({
         applicationType={application.applicationType}
         userRole={userRole}
         isCompleted={application.status === "completed"}
+        supporterCandidates={supporterCandidates}
+        initialSupporterId={application.supporterId}
       />
     </div>
   );

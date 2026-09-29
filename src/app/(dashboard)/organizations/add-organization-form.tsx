@@ -5,6 +5,9 @@ import { createOrganization, updateOrganization } from "@/actions/organizations"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Loader2, CheckCircle } from "lucide-react";
 import { AddressSplitInput } from "@/components/ui/postal-code-input";
+import { BusinessTypeMultiSelect } from "@/components/ui/business-type-multi-select";
+import { MoneyInput } from "@/components/ui/money-input";
+import { BUSINESS_TYPES } from "@/lib/form-types";
 
 type OrgForm = {
   nameJa: string;
@@ -15,23 +18,33 @@ type OrgForm = {
   city: string;
   addressLine: string;
   phone: string;
+  fax: string;
   email: string;
   category: string;
   capital: string;
   annualSales: string;
   employeeCount: string;
+  foreignEmployeeCount: string;
+  technicalInternCount: string;
   industry: string;
-  workersAccidentInsuranceNo: string;
+  businessTypeCode: string;
+  /** カンマ区切り文字列（BusinessTypeMultiSelectの値形式）。送信時に配列へ変換する */
+  businessTypeOtherCodes: string;
   employmentInsuranceNo: string;
+  laborInsuranceNo: string;
+  socialInsuranceSymbol: string;
   representativeTitle: string;
   representativeName: string;
 };
 
 const EMPTY_FORM: OrgForm = {
   nameJa: "", nameEn: "", corporateNumber: "", postalCode: "",
-  prefecture: "", city: "", addressLine: "", phone: "", email: "",
-  category: "", capital: "", annualSales: "", employeeCount: "", industry: "",
-  workersAccidentInsuranceNo: "", employmentInsuranceNo: "",
+  prefecture: "", city: "", addressLine: "", phone: "", fax: "", email: "",
+  category: "", capital: "", annualSales: "", employeeCount: "",
+  foreignEmployeeCount: "", technicalInternCount: "", industry: "",
+  businessTypeCode: "", businessTypeOtherCodes: "",
+  employmentInsuranceNo: "", laborInsuranceNo: "",
+  socialInsuranceSymbol: "",
   representativeTitle: "", representativeName: "",
 };
 
@@ -45,14 +58,20 @@ type EditingOrg = {
   city?: string;
   addressLine?: string;
   phone?: string;
+  fax?: string;
   email?: string;
   category?: string;
   capital?: number | null;
   annualSales?: number | null;
   employeeCount?: number | null;
+  foreignEmployeeCount?: number | null;
+  technicalInternCount?: number | null;
   industry?: string;
-  workersAccidentInsuranceNo?: string;
+  businessTypeCode?: string | null;
+  businessTypeOtherCodes?: unknown;
   employmentInsuranceNo?: string;
+  laborInsuranceNo?: string;
+  socialInsuranceSymbol?: string;
   representativeTitle?: string;
   representativeName?: string;
 };
@@ -79,14 +98,22 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
       city: editingOrg.city ?? "",
       addressLine: editingOrg.addressLine ?? "",
       phone: editingOrg.phone ?? "",
+      fax: editingOrg.fax ?? "",
       email: editingOrg.email ?? "",
       category: editingOrg.category ?? "",
       capital: editingOrg.capital != null ? String(editingOrg.capital) : "",
       annualSales: editingOrg.annualSales != null ? String(editingOrg.annualSales) : "",
       employeeCount: editingOrg.employeeCount != null ? String(editingOrg.employeeCount) : "",
+      foreignEmployeeCount: editingOrg.foreignEmployeeCount != null ? String(editingOrg.foreignEmployeeCount) : "",
+      technicalInternCount: editingOrg.technicalInternCount != null ? String(editingOrg.technicalInternCount) : "",
       industry: editingOrg.industry ?? "",
-      workersAccidentInsuranceNo: editingOrg.workersAccidentInsuranceNo ?? "",
+      businessTypeCode: editingOrg.businessTypeCode ?? "",
+      businessTypeOtherCodes: Array.isArray(editingOrg.businessTypeOtherCodes)
+        ? (editingOrg.businessTypeOtherCodes as unknown[]).filter(Boolean).join(", ")
+        : "",
       employmentInsuranceNo: editingOrg.employmentInsuranceNo ?? "",
+      laborInsuranceNo: editingOrg.laborInsuranceNo ?? "",
+      socialInsuranceSymbol: editingOrg.socialInsuranceSymbol ?? "",
       representativeTitle: editingOrg.representativeTitle ?? "",
       representativeName: editingOrg.representativeName ?? "",
     };
@@ -94,6 +121,12 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setSuccess(false);
+    setError("");
+  }
+
+  function handleFieldChange(name: keyof OrgForm, value: string) {
+    setForm((prev) => ({ ...prev, [name]: value }));
     setSuccess(false);
     setError("");
   }
@@ -107,6 +140,11 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
           capital:       form.capital       ? parseFloat(form.capital)       : undefined,
           annualSales:   form.annualSales   ? parseFloat(form.annualSales)   : undefined,
           employeeCount: form.employeeCount ? parseInt(form.employeeCount)   : undefined,
+          foreignEmployeeCount: form.foreignEmployeeCount ? parseInt(form.foreignEmployeeCount) : undefined,
+          technicalInternCount: form.technicalInternCount ? parseInt(form.technicalInternCount) : undefined,
+          businessTypeOtherCodes: form.businessTypeOtherCodes
+            ? form.businessTypeOtherCodes.split(",").map((s) => s.trim()).filter(Boolean)
+            : [],
         };
         if (isEdit && editingOrg) {
           await updateOrganization(editingOrg.id, payload);
@@ -170,6 +208,10 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
               <input name="phone" value={form.phone} onChange={handleChange} placeholder="03-0000-0000" className="input-field" />
             </div>
             <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">FAX番号</label>
+              <input name="fax" value={form.fax} onChange={handleChange} placeholder="03-0000-0001" className="input-field" />
+            </div>
+            <div className="col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">メールアドレス</label>
               <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="info@example.com" className="input-field" />
             </div>
@@ -195,12 +237,16 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
             <p className="text-xs font-semibold text-gray-500 mb-2">保険番号</p>
             <div className="grid grid-cols-1 gap-2">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">労働災害保険番号</label>
-                <input name="workersAccidentInsuranceNo" value={form.workersAccidentInsuranceNo} onChange={handleChange} placeholder="01-123456-789012-000" className="input-field font-mono" />
-              </div>
-              <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">雇用保険事業者番号</label>
                 <input name="employmentInsuranceNo" value={form.employmentInsuranceNo} onChange={handleChange} placeholder="0100-012345-6" className="input-field font-mono" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">労働保険番号（14桁）</label>
+                <input name="laborInsuranceNo" value={form.laborInsuranceNo} onChange={handleChange} placeholder="01-234567-890123-000" className="input-field font-mono" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">健康保険・厚生年金保険事業所整理記号等</label>
+                <input name="socialInsuranceSymbol" value={form.socialInsuranceSymbol} onChange={handleChange} placeholder="例：12-アイウ" className="input-field font-mono" />
               </div>
             </div>
           </div>
@@ -212,11 +258,10 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">資本金（円）</label>
-                <input
+                <MoneyInput
                   name="capital"
-                  type="number"
                   value={form.capital}
-                  onChange={handleChange}
+                  onChange={(v) => handleFieldChange("capital", v)}
                   placeholder="例：10000000"
                   className="input-field"
                 />
@@ -226,19 +271,18 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
                   年間売上金額（円）
                   <span className="ml-1 text-amber-600 font-normal">※ 要更新</span>
                 </label>
-                <input
+                <MoneyInput
                   name="annualSales"
-                  type="number"
                   value={form.annualSales}
-                  onChange={handleChange}
+                  onChange={(v) => handleFieldChange("annualSales", v)}
                   placeholder="例：500000000"
                   className="input-field"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                  常勤職員数（名）
-                  <span className="ml-1 text-amber-600 font-normal">※ 要更新</span>
+                  従業員数（名）
+                  <span className="ml-1 text-gray-400 font-normal">常勤職員数</span>
                 </label>
                 <input
                   name="employeeCount"
@@ -246,6 +290,32 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
                   value={form.employeeCount}
                   onChange={handleChange}
                   placeholder="例：50"
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  うち外国人従業員数（名）
+                </label>
+                <input
+                  name="foreignEmployeeCount"
+                  type="number"
+                  value={form.foreignEmployeeCount}
+                  onChange={handleChange}
+                  placeholder="例：10"
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  うち技能実習生数（名）
+                </label>
+                <input
+                  name="technicalInternCount"
+                  type="number"
+                  value={form.technicalInternCount}
+                  onChange={handleChange}
+                  placeholder="例：5"
                   className="input-field"
                 />
               </div>
@@ -267,8 +337,32 @@ export function AddOrganizationForm({ editingOrg, onSaved }: Props) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">業種</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">業種（自由記載）</label>
                 <input name="industry" value={form.industry} onChange={handleChange} placeholder="IT・情報通信" className="input-field" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── 業種（別紙「業種一覧」番号。申請書作成の業種欄に自動反映されます） ── */}
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-700 mb-1">業種（別紙「業種一覧」番号）</p>
+            <p className="text-xs text-gray-400 mb-2">申請書作成画面の「業種」欄に自動で反映されます。</p>
+            <div className="grid grid-cols-1 gap-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">主たる業種</label>
+                <select name="businessTypeCode" value={form.businessTypeCode} onChange={handleChange} className="input-field">
+                  <option value="">選択してください</option>
+                  {BUSINESS_TYPES.map((b) => (
+                    <option key={b.code} value={String(b.code)}>{b.code}. {b.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">他の業種（複数選択可）</label>
+                <BusinessTypeMultiSelect
+                  value={form.businessTypeOtherCodes}
+                  onChange={(v) => { setForm((prev) => ({ ...prev, businessTypeOtherCodes: v })); setSuccess(false); setError(""); }}
+                />
               </div>
             </div>
           </div>

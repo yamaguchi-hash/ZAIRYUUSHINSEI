@@ -1,26 +1,12 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { applications, applicantMaster, organizationMaster } from "@/lib/db/schema";
-import { eq, count, and, lte, gte, isNotNull, desc } from "drizzle-orm";
+import { eq, count, and, lte, isNotNull, desc } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Users, Building2, AlertTriangle, Bell } from "lucide-react";
+import { FileText, Users, Building2, AlertTriangle } from "lucide-react";
 import { APPLICATION_STATUS_LABELS, STATUS_COLORS, VISA_TYPE_LABELS, formatDate } from "@/lib/utils";
 import Link from "next/link";
-
-function getDaysUntil(dateStr: string | null): number | null {
-  if (!dateStr) return null;
-  const expiry = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function getAlertColor(days: number) {
-  if (days < 0)  return { bg: "bg-gray-100", border: "border-gray-200", text: "text-gray-600", badge: "bg-gray-200 text-gray-700", label: "期限切れ" };
-  if (days <= 30) return { bg: "bg-red-50",   border: "border-red-200",   text: "text-red-700",   badge: "bg-red-500 text-white",        label: `残${days}日` };
-  if (days <= 60) return { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", badge: "bg-orange-400 text-white",   label: `残${days}日` };
-  return           { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", badge: "bg-yellow-400 text-white",  label: `残${days}日` };
-}
+import { ExpiryAlertList, type ExpiryAlertItem } from "./expiry-alert-list";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -40,7 +26,6 @@ export default async function DashboardPage() {
 
   // 90日以内に在留期限が到来する申請人
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
   const in90Days = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   const [appCount, applicantCount, orgCount, recentApps, expiringApplicants] = await Promise.all([
@@ -63,7 +48,7 @@ export default async function DashboardPage() {
     .orderBy(desc(applications.updatedAt))
     .limit(10),
 
-    // 在留期限アラート: 期限切れ〜90日以内
+    // 在留期限アラート: 期限切れ〜90日以内（非表示設定分も取得し、クライアント側で振り分け）
     db.select({
       id: applicantMaster.id,
       familyNameEn: applicantMaster.familyNameEn,
@@ -74,6 +59,7 @@ export default async function DashboardPage() {
       currentVisaType: applicantMaster.currentVisaType,
       currentVisaExpiry: applicantMaster.currentVisaExpiry,
       passportExpiry: applicantMaster.passportExpiry,
+      hideExpiryAlert: applicantMaster.hideExpiryAlert,
     })
     .from(applicantMaster)
     .where(
@@ -85,75 +71,32 @@ export default async function DashboardPage() {
       )
     )
     .orderBy(applicantMaster.currentVisaExpiry)
-    .limit(20),
+    .limit(40),
   ]);
+
+  // RSC シリアライズ安全化（date型は文字列化して渡す）
+  const expiryAlertItems: ExpiryAlertItem[] = expiringApplicants.map((a) => ({
+    id: a.id,
+    familyNameEn: a.familyNameEn ?? null,
+    givenNameEn: a.givenNameEn ?? null,
+    familyNameJa: a.familyNameJa ?? null,
+    givenNameJa: a.givenNameJa ?? null,
+    nationality: a.nationality ?? null,
+    currentVisaType: a.currentVisaType ?? null,
+    currentVisaExpiry: a.currentVisaExpiry ? String(a.currentVisaExpiry) : null,
+    passportExpiry: a.passportExpiry ? String(a.passportExpiry) : null,
+    hideExpiryAlert: a.hideExpiryAlert,
+  }));
 
   return (
     <div className="p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">ダッシュボード</h1>
-        <p className="text-gray-500 text-sm mt-1">在留資格申請書類作成システム</p>
+        <p className="text-gray-500 text-sm mt-1">行政書士業務システム</p>
       </div>
 
-      {/* ── 在留期限アラート ── */}
-      {expiringApplicants.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <Bell className="w-5 h-5 text-red-500" />
-            <h2 className="text-base font-semibold text-gray-900">
-              在留期限アラート
-              <span className="ml-2 text-xs font-normal text-gray-500">（3ヶ月以内に期限が到来）</span>
-            </h2>
-            <span className="ml-auto text-xs bg-red-100 text-red-700 rounded-full px-2 py-0.5 font-medium">
-              {expiringApplicants.length}件
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {expiringApplicants.map((a) => {
-              const days = getDaysUntil(a.currentVisaExpiry);
-              if (days === null) return null;
-              const colors = getAlertColor(days);
-
-              return (
-                <Link
-                  key={a.id}
-                  href={`/applicants/${a.id}`}
-                  className={`flex items-start gap-3 p-4 rounded-xl border ${colors.bg} ${colors.border} hover:shadow-md transition-shadow`}
-                >
-                  {/* Days badge */}
-                  <div className={`flex-shrink-0 rounded-lg px-2 py-1 text-xs font-bold min-w-[52px] text-center ${colors.badge}`}>
-                    {colors.label}
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className={`text-sm font-semibold ${colors.text} truncate`}>
-                      {a.familyNameEn} {a.givenNameEn}
-                      {a.familyNameJa && (
-                        <span className="ml-1 font-normal text-xs opacity-80">
-                          ({a.familyNameJa})
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5 truncate">
-                      {a.nationality}　{a.currentVisaType ? VISA_TYPE_LABELS[a.currentVisaType] ?? a.currentVisaType : "—"}
-                    </p>
-                    <p className={`text-xs font-medium mt-1 ${colors.text}`}>
-                      在留期限: {formatDate(a.currentVisaExpiry)}
-                    </p>
-                    {/* Passport expiry warning */}
-                    {a.passportExpiry && getDaysUntil(a.passportExpiry) !== null && getDaysUntil(a.passportExpiry)! <= 90 && (
-                      <p className="text-xs text-orange-600 mt-0.5">
-                        ⚠ パスポート期限: {formatDate(a.passportExpiry)}
-                      </p>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* ── 在留期限アラート（申請人個別に非表示設定可） ── */}
+      <ExpiryAlertList items={expiryAlertItems} />
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
